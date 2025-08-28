@@ -1,4 +1,4 @@
-# Development dependencies for Pimeleon Build System
+# Development dependencies for Pi Router Build System
 
 # Testing
 pytest>=7.0.0

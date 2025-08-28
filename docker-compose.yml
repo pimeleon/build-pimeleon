@@ -1,119 +1,35 @@
----
-name: pimeleon-build
-
 services:
   builder:
     build:
-      context: .
-      dockerfile: ./shared/containers/builder/Dockerfile
-      target: base
-      args:
-        APT_PROXY: ${APT_PROXY:-}
-    container_name: pimeleon-builder
-    init: true
-    stop_signal: SIGTERM
-    stop_grace_period: 30s
+      context: ./containers/builder
+      dockerfile: Dockerfile
+    container_name: pi-router-builder
     volumes:
       - ./output:/output
       - ./cache:/cache
-      - ./shared/configs:/configs
-      # Monorepo structure - inner mount must precede parent to survive parent's :ro
-      - ../pi-router-apps:/workspace/pi-router-apps:ro
-      - .:/workspace:ro
-      - ./shared/scripts:/scripts:ro
-      - ./shared/ansible:/ansible:ro
-      # Docker volumes for caching
-      - apt-cache:/var/cache/apt
-      - pip-cache:/root/.cache/pip
-      - debootstrap-cache:/var/cache/debootstrap
-      # Device access
-      - /dev:/dev:rw
-      - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
+      - ./configs:/configs
+      - ./ansible:/ansible
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      # Directory configuration
-      - CACHE_DIR=/cache
+      - BUILD_CACHE_DIR=/cache
       - OUTPUT_DIR=/output
-      - CONFIG_DIR=/configs
-      - WORKSPACE_DIR=/workspace
-      - PIMELEON_APPS_LOCAL_PATH=${PIMELEON_APPS_LOCAL_PATH:-/workspace/pi-router-apps}
-      - ANSIBLE_DIR=/ansible
       - ANSIBLE_CONFIG=/ansible/ansible.cfg
       - DEBIAN_FRONTEND=noninteractive
-      # App selection (required for monorepo builds)
-      - TARGET_PLATFORM=${TARGET_PLATFORM:-rpi3-bookworm}
-      # Raspberry Pi configuration (can override app defaults)
-      - PIMELEON_RPI_MODEL=${PIMELEON_RPI_MODEL:-}
-      - RPI_ARCH=${RPI_ARCH:-}
-      - RASPBIAN_VERSION=${RASPBIAN_VERSION:-}
-      - RASPBIAN_MIRROR=${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/}
-      # Image configuration
-      - PIMELEON_IMAGE_SIZE=${PIMELEON_IMAGE_SIZE:-}
-      - IMAGE_COMPRESSION=${IMAGE_COMPRESSION:-xz}
-      - IMAGE_COMPRESSION_LEVEL=${IMAGE_COMPRESSION_LEVEL:-6}
-      # Build configuration
-      - BUILD_PARALLEL_JOBS=${BUILD_PARALLEL_JOBS:-4}
-      - PIMELEON_PROFILE=${PIMELEON_PROFILE:-development}
-      - PIMELEON_INITIAL_PASSWORD=${PIMELEON_INITIAL_PASSWORD:-netblox}
-      # APT cache proxy (set APT_PROXY=host:port to enable)
-      - APT_PROXY=${APT_PROXY:-}
-      # pi-router-apps package registry
-      - PIMELEON_APPS_PROJECT_ID=${PIMELEON_APPS_PROJECT_ID:-}
-      - PIMELEON_APPS_READ_TOKEN=${PIMELEON_APPS_READ_TOKEN:-}
-      # Network configuration - LAN
-      - LAN_NETWORK=${LAN_NETWORK:-192.168.43.0/24}
-      - LAN_GATEWAY=${LAN_GATEWAY:-192.168.43.1}
-      - LAN_DHCP_START=${LAN_DHCP_START:-192.168.43.100}
-      - LAN_DHCP_END=${LAN_DHCP_END:-192.168.43.254}
-      # Network configuration - WiFi AP
-      - WIFI_NETWORK=${WIFI_NETWORK:-192.168.42.0/24}
-      - WIFI_GATEWAY=${WIFI_GATEWAY:-192.168.42.1}
-      - WIFI_SSID=${WIFI_SSID:-pimeleon}
-      - WIFI_PASSPHRASE=${WIFI_PASSPHRASE:-changeme123!}
-      - WIFI_CHANNEL=${WIFI_CHANNEL:-6}
-      - WIFI_COUNTRY=${WIFI_COUNTRY:-US}
-      - WIFI_MODE=${WIFI_MODE:-g}
-      # Network configuration - Management
-      - MGMT_NETWORK=${MGMT_NETWORK:-172.16.0.0/24}
-      - MGMT_GATEWAY=${MGMT_GATEWAY:-172.16.0.1}
-      # Service ports
-      - SSH_PORT=${SSH_PORT:-22}
-      - DNSCRYPT_PORT=${DNSCRYPT_PORT:-5054}
-      - PIHOLE_PORT=${PIHOLE_PORT:-5553}
-      - PRIVOXY_PORT=${PRIVOXY_PORT:-8118}
-      - SQUID_PORT=${SQUID_PORT:-3128}
-      - TOR_SOCKS_PORT=${TOR_SOCKS_PORT:-9050}
-      # System configuration
-      - PIMELEON_HOSTNAME=${PIMELEON_HOSTNAME:-pimeleon}
-      - PIMELEON_TIMEZONE=${PIMELEON_TIMEZONE:-UTC}
-      - PIMELEON_LOCALE=${PIMELEON_LOCALE:-en_US.UTF-8}
-      # WiFi AP name (for hostapd)
-      - PIMELEON_AP_NAME=${PIMELEON_AP_NAME:-Pimeleon}
-      # Pimeleon Web UI source
-      - PIMELEON_UI_REPO=${PIMELEON_UI_REPO:-https://gitlab.pirouter.dev/pimeleon/pirouter-ui.git}
-      - PIMELEON_UI_BRANCH=${PIMELEON_UI_BRANCH:-}
-      - PIMELEON_UI_BUILD_TOKEN=${PIMELEON_UI_BUILD_TOKEN:-}
-    privileged: true
     cap_add:
       - SYS_ADMIN
       - MKNOD
     devices:
       - /dev/loop-control:/dev/loop-control
+    security_opt:
+      - apparmor:unconfined
     networks:
       - build-network
-    deploy:
-      resources:
-        limits:
-          cpus: '6'
-          memory: 32G
 
   tester:
     build:
-      context: ./shared/containers/tester
+      context: ./containers/tester
       dockerfile: Dockerfile
-      args:
-        APT_PROXY: ${APT_PROXY:-}
-    container_name: pimeleon-tester
+    container_name: pi-router-tester
     privileged: true
     volumes:
       - ./output:/images:ro
@@ -125,15 +41,12 @@ services:
       - LIBVIRT_DEFAULT_URI=qemu:///system
       - TEST_IMAGE_DIR=/images
       - TEST_RESULTS_DIR=/tests/results
-      - TARGET_PLATFORM=${TARGET_PLATFORM:-rpi3-bookworm}
-      - TEST_TIMEOUT=${TEST_TIMEOUT:-3600}
-      - TEST_CLIENT_COUNT=${TEST_CLIENT_COUNT:-5}
-      - TEST_STRESS_CLIENTS=${TEST_STRESS_CLIENTS:-50}
-      - TEST_BANDWIDTH_LIMIT=${TEST_BANDWIDTH_LIMIT:-100M}
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN
       - SYS_NICE
+      - SYS_PTRACE
+      - SYS_MODULE
     devices:
       - /dev/kvm:/dev/kvm
       - /dev/net/tun:/dev/net/tun
@@ -148,23 +61,17 @@ services:
   # Development environment with all tools
   dev:
     build:
-      context: .
-      dockerfile: ./shared/containers/builder/Dockerfile
+      context: ./containers/builder
+      dockerfile: Dockerfile
       target: development
-      args:
-        APT_PROXY: ${APT_PROXY:-}
-    container_name: pimeleon-dev
+    container_name: pi-router-dev
     volumes:
       - .:/workspace
       - ./output:/output
       - ./cache:/cache
-      - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
     environment:
       - BUILD_CACHE_DIR=/cache
       - OUTPUT_DIR=/output
-      - WORKSPACE_DIR=/workspace
-      - TARGET_PLATFORM=${TARGET_PLATFORM:-rpi3-bookworm}
     working_dir: /workspace
     command: /bin/bash
     stdin_open: true
@@ -183,7 +90,7 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: ${TEST_WAN_SUBNET:-10.0.1.0/24}
+        - subnet: 10.0.1.0/24
           gateway: 10.0.1.1
     driver_opts:
       com.docker.network.bridge.name: br-wan
@@ -210,10 +117,4 @@ volumes:
   libvirt-images:
     driver: local
   libvirt-run:
-    driver: local
-  apt-cache:
-    driver: local
-  pip-cache:
-    driver: local
-  debootstrap-cache:
     driver: local

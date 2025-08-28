@@ -1,0 +1,72 @@
+---
+# Base setup playbook for Pi Router
+- name: Pi Router Base Setup
+  hosts: pi_router
+  become: yes
+  
+  tasks:
+    - name: Set system hostname
+      hostname:
+        name: pi-router
+    
+    - name: Update hostname in /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.1\.1'
+        line: '127.0.1.1 pi-router'
+    
+    - name: Configure timezone
+      timezone:
+        name: UTC
+    
+    - name: Enable essential services
+      systemd:
+        name: "{{ item }}"
+        enabled: yes
+        state: started
+      loop:
+        - ssh
+        - systemd-networkd
+        - systemd-resolved
+      ignore_errors: yes
+    
+    - name: Configure sysctl for routing
+      sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        sysctl_set: yes
+        state: present
+        reload: yes
+      loop:
+        - { name: 'net.ipv4.ip_forward', value: '1' }
+        - { name: 'net.ipv6.conf.all.forwarding', value: '1' }
+        - { name: 'net.ipv4.conf.all.send_redirects', value: '0' }
+        - { name: 'net.ipv4.conf.all.accept_redirects', value: '0' }
+        - { name: 'net.ipv4.conf.all.accept_source_route', value: '0' }
+        - { name: 'net.ipv4.tcp_syncookies', value: '1' }
+        - { name: 'net.ipv4.icmp_echo_ignore_broadcasts', value: '1' }
+    
+    - name: Create necessary directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /etc/pi-router
+        - /var/log/pi-router
+        - /var/lib/pi-router
+    
+    - name: Install base packages
+      apt:
+        name:
+          - vim-tiny
+          - htop
+          - iotop
+          - tcpdump
+          - mtr-tiny
+          - dnsutils
+          - iputils-ping
+          - traceroute
+        state: present
+        update_cache: yes
+      when: ansible_connection != "chroot"

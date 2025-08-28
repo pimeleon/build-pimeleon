@@ -2,15 +2,13 @@
 extends: default
 
 rules:
-  line-length: disable
+  line-length:
+    max: 120
+    level: warning
   truthy:
     allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
   comments:
-    min-spaces-from-content: 1
-  comments-indentation: false
-  octal-values:
-    forbid-implicit-octal: true
-    forbid-explicit-octal: true
+    min-spaces-from-content: 2
   braces:
     max-spaces-inside: 1
   brackets:
@@ -25,4 +23,3 @@ ignore: |
   node_modules/
   cache/
   output/
-  shared/ansible/playbooks/files/

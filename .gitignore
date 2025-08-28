@@ -47,9 +47,6 @@ test-results/
 coverage/
 .coverage
 htmlcov/
-tests/results/
-tests/__pycache__/
-tests/.pytest_cache/
 
 # Security
 *.key
@@ -59,8 +56,6 @@ tests/.pytest_cache/
 secrets/
 .env
 .env.*
-!.env.example
-!.env.defaults
 
 # VM images and states
 *.qcow2.backup
@@ -72,22 +67,3 @@ libvirt/images/
 # Package manager
 node_modules/
 vendor/
-
-# Downloaded external sources (fetched during build)
-shared/ansible/playbooks/files/
-
-# Pimeleon build system
-benchmarks/*
-output/*
-
-# MkDocs build output
-site/
-.venv/
-
-# MkDocs - exclude non-English lunr search language files
-site/assets/javascripts/lunr/min/lunr.*.min.js
-!site/assets/javascripts/lunr/min/lunr.stemmer.support.min.js
-# Git backup files
-.git.backup*.tar.gz
-*.bak.*
-.mypy_cache/
