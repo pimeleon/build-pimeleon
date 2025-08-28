@@ -1,0 +1,69 @@
+# Build outputs
+output/*.img
+output/*.img.xz
+output/*.qcow2
+output/*.iso
+
+# Cache directories
+cache/
+.cache/
+*.cache
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Log files
+*.log
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+.venv
+
+# Ansible
+*.retry
+ansible/*.retry
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Docker volumes
+.docker/
+
+# Test artifacts
+test-results/
+coverage/
+.coverage
+htmlcov/
+
+# Security
+*.key
+*.pem
+*.crt
+*.p12
+secrets/
+.env
+.env.*
+
+# VM images and states
+*.qcow2.backup
+*.vmdk
+*.vdi
+*.raw
+libvirt/images/
+
+# Package manager
+node_modules/
+vendor/

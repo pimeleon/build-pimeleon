@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  dev:
+    build:
+      context: ../containers/builder
+      dockerfile: Dockerfile
+      target: development
+    container_name: pimeleon-devcontainer
+    volumes:
+      - ..:/workspace:cached
+      - ~/.ssh:/home/builder/.ssh:ro
+      - ~/.gitconfig:/home/builder/.gitconfig:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - BUILD_CACHE_DIR=/workspace/cache
+      - OUTPUT_DIR=/workspace/output
+      - ANSIBLE_CONFIG=/workspace/ansible/ansible.cfg
+    working_dir: /workspace
+    command: sleep infinity
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+    devices:
+      - /dev/loop-control:/dev/loop-control
+    security_opt:
+      - apparmor:unconfined
+    networks:
+      - devcontainer-network
+
+networks:
+  devcontainer-network:
+    driver: bridge

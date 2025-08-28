@@ -1,0 +1,137 @@
+---
+# Security hardening playbook for Pi Router
+- name: Pi Router Security Hardening
+  hosts: pimeleon
+  become: yes
+  
+  tasks:
+    - name: Configure SSH security
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+      loop:
+        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+        - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+        - { regexp: '^#?PermitEmptyPasswords', line: 'PermitEmptyPasswords no' }
+        - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
+        - { regexp: '^#?ClientAliveInterval', line: 'ClientAliveInterval 300' }
+        - { regexp: '^#?ClientAliveCountMax', line: 'ClientAliveCountMax 2' }
+        - { regexp: '^#?Protocol', line: 'Protocol 2' }
+      notify: restart ssh
+    
+    - name: Configure fail2ban
+      copy:
+        dest: /etc/fail2ban/jail.local
+        content: |
+          [DEFAULT]
+          bantime = 3600
+          findtime = 600
+          maxretry = 3
+          
+          [sshd]
+          enabled = true
+          port = ssh
+          filter = sshd
+          logpath = /var/log/auth.log
+          maxretry = 3
+          
+          [nftables-common]
+          enabled = true
+          port = all
+          protocol = all
+          filter = nftables-common
+          logpath = /var/log/syslog
+          maxretry = 5
+    
+    - name: Install security packages
+      apt:
+        name:
+          - fail2ban
+          - rkhunter
+          - aide
+          - auditd
+          - unattended-upgrades
+        state: present
+      when: ansible_connection != "chroot"
+    
+    - name: Configure automatic security updates
+      copy:
+        dest: /etc/apt/apt.conf.d/50unattended-upgrades
+        content: |
+          Unattended-Upgrade::Allowed-Origins {
+              "${distro_id}:${distro_codename}-security";
+          };
+          Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+          Unattended-Upgrade::MinimalSteps "true";
+          Unattended-Upgrade::Remove-Unused-Dependencies "true";
+          Unattended-Upgrade::Automatic-Reboot "false";
+    
+    - name: Set secure file permissions
+      file:
+        path: "{{ item.path }}"
+        mode: "{{ item.mode }}"
+        owner: root
+        group: root
+      loop:
+        - { path: '/etc/passwd', mode: '0644' }
+        - { path: '/etc/shadow', mode: '0640' }
+        - { path: '/etc/group', mode: '0644' }
+        - { path: '/etc/gshadow', mode: '0640' }
+        - { path: '/etc/ssh/sshd_config', mode: '0600' }
+    
+    - name: Disable unnecessary services
+      systemd:
+        name: "{{ item }}"
+        enabled: no
+        state: stopped
+      loop:
+        - bluetooth
+        - avahi-daemon
+      ignore_errors: yes
+    
+    - name: Configure audit rules
+      copy:
+        dest: /etc/audit/rules.d/pimeleon.rules
+        content: |
+          # Monitor authentication
+          -w /var/log/auth.log -p wa -k authentication
+          -w /etc/passwd -p wa -k passwd_changes
+          -w /etc/shadow -p wa -k shadow_changes
+          
+          # Monitor network configuration
+          -w /etc/network/ -p wa -k network_config
+          -w /etc/nftables.conf -p wa -k firewall_config
+          
+          # Monitor system calls
+          -a always,exit -F arch=b32 -S execve -k exec
+          -a always,exit -F arch=b32 -S socket -S bind -S connect -k network
+    
+    - name: Create security report script
+      copy:
+        dest: /usr/local/bin/security-check.sh
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          echo "Pi Router Security Check - $(date)"
+          echo "================================"
+          echo
+          echo "Failed login attempts:"
+          grep "Failed password" /var/log/auth.log | tail -10
+          echo
+          echo "Active connections:"
+          ss -tunap | grep ESTABLISHED
+          echo
+          echo "Firewall statistics:"
+          nft list ruleset | grep -E "counter|drop"
+          echo
+          echo "System updates:"
+          apt list --upgradable 2>/dev/null | grep -v "Listing"
+    
+  handlers:
+    - name: restart ssh
+      systemd:
+        name: ssh
+        state: restarted

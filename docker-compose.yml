@@ -1,0 +1,120 @@
+services:
+  builder:
+    build:
+      context: ./containers/builder
+      dockerfile: Dockerfile
+    container_name: pimeleon-builder
+    volumes:
+      - ./output:/output
+      - ./cache:/cache
+      - ./configs:/configs
+      - ./ansible:/ansible
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - BUILD_CACHE_DIR=/cache
+      - OUTPUT_DIR=/output
+      - ANSIBLE_CONFIG=/ansible/ansible.cfg
+      - DEBIAN_FRONTEND=noninteractive
+    cap_add:
+      - SYS_ADMIN
+      - MKNOD
+    devices:
+      - /dev/loop-control:/dev/loop-control
+    security_opt:
+      - apparmor:unconfined
+    networks:
+      - build-network
+
+  tester:
+    build:
+      context: ./containers/tester
+      dockerfile: Dockerfile
+    container_name: pimeleon-tester
+    privileged: true
+    volumes:
+      - ./output:/images:ro
+      - ./tests:/tests
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      - libvirt-images:/var/lib/libvirt/images
+      - libvirt-run:/var/run/libvirt
+    environment:
+      - LIBVIRT_DEFAULT_URI=qemu:///system
+      - TEST_IMAGE_DIR=/images
+      - TEST_RESULTS_DIR=/tests/results
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_NICE
+      - SYS_PTRACE
+      - SYS_MODULE
+    devices:
+      - /dev/kvm:/dev/kvm
+      - /dev/net/tun:/dev/net/tun
+    networks:
+      - test-network
+      - wan-network
+      - lan-network
+      - mgmt-network
+    depends_on:
+      - builder
+
+  # Development environment with all tools
+  dev:
+    build:
+      context: ./containers/builder
+      dockerfile: Dockerfile
+      target: development
+    container_name: pimeleon-dev
+    volumes:
+      - .:/workspace
+      - ./output:/output
+      - ./cache:/cache
+    environment:
+      - BUILD_CACHE_DIR=/cache
+      - OUTPUT_DIR=/output
+    working_dir: /workspace
+    command: /bin/bash
+    stdin_open: true
+    tty: true
+    networks:
+      - build-network
+
+networks:
+  build-network:
+    driver: bridge
+
+  test-network:
+    driver: bridge
+
+  wan-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.1.0/24
+          gateway: 10.0.1.1
+    driver_opts:
+      com.docker.network.bridge.name: br-wan
+
+  lan-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.100.0/24
+    driver_opts:
+      com.docker.network.bridge.name: br-lan
+    internal: true
+
+  mgmt-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.0.0/24
+          gateway: 172.16.0.1
+    driver_opts:
+      com.docker.network.bridge.name: br-mgmt
+
+volumes:
+  libvirt-images:
+    driver: local
+  libvirt-run:
+    driver: local

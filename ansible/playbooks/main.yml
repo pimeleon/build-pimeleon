@@ -1,0 +1,27 @@
+---
+# Main playbook for Pi Router configuration
+- name: Pi Router Complete Setup
+  hosts: pimeleon
+  
+  pre_tasks:
+    - name: Display build information
+      debug:
+        msg: "Building Pi Router image for {{ ansible_hostname }}"
+  
+  tasks:
+    - name: Run base setup
+      include_tasks: base-setup.yml
+      tags: [base]
+    
+    - name: Run network setup
+      include_tasks: network-setup.yml
+      tags: [network]
+    
+    - name: Run security hardening
+      include_tasks: security-hardening.yml
+      tags: [security]
+  
+  post_tasks:
+    - name: Display completion message
+      debug:
+        msg: "Pi Router configuration completed successfully!"
