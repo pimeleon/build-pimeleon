@@ -3,25 +3,34 @@ services:
     build:
       context: ./containers/builder
       dockerfile: Dockerfile
+      cache_from:
+        - pi-router-builder:latest
+      target: base
     container_name: pi-router-builder
     volumes:
       - ./output:/output
       - ./cache:/cache
       - ./configs:/configs
       - ./ansible:/ansible
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - apt-cache:/var/cache/apt
+      - pip-cache:/root/.cache/pip
+      - debootstrap-cache:/var/cache/debootstrap
+      - /dev:/dev:rw
     environment:
-      - BUILD_CACHE_DIR=/cache
+      - CACHE_DIR=/cache
       - OUTPUT_DIR=/output
       - ANSIBLE_CONFIG=/ansible/ansible.cfg
       - DEBIAN_FRONTEND=noninteractive
+      - RPI_MODEL=${RPI_MODEL:-3B+}
+      - IMAGE_SIZE=${IMAGE_SIZE:-4G}
+      - RASPBIAN_VERSION=${RASPBIAN_VERSION:-buster}
+      - RASPBIAN_MIRROR=${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.org/raspbian/}
+    privileged: true
     cap_add:
       - SYS_ADMIN
       - MKNOD
     devices:
       - /dev/loop-control:/dev/loop-control
-    security_opt:
-      - apparmor:unconfined
     networks:
       - build-network
 
@@ -45,8 +54,6 @@ services:
       - NET_ADMIN
       - SYS_ADMIN
       - SYS_NICE
-      - SYS_PTRACE
-      - SYS_MODULE
     devices:
       - /dev/kvm:/dev/kvm
       - /dev/net/tun:/dev/net/tun
@@ -117,4 +124,10 @@ volumes:
   libvirt-images:
     driver: local
   libvirt-run:
+    driver: local
+  apt-cache:
+    driver: local
+  pip-cache:
+    driver: local
+  debootstrap-cache:
     driver: local

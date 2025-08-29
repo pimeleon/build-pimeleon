@@ -22,7 +22,7 @@ setup_chroot "${MOUNT_POINT}"
 log_info "Updating package lists"
 chroot_run "${MOUNT_POINT}" apt-get update
 
-# Install essential packages
+# Install essential packages only
 log_info "Installing essential packages"
 chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     systemd \
@@ -34,48 +34,20 @@ chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     wget \
     curl \
     ca-certificates \
-    gnupg \
-    lsb-release \
     net-tools \
     iproute2 \
     iptables \
-    ipset \
+    wireless-tools \
+    firmware-brcm80211 \
+    rsyslog
+
+# Install basic networking tools
+log_info "Installing basic networking tools"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
+    bridge-utils \
     dnsmasq \
     hostapd \
-    bridge-utils \
-    vlan \
-    wireless-tools \
-    wpasupplicant \
-    rfkill \
-    crda \
-    firmware-brcm80211 \
-    raspberrypi-net-mods
-
-# Install routing and firewall packages
-log_info "Installing routing packages"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
-    nftables \
-    conntrack \
-    conntrackd \
-    keepalived \
-    bird2 \
-    frr \
-    strongswan \
-    openvpn \
-    wireguard-tools
-
-# Install monitoring and management tools
-log_info "Installing monitoring tools"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
-    htop \
-    iotop \
-    nethogs \
-    vnstat \
-    fail2ban \
-    rsyslog \
-    logrotate \
-    monit \
-    prometheus-node-exporter
+    wpasupplicant
 
 # Configure system
 log_info "Configuring system"
@@ -117,16 +89,22 @@ echo "AllowUsers pi" >> "${MOUNT_POINT}/etc/ssh/sshd_config"
 # Create pi user
 log_info "Creating pi user"
 chroot_run "${MOUNT_POINT}" useradd -m -s /bin/bash -G sudo,adm,dialout,cdrom,audio,video,plugdev,games,users,input,netdev,gpio,i2c,spi pi
-echo "pi:raspberry" | chroot_run "${MOUNT_POINT}" chpasswd
-echo "pi ALL=(ALL) NOPASSWD: ALL" > "${MOUNT_POINT}/etc/sudoers.d/010_pi-nopasswd"
+# Generate a random password and save it
+TEMP_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+echo "pi:${TEMP_PASSWORD}" | chroot_run "${MOUNT_POINT}" chpasswd
+echo "${TEMP_PASSWORD}" > "${OUTPUT_DIR}/pi-initial-password.txt"
+chmod 600 "${OUTPUT_DIR}/pi-initial-password.txt"
+log_warn "Initial password saved to: ${OUTPUT_DIR}/pi-initial-password.txt"
 
-# Configure services
+# Create restricted sudo access for pi user
+cat > "${MOUNT_POINT}/etc/sudoers.d/010_pi-restricted" << EOF
+pi ALL=(ALL) PASSWD: /sbin/reboot, /sbin/poweroff, /usr/bin/systemctl
+EOF
+
+# Configure basic services
 log_info "Configuring services"
 chroot_run "${MOUNT_POINT}" systemctl enable ssh
-chroot_run "${MOUNT_POINT}" systemctl enable systemd-networkd
-chroot_run "${MOUNT_POINT}" systemctl enable systemd-resolved
-chroot_run "${MOUNT_POINT}" systemctl enable nftables
-chroot_run "${MOUNT_POINT}" systemctl enable fail2ban
+chroot_run "${MOUNT_POINT}" systemctl enable rsyslog
 
 # Apply Ansible playbooks if available
 if [[ -d "${ANSIBLE_DIR}/playbooks" ]] && [[ -n "$(ls -A ${ANSIBLE_DIR}/playbooks/*.yml 2>/dev/null)" ]]; then

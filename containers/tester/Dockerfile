@@ -4,8 +4,12 @@ FROM ubuntu:22.04
 # Prevent interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install base dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install base dependencies and testing tools with cache mount
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean && \
+    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache && \
+    apt-get update && apt-get install -y --no-install-recommends \
     qemu-system-arm \
     qemu-utils \
     qemu-efi-aarch64 \
@@ -30,10 +34,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sshpass \
     expect \
     jq \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install testing tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
     iperf3 \
     nmap \
     hping3 \
@@ -42,11 +42,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     stress-ng \
     apache2-utils \
     siege \
-    nikto \
-    && rm -rf /var/lib/apt/lists/*
+    nikto
 
-# Install Python testing packages
-RUN pip3 install \
+# Install Python testing packages with cache mount
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install \
     pytest \
     pytest-timeout \
     pytest-xdist \
