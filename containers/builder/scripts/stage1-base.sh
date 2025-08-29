@@ -89,7 +89,9 @@ else
     log_info "Relying on host system ARM binary format registration"
     
     # Bootstrap base system without Pi-specific packages first
+    # Exclude DHCP packages since systemd handles networking
     sudo debootstrap --foreign --arch=armhf \
+        --exclude=isc-dhcp-common,isc-dhcp-client \
         ${KEYRING_OPT} \
         "${RASPBIAN_VERSION}" "${MOUNT_POINT}" "${RASPBIAN_MIRROR}"
     
@@ -98,6 +100,12 @@ else
     
     # Second stage debootstrap
     chroot_run "${MOUNT_POINT}" /debootstrap/debootstrap --second-stage
+    
+    # Configure apt sources with all required components
+    sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
+deb ${RASPBIAN_MIRROR} ${RASPBIAN_VERSION} main contrib non-free rpi
+deb-src ${RASPBIAN_MIRROR} ${RASPBIAN_VERSION} main contrib non-free rpi
+EOF
     
     # Cache the base system
     log_info "Caching base system for future builds"
@@ -110,7 +118,7 @@ fi
 
 # Configure boot
 log_info "Configuring boot"
-cat > "${MOUNT_POINT}/boot/config.txt" <<EOF
+sudo tee "${MOUNT_POINT}/boot/config.txt" > /dev/null <<EOF
 # Pi Router Boot Configuration
 enable_uart=1
 dtparam=spi=on
@@ -127,17 +135,17 @@ over_voltage=2
 EOF
 
 # Configure cmdline
-echo "console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet" > "${MOUNT_POINT}/boot/cmdline.txt"
+echo "console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet" | sudo tee "${MOUNT_POINT}/boot/cmdline.txt" > /dev/null
 
 # Basic fstab
-cat > "${MOUNT_POINT}/etc/fstab" <<EOF
+sudo tee "${MOUNT_POINT}/etc/fstab" > /dev/null <<EOF
 proc            /proc           proc    defaults          0       0
 /dev/mmcblk0p1  /boot           vfat    defaults          0       2
 /dev/mmcblk0p2  /               ext4    defaults,noatime  0       1
 EOF
 
 # Set hostname
-echo "pi-router" > "${MOUNT_POINT}/etc/hostname"
+echo "pi-router" | sudo tee "${MOUNT_POINT}/etc/hostname" > /dev/null
 
 # Unmount
 sudo umount "${MOUNT_POINT}/boot"

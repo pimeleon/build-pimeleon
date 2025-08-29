@@ -53,7 +53,9 @@ chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
 log_info "Configuring system"
 
 # Enable IP forwarding
-cat > "${MOUNT_POINT}/etc/sysctl.d/30-ip-forward.conf" <<EOF
+sudo mkdir -p "${MOUNT_POINT}/etc/sysctl.d"
+sudo chmod 777 "${MOUNT_POINT}/etc/sysctl.d"
+cat > /tmp/sysctl-config <<EOF
 net.ipv4.ip_forward=1
 net.ipv6.conf.all.forwarding=1
 net.ipv4.conf.all.send_redirects=0
@@ -63,9 +65,11 @@ net.ipv4.conf.all.log_martians=1
 net.ipv4.tcp_syncookies=1
 net.ipv4.icmp_echo_ignore_broadcasts=1
 EOF
+sudo cp /tmp/sysctl-config "${MOUNT_POINT}/etc/sysctl.d/30-ip-forward.conf"
+sudo chmod 777 "${MOUNT_POINT}/etc/sysctl.d/30-ip-forward.conf"
 
 # Configure network interfaces
-cat > "${MOUNT_POINT}/etc/network/interfaces" <<EOF
+cat > /tmp/network-interfaces <<EOF
 # Loopback
 auto lo
 iface lo inet loopback
@@ -80,11 +84,13 @@ iface eth0:1 inet static
     address 172.16.0.1
     netmask 255.255.255.0
 EOF
+sudo cp /tmp/network-interfaces "${MOUNT_POINT}/etc/network/interfaces"
+sudo chmod 777 "${MOUNT_POINT}/etc/network/interfaces"
 
 # Configure SSH
-sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' "${MOUNT_POINT}/etc/ssh/sshd_config"
-sed -i 's/#PasswordAuthentication.*/PasswordAuthentication no/' "${MOUNT_POINT}/etc/ssh/sshd_config"
-echo "AllowUsers pi" >> "${MOUNT_POINT}/etc/ssh/sshd_config"
+sudo sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' "${MOUNT_POINT}/etc/ssh/sshd_config"
+sudo sed -i 's/#PasswordAuthentication.*/PasswordAuthentication no/' "${MOUNT_POINT}/etc/ssh/sshd_config"
+echo "AllowUsers pi" | sudo tee -a "${MOUNT_POINT}/etc/ssh/sshd_config" > /dev/null
 
 # Create pi user
 log_info "Creating pi user"
@@ -92,14 +98,18 @@ chroot_run "${MOUNT_POINT}" useradd -m -s /bin/bash -G sudo,adm,dialout,cdrom,au
 # Generate a random password and save it
 TEMP_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
 echo "pi:${TEMP_PASSWORD}" | chroot_run "${MOUNT_POINT}" chpasswd
-echo "${TEMP_PASSWORD}" > "${OUTPUT_DIR}/pi-initial-password.txt"
-chmod 600 "${OUTPUT_DIR}/pi-initial-password.txt"
+echo "${TEMP_PASSWORD}" | sudo tee "${OUTPUT_DIR}/pi-initial-password.txt" > /dev/null
+sudo chmod 600 "${OUTPUT_DIR}/pi-initial-password.txt"
 log_warn "Initial password saved to: ${OUTPUT_DIR}/pi-initial-password.txt"
 
 # Create restricted sudo access for pi user
-cat > "${MOUNT_POINT}/etc/sudoers.d/010_pi-restricted" << EOF
+sudo mkdir -p "${MOUNT_POINT}/etc/sudoers.d"
+sudo chmod 777 "${MOUNT_POINT}/etc/sudoers.d"
+cat > /tmp/sudoers-pi << EOF
 pi ALL=(ALL) PASSWD: /sbin/reboot, /sbin/poweroff, /usr/bin/systemctl
 EOF
+sudo cp /tmp/sudoers-pi "${MOUNT_POINT}/etc/sudoers.d/010_pi-restricted"
+sudo chmod 777 "${MOUNT_POINT}/etc/sudoers.d/010_pi-restricted"
 
 # Configure basic services
 log_info "Configuring services"
