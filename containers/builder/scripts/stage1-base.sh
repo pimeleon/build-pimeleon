@@ -88,9 +88,16 @@ else
     # Host should have: sudo apt install binfmt-support qemu-user-static
     log_info "Relying on host system ARM binary format registration"
     
+    # Configure proxy environment for debootstrap if available
+    DEBOOTSTRAP_ENV=""
+    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+        log_info "Configuring APT proxy for debootstrap: ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+        DEBOOTSTRAP_ENV="http_proxy=http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142} HTTP_PROXY=http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+    fi
+    
     # Bootstrap base system without Pi-specific packages first
     # Exclude DHCP packages since systemd handles networking
-    sudo debootstrap --foreign --arch=armhf \
+    sudo env ${DEBOOTSTRAP_ENV} debootstrap --foreign --arch=armhf \
         --exclude=isc-dhcp-common,isc-dhcp-client \
         ${KEYRING_OPT} \
         "${RASPBIAN_VERSION}" "${MOUNT_POINT}" "${RASPBIAN_MIRROR}"
@@ -98,8 +105,23 @@ else
     # Setup chroot for second stage
     setup_chroot "${MOUNT_POINT}"
     
+    # Configure proxy for second stage debootstrap if available
+    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+        sudo mkdir -p "${MOUNT_POINT}/etc/apt/apt.conf.d"
+        sudo tee "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy-temp" > /dev/null <<EOF
+# Temporary APT proxy for debootstrap second stage
+Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
+Acquire::https::Proxy "DIRECT";
+EOF
+    fi
+    
     # Second stage debootstrap
     chroot_run "${MOUNT_POINT}" /debootstrap/debootstrap --second-stage
+    
+    # Remove temporary proxy config
+    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+        sudo rm -f "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy-temp"
+    fi
     
     # Configure apt sources with all required components
     sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
@@ -127,9 +149,9 @@ EOF
     cleanup_chroot "${MOUNT_POINT}"
 fi
 
-# Configure boot
-log_info "Configuring boot"
-sudo tee "${MOUNT_POINT}/boot/config.txt" > /dev/null <<EOF
+# Configure basic boot files (firmware will be installed in stage2)
+log_info "Configuring basic boot files"
+sudo tee "${BOOT_MOUNT}/config.txt" > /dev/null <<EOF
 # Pi Router Boot Configuration
 enable_uart=1
 dtparam=spi=on
@@ -146,7 +168,7 @@ over_voltage=2
 EOF
 
 # Configure cmdline
-echo "console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet" | sudo tee "${MOUNT_POINT}/boot/cmdline.txt" > /dev/null
+echo "console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet" | sudo tee "${BOOT_MOUNT}/cmdline.txt" > /dev/null
 
 # Basic fstab
 sudo tee "${MOUNT_POINT}/etc/fstab" > /dev/null <<EOF
