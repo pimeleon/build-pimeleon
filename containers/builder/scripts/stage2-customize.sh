@@ -9,11 +9,16 @@ source /scripts/common.sh
 WORK_DIR=$1
 IMAGE_PATH=$2
 MOUNT_POINT="${WORK_DIR}/mount"
+BOOT_MOUNT="${WORK_DIR}/boot"
 
 log_info "Starting system customization"
 
 # Mount image
 LOOP_DEVICE=$(mount_image "${IMAGE_PATH}" "${MOUNT_POINT}")
+
+# Mount boot partition separately for firmware copying
+sudo mkdir -p "${BOOT_MOUNT}"
+sudo mount "${LOOP_DEVICE}p1" "${BOOT_MOUNT}"
 
 # Setup chroot
 setup_chroot "${MOUNT_POINT}"
@@ -40,6 +45,27 @@ chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     wireless-tools \
     firmware-brcm80211 \
     rsyslog
+
+# Install Pi-specific packages (kernel, bootloader, firmware)
+log_info "Installing Raspberry Pi kernel and firmware"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
+    raspberrypi-kernel \
+    libraspberrypi-bin
+
+# Copy Pi boot firmware to boot partition
+log_info "Copying Pi boot firmware to boot partition"
+if [[ -d "${MOUNT_POINT}/boot" ]]; then
+    # Pi boot files are installed to /boot by raspberrypi-kernel package
+    # Copy essential boot files to FAT32 boot partition
+    sudo cp "${MOUNT_POINT}/boot/bootcode.bin" "${BOOT_MOUNT}/" || log_warn "bootcode.bin not found"
+    sudo cp "${MOUNT_POINT}/boot/start*.elf" "${BOOT_MOUNT}/" || log_warn "start.elf files not found"  
+    sudo cp "${MOUNT_POINT}/boot/fixup*.dat" "${BOOT_MOUNT}/" || log_warn "fixup.dat files not found"
+    sudo cp "${MOUNT_POINT}/boot/kernel*.img" "${BOOT_MOUNT}/" || log_warn "kernel images not found"
+    sudo cp "${MOUNT_POINT}/boot/bcm2710-rpi-3-b-plus.dtb" "${BOOT_MOUNT}/" || log_warn "Pi 3B+ device tree not found"
+    sudo cp -r "${MOUNT_POINT}/boot/overlays" "${BOOT_MOUNT}/" 2>/dev/null || log_warn "Boot overlays not found"
+else
+    log_warn "Pi firmware not found in expected location"
+fi
 
 # Install basic networking tools
 log_info "Installing basic networking tools"
@@ -176,6 +202,10 @@ fi
 
 # Cleanup chroot
 cleanup_chroot "${MOUNT_POINT}"
+
+# Unmount boot partition
+sudo umount "${BOOT_MOUNT}" || log_warn "Failed to unmount boot partition"
+sudo rmdir "${BOOT_MOUNT}" || log_warn "Failed to remove boot mount directory"
 
 # Unmount image
 unmount_image "${MOUNT_POINT}" "${LOOP_DEVICE}"

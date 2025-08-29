@@ -206,7 +206,8 @@ cache_get() {
     
     if cache_exists "$cache_key"; then
         log_info "Using cached file: $cache_key"
-        cp "$cache_path" "$destination"
+        sudo cp "$cache_path" "$destination"
+        sudo chown builder:builder "$destination"
         return 0
     else
         return 1
@@ -219,6 +220,7 @@ cache_put() {
     local cache_path=$(get_cache_path "$cache_key")
     
     log_info "Caching file: $cache_key"
-    mkdir -p "$(dirname $cache_path)"
-    cp "$source" "$cache_path"
+    sudo mkdir -p "$(dirname $cache_path)"
+    sudo cp "$source" "$cache_path"
+    sudo chown builder:builder "$cache_path"
 }

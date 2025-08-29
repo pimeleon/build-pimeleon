@@ -19,6 +19,10 @@ IMAGE_SIZE="${IMAGE_SIZE:-4G}"
 RASPBIAN_VERSION="${RASPBIAN_VERSION:-buster}"
 RASPBIAN_MIRROR="${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.org/raspbian/}"
 
+# Export APT cache configuration for all stages
+export APT_CACHE_SERVER="${APT_CACHE_SERVER:-}"
+export APT_CACHE_PORT="${APT_CACHE_PORT:-3142}"
+
 # Initialize logging
 exec > >(tee -a "${LOG_FILE}")
 exec 2>&1
