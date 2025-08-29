@@ -67,3 +67,5 @@ libvirt/images/
 # Package manager
 node_modules/
 vendor/
+
+*test*.*

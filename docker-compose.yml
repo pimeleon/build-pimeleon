@@ -3,8 +3,6 @@ services:
     build:
       context: ./containers/builder
       dockerfile: Dockerfile
-      cache_from:
-        - pimeleon-builder:latest
       target: base
       args:
         APT_CACHE_SERVER: ${APT_CACHE_SERVER:-truenas}
