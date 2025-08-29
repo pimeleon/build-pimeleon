@@ -171,6 +171,39 @@ df -h
 # In Docker Desktop: Settings > Resources > Memory > 8GB+
 ```
 
+### Display Issues
+
+**❓ Duplicate network creation messages during tester startup:**
+```
+[+] Creating 5/5uter-build_lan-network   Created
+✔ Network pi-router-build_wan-network   Created
+✔ Network pi-router-build_wan-network   Created  # <- Duplicate line
+```
+
+This is a **harmless Docker Compose display glitch** that occurs during parallel network creation. The networks are created correctly (verify with `docker network ls`). To suppress the confusing output:
+
+```bash
+# Use quiet progress mode
+docker compose --progress quiet run tester
+
+# Or disable parallel creation  
+docker compose --parallel 1 run tester
+```
+
+**❓ Authorization warnings in tester container:**
+```
+Authorization not available. Check if polkit service is running or see debug message for more information.
+error: failed to mark network default as autostarted
+```
+
+These are **expected and harmless warnings** in containerized libvirt environments. The libvirt operations still succeed despite the authorization messages. The warnings occur because:
+
+- Containers don't have full systemd/polkit integration
+- libvirt functionality works correctly regardless
+- Networks are created and started successfully
+
+You can safely ignore these messages or suppress them by using the updated entrypoint script.
+
 ## 🛠️ Development
 
 ### Adding Custom Configurations
