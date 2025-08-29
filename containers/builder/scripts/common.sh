@@ -180,7 +180,7 @@ generate_metadata() {
     },
     "build_info": {
         "rpi_model": "${RPI_MODEL:-3B+}",
-        "raspbian_version": "${RASPBIAN_VERSION:-bookworm}",
+        "raspbian_version": "${RASPBIAN_VERSION:-buster}",
         "builder_version": "1.0.0"
     }
 }

@@ -32,12 +32,14 @@ print_error() {
 # Check if we want to preserve caches
 PRESERVE_CACHE=true
 PRESERVE_VOLUMES=true
+CLEAN_OUTPUT=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --full)
             PRESERVE_CACHE=false
             PRESERVE_VOLUMES=false
+            CLEAN_OUTPUT=true
             shift
             ;;
         --no-cache)
@@ -48,15 +50,20 @@ while [[ $# -gt 0 ]]; do
             PRESERVE_VOLUMES=false
             shift
             ;;
+        --clean-output)
+            CLEAN_OUTPUT=true
+            shift
+            ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo "Options:"
-            echo "  --full        Full cleanup (removes everything including caches)"
-            echo "  --no-cache    Remove local cache directory but keep Docker volumes"
-            echo "  --no-volumes  Remove Docker volumes but keep local cache"
-            echo "  -h, --help    Show this help message"
+            echo "  --full           Full cleanup (removes everything including caches and old outputs)"
+            echo "  --no-cache       Remove local cache directory but keep Docker volumes"
+            echo "  --no-volumes     Remove Docker volumes but keep local cache"
+            echo "  --clean-output   Clean old image files and logs from output directory"
+            echo "  -h, --help       Show this help message"
             echo ""
-            echo "Default: Preserves successful base image caches and Docker volumes"
+            echo "Default: Preserves successful base image caches, Docker volumes, and output files"
             exit 0
             ;;
         *)
@@ -128,6 +135,56 @@ if [[ -n "$TEMP_CACHE_DIR" ]] && [[ "$PRESERVE_CACHE" == "true" ]]; then
     rm -rf "$TEMP_CACHE_DIR"
 fi
 
+# Handle output directory cleanup
+if [[ "$CLEAN_OUTPUT" == "true" ]] && [[ -d "./output" ]]; then
+    print_info "Cleaning output directory..."
+    
+    # Count files before cleanup
+    IMG_COUNT=$(find ./output -name "*.img" -type f | wc -l 2>/dev/null || echo "0")
+    LOG_COUNT=$(find ./output -name "build-*.log" -type f | wc -l 2>/dev/null || echo "0")
+    
+    if [[ $IMG_COUNT -gt 0 ]] || [[ $LOG_COUNT -gt 0 ]]; then
+        echo "Found $IMG_COUNT image files and $LOG_COUNT log files"
+        
+        # Keep only the most recent image and its log
+        LATEST_IMG=$(find ./output -name "*.img" -type f -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
+        if [[ -n "$LATEST_IMG" ]]; then
+            LATEST_BASENAME=$(basename "$LATEST_IMG" .img)
+            LATEST_LOG="./output/build-${LATEST_BASENAME#pimeleon-}.log"
+            
+            print_warning "Preserving latest image: $(basename "$LATEST_IMG")"
+            if [[ -f "$LATEST_LOG" ]]; then
+                print_warning "Preserving latest log: $(basename "$LATEST_LOG")"
+            fi
+            
+            # Remove old images (keep latest)
+            find ./output -name "*.img" -type f ! -path "$LATEST_IMG" -delete 2>/dev/null || true
+            
+            # Remove old logs (keep latest and password file)
+            find ./output -name "build-*.log" -type f ! -path "$LATEST_LOG" -delete 2>/dev/null || true
+        else
+            # No images found, remove all logs
+            find ./output -name "build-*.log" -type f -delete 2>/dev/null || true
+        fi
+        
+        # Count files after cleanup
+        REMAINING_IMG=$(find ./output -name "*.img" -type f | wc -l 2>/dev/null || echo "0")
+        REMAINING_LOG=$(find ./output -name "build-*.log" -type f | wc -l 2>/dev/null || echo "0")
+        
+        REMOVED_IMG=$((IMG_COUNT - REMAINING_IMG))
+        REMOVED_LOG=$((LOG_COUNT - REMAINING_LOG))
+        
+        print_success "Removed $REMOVED_IMG old images and $REMOVED_LOG old logs"
+        echo "Kept: $REMAINING_IMG image(s), $REMAINING_LOG log(s), and pi-initial-password.txt"
+    else
+        print_info "Output directory is already clean (no .img or .log files found)"
+    fi
+else
+    if [[ "$CLEAN_OUTPUT" == "false" ]]; then
+        print_info "Preserving all output files"
+    fi
+fi
+
 # Check space after cleanup
 print_info "Checking disk space after cleanup..."
 AFTER_SPACE=$(df -h / | tail -1 | awk '{print $4}')
@@ -149,6 +206,12 @@ if [[ "$PRESERVE_VOLUMES" == "true" ]]; then
     docker volume ls --filter name=pimeleon-build 2>/dev/null || echo "  (no volumes found)"
 else
     echo "❌ All Docker volumes removed"
+fi
+
+if [[ "$CLEAN_OUTPUT" == "false" ]]; then
+    echo "✅ Output directory preserved - all images and logs kept"
+else
+    echo "🧹 Output directory cleaned - kept latest image, log, and password file"
 fi
 
 echo ""
