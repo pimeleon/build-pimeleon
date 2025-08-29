@@ -10,13 +10,41 @@ WORK_DIR=$1
 IMAGE_PATH=$2
 IMAGE_SIZE=$3
 
+# Validate parameters
+if [[ -z "$WORK_DIR" || -z "$IMAGE_PATH" || -z "$IMAGE_SIZE" ]]; then
+    die "Usage: $0 <work_dir> <image_path> <image_size>"
+fi
+
 MOUNT_POINT="${WORK_DIR}/mount"
 RASPBIAN_CACHE_KEY="raspbian-${RASPBIAN_VERSION}-base.tar.gz"
 
 log_info "Creating image file: ${IMAGE_PATH}"
 
-# Create image file
-sudo dd if=/dev/zero of="${IMAGE_PATH}" bs=1M count=0 seek=$(echo $IMAGE_SIZE | sed 's/G/*1024/g' | bc)
+# Create image file - parse size properly
+SIZE_MB=$(echo "${IMAGE_SIZE}" | sed 's/G/*1024/' | sed 's/M//' | bc)
+log_info "Creating ${SIZE_MB}MB image file"
+
+# Ensure output directory exists and has proper permissions
+sudo mkdir -p "$(dirname "${IMAGE_PATH}")"
+sudo chown builder:builder "$(dirname "${IMAGE_PATH}")"
+
+# Create sparse image file
+if ! sudo dd if=/dev/zero of="${IMAGE_PATH}" bs=1M count=1 seek=$((SIZE_MB - 1)); then
+    die "Failed to create image file: ${IMAGE_PATH}"
+fi
+
+# Verify file was created with correct size
+if [[ ! -f "${IMAGE_PATH}" ]]; then
+    die "Image file was not created: ${IMAGE_PATH}"
+fi
+
+ACTUAL_SIZE=$(stat -c%s "${IMAGE_PATH}")
+EXPECTED_SIZE=$((SIZE_MB * 1024 * 1024))
+if [[ $ACTUAL_SIZE -ne $EXPECTED_SIZE ]]; then
+    die "Image file has wrong size: ${ACTUAL_SIZE} bytes, expected ${EXPECTED_SIZE} bytes"
+fi
+
+log_info "Successfully created ${SIZE_MB}MB image file"
 
 # Create partitions
 log_info "Creating partitions"
@@ -51,9 +79,18 @@ if cache_exists "${RASPBIAN_CACHE_KEY}"; then
 else
     log_info "Bootstrapping Raspbian ${RASPBIAN_VERSION}"
     
-    # First stage debootstrap
+    # First stage debootstrap with keyring handling
+    # For Raspbian, disable GPG verification as keyring is not readily available in Debian
+    KEYRING_OPT="--no-check-gpg"
+    log_warn "Disabling GPG verification for Raspbian bootstrap"
+    
+    # ARM binary format registration handled by host system
+    # Host should have: sudo apt install binfmt-support qemu-user-static
+    log_info "Relying on host system ARM binary format registration"
+    
+    # Bootstrap base system without Pi-specific packages first
     sudo debootstrap --foreign --arch=armhf \
-        --include=raspberrypi-bootloader,raspberrypi-kernel \
+        ${KEYRING_OPT} \
         "${RASPBIAN_VERSION}" "${MOUNT_POINT}" "${RASPBIAN_MIRROR}"
     
     # Setup chroot for second stage

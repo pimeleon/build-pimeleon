@@ -1,8 +1,12 @@
 # Pi Router Build Container
 FROM debian:12-slim AS base
 
-# Install base dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install base dependencies and build tools with cache mount
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean && \
+    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache && \
+    apt-get update && apt-get install -y --no-install-recommends \
     debootstrap \
     qemu-user-static \
     binfmt-support \
@@ -22,10 +26,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ansible \
     rsync \
     sudo \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install additional build tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     crossbuild-essential-armhf \
     device-tree-compiler \
@@ -34,18 +34,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bison \
     flex \
     libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+    util-linux \
+    coreutils
 
-# Create build user
+# Create build user with restricted sudo access
 RUN useradd -m -s /bin/bash -u 1000 builder && \
-    echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+    usermod -a -G disk builder && \
+    echo "builder ALL=(ALL) NOPASSWD: /usr/bin/mount, /usr/bin/umount, /sbin/losetup, /sbin/kpartx, /usr/sbin/debootstrap, /usr/sbin/chroot, /bin/dd, /sbin/mkfs.*, /sbin/parted, /bin/cp, /bin/rm, /bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/tee, /bin/cat, /bin/tar" >> /etc/sudoers.d/builder && \
+    chmod 0440 /etc/sudoers.d/builder
 
 # Set up Python environment
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install Python packages
-RUN pip install --upgrade pip && \
+# Install Python packages with cache mount
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
     pip install \
     pyyaml \
     jinja2 \
@@ -84,8 +88,10 @@ FROM base AS development
 
 USER root
 
-# Install development tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install development and debugging tools with cache mount
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     vim \
     nano \
     htop \
@@ -95,17 +101,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     shellcheck \
     yamllint \
     ansible-lint \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install debugging tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
     strace \
     ltrace \
     gdb \
     tcpdump \
     net-tools \
     iputils-ping \
-    dnsutils \
-    && rm -rf /var/lib/apt/lists/*
+    dnsutils
 
 USER builder
