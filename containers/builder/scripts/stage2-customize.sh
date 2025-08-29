@@ -98,6 +98,12 @@ sudo sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' "${MOUNT_POINT}/etc/ssh/s
 sudo sed -i 's/#PasswordAuthentication.*/PasswordAuthentication no/' "${MOUNT_POINT}/etc/ssh/sshd_config"
 echo "AllowUsers pi" | sudo tee -a "${MOUNT_POINT}/etc/ssh/sshd_config" > /dev/null
 
+# Create Pi-specific groups first
+log_info "Creating Pi-specific groups"
+for group in gpio i2c spi; do
+    chroot_run "${MOUNT_POINT}" groupadd -f -r "$group" || true
+done
+
 # Create pi user
 log_info "Creating pi user"
 chroot_run "${MOUNT_POINT}" useradd -m -s /bin/bash -G sudo,adm,dialout,cdrom,audio,video,plugdev,games,users,input,netdev,gpio,i2c,spi pi

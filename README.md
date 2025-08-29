@@ -135,6 +135,10 @@ sudo apt install binfmt-support qemu-user-static
 
 - Fixed: Scripts now use `sudo tee` for proper permissions
 
+❌ "useradd: group 'gpio' does not exist"
+
+- Fixed: Pi-specific groups (gpio, i2c, spi) are created before user creation
+
 ❌ Build hangs at package installation
 
 ```bash
@@ -202,6 +206,14 @@ These are **expected and harmless warnings** in containerized libvirt environmen
 - libvirt functionality works correctly regardless
 - Networks are created and started successfully
 
+**❓ Permission denied during cleanup:**
+```
+truncate: cannot open '/tmp/build/mount/var/log/dpkg.log' for writing: Permission denied
+rm: cannot remove '/tmp/build/mount/var/lib/apt/lists/lock': Permission denied
+```
+
+These are **expected and harmless warnings** during image cleanup. The build completes successfully despite these messages, which occur because some files are owned by root in the chroot environment.
+
 You can safely ignore these messages or suppress them by using the updated entrypoint script.
 
 ## 🛠️ Development
@@ -256,8 +268,9 @@ qemu-system-arm -M raspi3 -kernel output/pi-router-*.img
 - Raspbian Buster base system creation and caching
 - Package installation with APT cache support
 - Network configuration with systemd-networkd
-- User creation and SSH hardening
-- Build artifact generation
+- Pi-specific groups (gpio, i2c, spi) and user creation
+- SSH hardening
+- Build artifact generation (4GB bootable images)
 
 ### 🚧 In Development
 

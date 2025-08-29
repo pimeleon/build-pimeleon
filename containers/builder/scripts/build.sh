@@ -16,7 +16,7 @@ LOG_FILE="${OUTPUT_DIR}/build-$(date +%Y%m%d-%H%M%S).log"
 # Default values
 RPI_MODEL="${RPI_MODEL:-3B+}"
 IMAGE_SIZE="${IMAGE_SIZE:-4G}"
-RASPBIAN_VERSION="${RASPBIAN_VERSION:-bookworm}"
+RASPBIAN_VERSION="${RASPBIAN_VERSION:-buster}"
 RASPBIAN_MIRROR="${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.org/raspbian/}"
 
 # Initialize logging
