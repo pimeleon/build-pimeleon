@@ -106,6 +106,17 @@ else
 deb ${RASPBIAN_MIRROR} ${RASPBIAN_VERSION} main contrib non-free rpi
 deb-src ${RASPBIAN_MIRROR} ${RASPBIAN_VERSION} main contrib non-free rpi
 EOF
+
+    # Configure APT cache for chroot if available
+    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+        log_info "Configuring APT cache for chroot environment"
+        sudo mkdir -p "${MOUNT_POINT}/etc/apt/apt.conf.d"
+        sudo tee "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy" > /dev/null <<EOF
+# APT Cache Configuration for Build Process
+Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
+Acquire::https::Proxy "DIRECT";
+EOF
+    fi
     
     # Cache the base system
     log_info "Caching base system for future builds"

@@ -22,7 +22,7 @@ setup_chroot "${MOUNT_POINT}"
 log_info "Updating package lists"
 chroot_run "${MOUNT_POINT}" apt-get update
 
-# Install essential packages only
+# Install essential packages only (systemd-resolved is part of systemd package)
 log_info "Installing essential packages"
 chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     systemd \
@@ -54,8 +54,7 @@ log_info "Configuring system"
 
 # Enable IP forwarding
 sudo mkdir -p "${MOUNT_POINT}/etc/sysctl.d"
-sudo chmod 777 "${MOUNT_POINT}/etc/sysctl.d"
-cat > /tmp/sysctl-config <<EOF
+sudo tee "${MOUNT_POINT}/etc/sysctl.d/30-ip-forward.conf" > /dev/null <<EOF
 net.ipv4.ip_forward=1
 net.ipv6.conf.all.forwarding=1
 net.ipv4.conf.all.send_redirects=0
@@ -65,27 +64,34 @@ net.ipv4.conf.all.log_martians=1
 net.ipv4.tcp_syncookies=1
 net.ipv4.icmp_echo_ignore_broadcasts=1
 EOF
-sudo cp /tmp/sysctl-config "${MOUNT_POINT}/etc/sysctl.d/30-ip-forward.conf"
-sudo chmod 777 "${MOUNT_POINT}/etc/sysctl.d/30-ip-forward.conf"
+# sudo cp /tmp/sysctl-config "${MOUNT_POINT}/etc/sysctl.d/30-ip-forward.conf"
+sudo chmod 644 "${MOUNT_POINT}/etc/sysctl.d/30-ip-forward.conf"
 
-# Configure network interfaces
-cat > /tmp/network-interfaces <<EOF
-# Loopback
-auto lo
-iface lo inet loopback
+# Configure systemd-networkd
+sudo mkdir -p "${MOUNT_POINT}/etc/systemd/network"
+sudo chmod 755 "${MOUNT_POINT}/etc/systemd/network"
 
-# Ethernet WAN
-auto eth0
-iface eth0 inet dhcp
+# Configure eth0 for DHCP (WAN)
+cat > /tmp/eth0-network <<EOF
+[Match]
+Name=eth0
 
-# Management interface
-auto eth0:1
-iface eth0:1 inet static
-    address 172.16.0.1
-    netmask 255.255.255.0
+[Network]
+DHCP=yes
 EOF
-sudo cp /tmp/network-interfaces "${MOUNT_POINT}/etc/network/interfaces"
-sudo chmod 777 "${MOUNT_POINT}/etc/network/interfaces"
+sudo cp /tmp/eth0-network "${MOUNT_POINT}/etc/systemd/network/10-eth0.network"
+sudo chmod 644 "${MOUNT_POINT}/etc/systemd/network/10-eth0.network"
+
+# Configure management interface on eth0:1
+cat > /tmp/eth0-mgmt <<EOF
+[Match]
+Name=eth0
+
+[Address]
+Address=172.16.0.1/24
+EOF
+sudo cp /tmp/eth0-mgmt "${MOUNT_POINT}/etc/systemd/network/20-eth0-mgmt.network"
+sudo chmod 644 "${MOUNT_POINT}/etc/systemd/network/20-eth0-mgmt.network"
 
 # Configure SSH
 sudo sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' "${MOUNT_POINT}/etc/ssh/sshd_config"
@@ -111,10 +117,12 @@ EOF
 sudo cp /tmp/sudoers-pi "${MOUNT_POINT}/etc/sudoers.d/010_pi-restricted"
 sudo chmod 777 "${MOUNT_POINT}/etc/sudoers.d/010_pi-restricted"
 
-# Configure basic services
+# Configure basic services (systemd-resolved service is part of systemd package)
 log_info "Configuring services"
 chroot_run "${MOUNT_POINT}" systemctl enable ssh
 chroot_run "${MOUNT_POINT}" systemctl enable rsyslog
+chroot_run "${MOUNT_POINT}" systemctl enable systemd-networkd
+chroot_run "${MOUNT_POINT}" systemctl enable systemd-resolved
 
 # Apply Ansible playbooks if available
 if [[ -d "${ANSIBLE_DIR}/playbooks" ]] && [[ -n "$(ls -A ${ANSIBLE_DIR}/playbooks/*.yml 2>/dev/null)" ]]; then
@@ -152,6 +160,12 @@ if [[ -d "${CONFIG_DIR}" ]]; then
     if [[ -d "${CONFIG_DIR}/services" ]] && [[ -n "$(ls -A ${CONFIG_DIR}/services/* 2>/dev/null)" ]]; then
         sudo cp -r "${CONFIG_DIR}/services/"* "${MOUNT_POINT}/etc/" || true
     fi
+fi
+
+# Clean up APT cache configuration from final image
+if [[ -f "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy" ]]; then
+    log_info "Removing APT cache configuration from final image"
+    sudo rm -f "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy"
 fi
 
 # Cleanup chroot

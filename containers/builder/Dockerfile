@@ -1,6 +1,17 @@
 # Pi Router Build Container
 FROM debian:12-slim AS base
 
+# Build arguments for APT cache configuration
+ARG APT_CACHE_SERVER
+ARG APT_CACHE_PORT="3142"
+
+# Configure APT cache if server is provided
+RUN if [ -n "$APT_CACHE_SERVER" ]; then \
+    echo "Acquire::http::Proxy \"http://${APT_CACHE_SERVER}:${APT_CACHE_PORT}\";" > /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::https::Proxy \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy && \
+    echo "Using APT cache at ${APT_CACHE_SERVER}:${APT_CACHE_PORT}"; \
+    fi
+
 # Install base dependencies and build tools with cache mount
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -40,7 +51,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # Create build user with restricted sudo access
 RUN useradd -m -s /bin/bash -u 1000 builder && \
     usermod -a -G disk builder && \
-    echo "builder ALL=(ALL) NOPASSWD: /usr/bin/mount, /usr/bin/umount, /sbin/losetup, /sbin/kpartx, /usr/sbin/debootstrap, /usr/sbin/chroot, /bin/dd, /sbin/mkfs.*, /sbin/parted, /bin/cp, /bin/rm, /bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/tee, /bin/cat, /bin/tar" >> /etc/sudoers.d/builder && \
+    echo "builder ALL=(ALL) NOPASSWD: /usr/bin/mount, /usr/bin/umount, /sbin/losetup, /sbin/kpartx, /usr/sbin/debootstrap, /usr/sbin/chroot, /bin/dd, /sbin/mkfs.*, /sbin/parted, /bin/cp, /bin/rm, /bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/tee, /bin/cat, /bin/tar, /bin/touch, /bin/sed, /bin/ls, /usr/bin/sed" >> /etc/sudoers.d/builder && \
     chmod 0440 /etc/sudoers.d/builder
 
 # Set up Python environment
@@ -66,6 +77,11 @@ RUN mkdir -p /output /cache /configs /ansible /scripts && \
 # Copy build scripts
 COPY scripts/ /scripts/
 RUN chmod +x /scripts/*.sh
+
+# Cache Debian Buster base for debootstrap (matching production Pi 3B+)
+ADD --checksum=sha256:0680cca0de3a9b9e5ae12de8cfde3229749a757ddcee1d0ec3d22ef28f602611 \
+    http://deb.debian.org/debian/dists/buster/Release \
+    /cache/debian-buster-release
 
 # Set environment variables
 ENV BUILD_USER=builder
