@@ -6,6 +6,9 @@ services:
       cache_from:
         - pi-router-builder:latest
       target: base
+      args:
+        APT_CACHE_SERVER: ${APT_CACHE_SERVER:-truenas}
+        APT_CACHE_PORT: ${APT_CACHE_PORT:-3142}
     container_name: pi-router-builder
     volumes:
       - ./output:/output
@@ -25,6 +28,8 @@ services:
       - IMAGE_SIZE=${IMAGE_SIZE:-4G}
       - RASPBIAN_VERSION=${RASPBIAN_VERSION:-buster}
       - RASPBIAN_MIRROR=${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.org/raspbian/}
+      - APT_CACHE_SERVER=${APT_CACHE_SERVER:-truenas}
+      - APT_CACHE_PORT=${APT_CACHE_PORT:-3142}
     privileged: true
     cap_add:
       - SYS_ADMIN

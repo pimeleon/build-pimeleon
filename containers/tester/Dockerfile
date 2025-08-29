@@ -4,6 +4,16 @@ FROM ubuntu:22.04
 # Prevent interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 
+ARG APT_CACHE_SERVER=""
+ARG APT_CACHE_PORT="3142"
+
+# Configure APT cache if server is provided
+RUN if [ -n "$APT_CACHE_SERVER" ]; then \
+    echo "Acquire::http::Proxy \"http://${APT_CACHE_SERVER}:${APT_CACHE_PORT}\";" > /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::https::Proxy \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy && \
+    echo "Using APT cache at ${APT_CACHE_SERVER}:${APT_CACHE_PORT}"; \
+    fi
+
 # Install base dependencies and testing tools with cache mount
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
