@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
       target: base
       args:
-        APT_CACHE_SERVER: ${APT_CACHE_SERVER:-192.168.76.5}
+        APT_CACHE_SERVER: ${APT_CACHE_SERVER:-}
         APT_CACHE_PORT: ${APT_CACHE_PORT:-3142}
     container_name: pimeleon-builder
     volumes:
@@ -26,7 +26,7 @@ services:
       - IMAGE_SIZE=${IMAGE_SIZE:-4G}
       - RASPBIAN_VERSION=${RASPBIAN_VERSION:-buster}
       - RASPBIAN_MIRROR=${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.org/raspbian/}
-      - APT_CACHE_SERVER=${APT_CACHE_SERVER:-192.168.76.5}
+      - APT_CACHE_SERVER=${APT_CACHE_SERVER:-}
       - APT_CACHE_PORT=${APT_CACHE_PORT:-3142}
     privileged: true
     cap_add:
@@ -42,7 +42,7 @@ services:
       context: ./containers/tester
       dockerfile: Dockerfile
       args:
-        APT_CACHE_SERVER: ${APT_CACHE_SERVER:-192.168.76.5}
+        APT_CACHE_SERVER: ${APT_CACHE_SERVER:-}
         APT_CACHE_PORT: ${APT_CACHE_PORT:-3142}
     container_name: pimeleon-tester
     privileged: true
@@ -78,7 +78,7 @@ services:
       dockerfile: Dockerfile
       target: development
       args:
-        APT_CACHE_SERVER: ${APT_CACHE_SERVER:-192.168.76.5}
+        APT_CACHE_SERVER: ${APT_CACHE_SERVER:-}
         APT_CACHE_PORT: ${APT_CACHE_PORT:-3142}
     container_name: pimeleon-dev
     volumes:

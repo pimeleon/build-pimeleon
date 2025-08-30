@@ -16,12 +16,22 @@ log_info "Starting system customization"
 # Mount image
 LOOP_DEVICE=$(mount_image "${IMAGE_PATH}" "${MOUNT_POINT}")
 
-# Mount boot partition separately for firmware copying
-sudo mkdir -p "${BOOT_MOUNT}"
-sudo mount "${LOOP_DEVICE}p1" "${BOOT_MOUNT}"
+# Boot partition is already mounted at ${MOUNT_POINT}/boot by mount_image function
+BOOT_MOUNT="${MOUNT_POINT}/boot"
 
 # Setup chroot
 setup_chroot "${MOUNT_POINT}"
+
+# Configure APT cache for chroot environment early
+if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+    log_info "Configuring APT cache for chroot environment"
+    sudo mkdir -p "${MOUNT_POINT}/etc/apt/apt.conf.d"
+    sudo tee "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy" > /dev/null <<EOF
+# APT Cache Configuration for Build Process
+Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
+Acquire::https::Proxy "DIRECT";
+EOF
+fi
 
 # Update package lists
 log_info "Updating package lists"
@@ -133,8 +143,8 @@ done
 # Create pi user
 log_info "Creating pi user"
 chroot_run "${MOUNT_POINT}" useradd -m -s /bin/bash -G sudo,adm,dialout,cdrom,audio,video,plugdev,games,users,input,netdev,gpio,i2c,spi pi
-# Generate a random password and save it
-TEMP_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+# Set password - use environment variable or default thematic word
+TEMP_PASSWORD="${PI_INITIAL_PASSWORD:-netblox}"
 echo "pi:${TEMP_PASSWORD}" | chroot_run "${MOUNT_POINT}" chpasswd
 echo "${TEMP_PASSWORD}" | sudo tee "${OUTPUT_DIR}/pi-initial-password.txt" > /dev/null
 sudo chmod 600 "${OUTPUT_DIR}/pi-initial-password.txt"
@@ -203,11 +213,7 @@ fi
 # Cleanup chroot
 cleanup_chroot "${MOUNT_POINT}"
 
-# Unmount boot partition
-sudo umount "${BOOT_MOUNT}" || log_warn "Failed to unmount boot partition"
-sudo rmdir "${BOOT_MOUNT}" || log_warn "Failed to remove boot mount directory"
-
-# Unmount image
+# Unmount image (includes boot partition)
 unmount_image "${MOUNT_POINT}" "${LOOP_DEVICE}"
 
 log_info "Stage 2 completed successfully"

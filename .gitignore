@@ -68,4 +68,7 @@ libvirt/images/
 node_modules/
 vendor/
 
+# Pi Router build system
 *test*.*
+benchmarks/*
+output/*

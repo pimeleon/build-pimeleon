@@ -52,13 +52,13 @@ log_section "Stage 1: Creating base system"
 log_section "Stage 2: Customizing system"
 /scripts/stage2-customize.sh "${WORK_DIR}" "${IMAGE_PATH}"
 
-# Stage 3: Optimization
-log_section "Stage 3: Optimizing image"
-/scripts/stage3-optimize.sh "${WORK_DIR}" "${IMAGE_PATH}"
+# Stage 3: Optimization (TEMPORARILY DISABLED FOR TESTING)
+# log_section "Stage 3: Optimizing image"
+# /scripts/stage3-optimize.sh "${WORK_DIR}" "${IMAGE_PATH}"
 
-# Stage 4: Packaging
-log_section "Stage 4: Packaging image"
-/scripts/stage4-package.sh "${WORK_DIR}" "${IMAGE_PATH}"
+# Stage 4: Packaging (TEMPORARILY DISABLED FOR TESTING)
+# log_section "Stage 4: Packaging image"
+# /scripts/stage4-package.sh "${WORK_DIR}" "${IMAGE_PATH}"
 
 # Generate metadata
 log_section "Generating metadata"
