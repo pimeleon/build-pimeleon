@@ -71,5 +71,4 @@ vendor/
 # Pi Router build system
 *test*.*
 benchmarks/*
-output/*containers/builder/scripts/stage3-optimize.sh
-containers/builder/scripts/stage4-package.sh
+output/*
