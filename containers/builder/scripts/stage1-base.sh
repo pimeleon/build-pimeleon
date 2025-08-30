@@ -16,7 +16,10 @@ if [[ -z "$WORK_DIR" || -z "$IMAGE_PATH" || -z "$IMAGE_SIZE" ]]; then
 fi
 
 MOUNT_POINT="${WORK_DIR}/mount"
-RASPBIAN_CACHE_KEY="raspbian-${RASPBIAN_VERSION}-base.tar.gz"
+CACHE_VERSION="v1"  # Increment when base system changes significantly
+# Normalize RPI_MODEL for cache naming (3B+ -> rpi3, 4B -> rpi4, etc.)
+RPI_CACHE_NAME=$(echo "${RPI_MODEL}" | sed -E 's/^([0-9]+).*/rpi\1/')
+RASPBIAN_CACHE_KEY="pirouter-${RPI_CACHE_NAME}-${RASPBIAN_VERSION}-base-${CACHE_VERSION}.tar.gz"
 
 log_info "Creating image file: ${IMAGE_PATH}"
 
@@ -129,6 +132,17 @@ deb ${RASPBIAN_MIRROR} ${RASPBIAN_VERSION} main contrib non-free rpi
 deb-src ${RASPBIAN_MIRROR} ${RASPBIAN_VERSION} main contrib non-free rpi
 EOF
 
+    # Add Raspberry Pi Foundation repository for kernel and firmware
+    sudo tee "${MOUNT_POINT}/etc/apt/sources.list.d/raspi.list" > /dev/null <<EOF
+deb http://archive.raspberrypi.org/debian/ ${RASPBIAN_VERSION} main
+EOF
+
+    # Add Raspberry Pi Foundation GPG key
+    sudo mkdir -p "${MOUNT_POINT}/etc/apt/trusted.gpg.d"
+    wget -qO- https://archive.raspberrypi.org/debian/raspberrypi.gpg.key | sudo tee "${MOUNT_POINT}/tmp/raspberrypi.gpg.key" > /dev/null
+    chroot_run "${MOUNT_POINT}" apt-key add /tmp/raspberrypi.gpg.key
+    sudo rm -f "${MOUNT_POINT}/tmp/raspberrypi.gpg.key"
+
     # Configure APT cache for chroot if available
     if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
         log_info "Configuring APT cache for chroot environment"
@@ -151,7 +165,7 @@ fi
 
 # Configure basic boot files (firmware will be installed in stage2)
 log_info "Configuring basic boot files"
-sudo tee "${BOOT_MOUNT}/config.txt" > /dev/null <<EOF
+sudo tee "${MOUNT_POINT}/boot/config.txt" > /dev/null <<EOF
 # Pi Router Boot Configuration
 enable_uart=1
 dtparam=spi=on
@@ -168,7 +182,7 @@ over_voltage=2
 EOF
 
 # Configure cmdline
-echo "console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet" | sudo tee "${BOOT_MOUNT}/cmdline.txt" > /dev/null
+echo "console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet" | sudo tee "${MOUNT_POINT}/boot/cmdline.txt" > /dev/null
 
 # Basic fstab
 sudo tee "${MOUNT_POINT}/etc/fstab" > /dev/null <<EOF

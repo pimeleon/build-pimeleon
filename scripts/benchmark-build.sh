@@ -1,5 +1,5 @@
 #!/bin/bash
-# benchmark-build.sh - Pimeleon Build System Benchmarking Wrapper
+# benchmark-build.sh - Pi Router Build System Benchmarking Wrapper
 # Collects comprehensive build metrics and system information
 
 set -e
@@ -10,7 +10,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🔬 Pimeleon Build System - Benchmarking Tool${NC}"
+echo -e "${BLUE}🔬 Pi Router Build System - Benchmarking Tool${NC}"
 echo "=========================================================="
 
 # Parse command line arguments
@@ -49,45 +49,39 @@ fi
 # Function to collect system info
 collect_system_info() {
     echo "Collecting system information..."
-
+    
     # System specs
-    local cpu_cores
-    cpu_cores=$(nproc)
-    local total_ram
-    total_ram=$(free -m | awk '/^Mem:/{print $2}')
-    local available_ram
-    available_ram=$(free -m | awk '/^Mem:/{print $7}')
-    local disk_space
-    disk_space=$(df -BG / | tail -1 | awk '{print $2}' | sed 's/G//')
-    local available_space
-    available_space=$(df -BG / | tail -1 | awk '{print $4}' | sed 's/G//')
-
+    local cpu_cores=$(nproc)
+    local total_ram=$(free -m | awk '/^Mem:/{print $2}')
+    local available_ram=$(free -m | awk '/^Mem:/{print $7}')
+    local disk_space=$(df -BG / | tail -1 | awk '{print $2}' | sed 's/G//')
+    local available_space=$(df -BG / | tail -1 | awk '{print $4}' | sed 's/G//')
+    
     # Docker info
-    local docker_version
-    docker_version=$(docker --version | awk '{print $3}' | sed 's/,//')
-    local docker_storage_driver
-    docker_storage_driver=$(docker system info 2>/dev/null | grep "Storage Driver" | awk '{print $3}')
-
+    local docker_version=$(docker --version | awk '{print $3}' | sed 's/,//')
+    local docker_storage_driver=$(docker system info 2>/dev/null | grep "Storage Driver" | awk '{print $3}')
+    
     # Build configuration
     local rpi_model=${RPI_MODEL:-3B+}
     local image_size=${IMAGE_SIZE:-4G}
     local raspbian_version=${RASPBIAN_VERSION:-buster}
-
+    
     # Handle APT cache configuration
     local apt_cache_server="none"
     local apt_cache_available="false"
-
+    
     if [[ "$NO_CACHE" == "true" ]]; then
         echo -e "${YELLOW}[BENCHMARK]${NC} Disabling APT cache for no-cache comparison"
         export APT_PROXY=""
         apt_cache_server="disabled"
         apt_cache_available="false"
     else
-        # Auto-detect or use provided APT proxy
-        if [[ -z "${APT_PROXY:-}" ]]; then
-            # Try to auto-detect TrueNAS APT cache (TCP check)
-            if timeout 1 bash -c "cat < /dev/null > /dev/tcp/192.168.76.5/3142" 2>/dev/null; then
-                export APT_PROXY="192.168.76.5:3142"
+        # Auto-detect or use provided APT cache server
+        if [[ -z "${APT_CACHE_SERVER:-}" ]]; then
+            # Try to auto-detect TrueNAS APT cache
+            if ping -c1 192.168.76.5 &>/dev/null; then
+                export APT_CACHE_SERVER=192.168.76.5
+                export APT_CACHE_PORT=3142
                 apt_cache_server="192.168.76.5:3142"
                 apt_cache_available="true"
                 echo -e "${GREEN}[BENCHMARK]${NC} Auto-detected TrueNAS APT cache: $apt_cache_server"
@@ -97,10 +91,8 @@ collect_system_info() {
                 echo -e "${YELLOW}[BENCHMARK]${NC} No APT cache detected, using direct downloads"
             fi
         else
-            apt_cache_server="${APT_PROXY}"
-            local apt_host="${APT_PROXY%:*}"
-            local apt_port="${APT_PROXY##*:}"
-            if timeout 1 bash -c "cat < /dev/null > /dev/tcp/${apt_host}/${apt_port}" 2>/dev/null; then
+            apt_cache_server="${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+            if ping -c1 "${APT_CACHE_SERVER}" &>/dev/null; then
                 apt_cache_available="true"
                 echo -e "${GREEN}[BENCHMARK]${NC} Using APT cache: $apt_cache_server"
             else
@@ -111,9 +103,8 @@ collect_system_info() {
     fi
 
     # System load before build
-    local load_avg
-    load_avg=$(cat /proc/loadavg | awk '{print $1}')
-
+    local load_avg=$(cat /proc/loadavg | awk '{print $1}')
+    
     cat > "$BENCHMARK_FILE" <<EOF
 {
   "benchmark_info": {
@@ -153,15 +144,12 @@ finalize_benchmark() {
     local exit_code=$1
     local build_duration=$2
     local image_path=$3
-
+    
     # System load after build
-    local load_avg_post
-    load_avg_post=$(cat /proc/loadavg | awk '{print $1}')
-    local available_ram_post
-    available_ram_post=$(free -m | awk '/^Mem:/{print $7}')
-    local available_space_post
-    available_space_post=$(df -BG / | tail -1 | awk '{print $4}' | sed 's/G//')
-
+    local load_avg_post=$(cat /proc/loadavg | awk '{print $1}')
+    local available_ram_post=$(free -m | awk '/^Mem:/{print $7}')
+    local available_space_post=$(df -BG / | tail -1 | awk '{print $4}' | sed 's/G//')
+    
     # Image info if successful
     local image_size_mb="null"
     local image_exists="false"
@@ -169,19 +157,17 @@ finalize_benchmark() {
         image_exists="true"
         image_size_mb=$(stat -c%s "$image_path" | awk '{print int($1/1024/1024)}')
     fi
-
+    
     # Calculate cache effectiveness
-    local cache_files
-    cache_files=$(find ./cache -name "*.tar.gz" 2>/dev/null | wc -l)
+    local cache_files=$(find ./cache -name "*.tar.gz" 2>/dev/null | wc -l)
     local cache_size_mb=0
     if [[ -d "./cache" ]]; then
         cache_size_mb=$(du -sm ./cache 2>/dev/null | awk '{print $1}' || echo 0)
     fi
-
+    
     # Docker volumes usage
-    local docker_volumes
-    docker_volumes=$(docker volume ls --filter name=pimeleon-build --format "{{.Name}}" | wc -l)
-
+    local docker_volumes=$(docker volume ls --filter name=pi-router-build --format "{{.Name}}" | wc -l)
+    
     # Append build results to JSON
     cat >> "$BENCHMARK_FILE" <<EOF
   "build_results": {
@@ -236,7 +222,7 @@ else
 fi
 
 if [[ $BUILD_EXIT_CODE -eq 0 ]]; then
-    echo -e "\n${BLUE}🚀 Running Pimeleon image build...${NC}"
+    echo -e "\n${BLUE}🚀 Running Pi Router image build...${NC}"
     docker compose run --rm builder >/dev/null 2>&1 || BUILD_EXIT_CODE=$?
 fi
 
