@@ -1,7 +1,6 @@
 # Getting Started
 
-Welcome to the Pimeleon Build System! This guide will help you build your first
-custom Raspberry Pi router image in just a few minutes.
+Welcome to the Pi Router Build System! This guide will help you build your first custom Raspberry Pi router image in just a few minutes.
 
 ## What You'll Build
 
@@ -46,21 +45,21 @@ Install ARM binary format support on your Linux host:
 ```bash
 sudo apt update
 sudo apt install binfmt-support qemu-user-static
-```text
+```
 
 Verify ARM emulation is working:
 
 ```bash
 ls -la /proc/sys/fs/binfmt_misc/qemu-arm
 # Should show a file exists
-```text
+```
 
 ### Step 2: Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/pimeleon.git
-cd pimeleon
-```text
+git clone https://github.com/yourusername/pi-router.git
+cd pi-router
+```
 
 ### Step 3: Build Containers
 
@@ -69,14 +68,14 @@ Build the Docker containers (one-time setup):
 ```bash
 export DOCKER_BUILDKIT=1
 docker compose build
-```text
+```
 
 !!! info "Build time"
     First container build takes 5-10 minutes. Subsequent builds use Docker layer cache.
 
 ### Step 4: Create Your First Image
 
-Run the builder to create a Pimeleon image:
+Run the builder to create a Pi Router image:
 
 === "With APT Cache (Recommended)"
 
@@ -98,7 +97,7 @@ Run the builder to create a Pimeleon image:
 
     ```bash
     export DOCKER_BUILDKIT=1
-    export RASPBIAN_MIRROR=http://mirrordirector.raspbian.org/raspbian/
+    export RASPBIAN_MIRROR=http://archive.raspbian.org/raspbian/
 
     docker compose run --rm builder
     ```
@@ -121,16 +120,16 @@ Your built image will be in the `output/` directory:
 
 ```bash
 ls -lh output/
-```text
+```
 
 You'll see:
 
-```text
-pimeleon-20241102-103045.img      # 4GB bootable image
-pimeleon-20241102-103045.img.sha256  # Checksum
+```
+pi-router-20241102-103045.img      # 4GB bootable image
+pi-router-20241102-103045.img.sha256  # Checksum
 build-20241102-103045.log          # Build log
 pi-initial-password.txt            # Generated password for 'pi' user
-```text
+```
 
 ### Step 6: Flash to SD Card
 
@@ -143,7 +142,7 @@ Flash the image to a microSD card (8GB minimum):
     lsblk
 
     # Flash the image (replace /dev/sdX with your SD card)
-    sudo dd if=output/pimeleon-*.img of=/dev/sdX bs=4M status=progress conv=fsync
+    sudo dd if=output/pi-router-*.img of=/dev/sdX bs=4M status=progress conv=fsync
 
     # Sync to ensure all data is written
     sync
@@ -159,7 +158,7 @@ Flash the image to a microSD card (8GB minimum):
     diskutil unmountDisk /dev/diskN
 
     # Flash the image
-    sudo dd if=output/pimeleon-*.img of=/dev/rdiskN bs=4m
+    sudo dd if=output/pi-router-*.img of=/dev/rdiskN bs=4m
 
     # Eject the SD card
     diskutil eject /dev/diskN
@@ -170,24 +169,24 @@ Flash the image to a microSD card (8GB minimum):
     Use [Raspberry Pi Imager](https://www.raspberrypi.com/software/) or [balenaEtcher](https://www.balena.io/etcher/):
 
     1. Select "Use custom" image
-    2. Choose your `pimeleon-*.img` file
+    2. Choose your `pi-router-*.img` file
     3. Select your SD card
     4. Click "Write"
 
 !!! warning "Data Loss Warning"
     Double-check the device name! `dd` will overwrite all data on the target device.
 
-### Step 7: Boot Your Pimeleon
+### Step 7: Boot Your Pi Router
 
 1. Insert the SD card into your Raspberry Pi 3B+
 2. Connect:
    - **eth0** - WAN connection (to your internet modem/router)
    - **eth1** - LAN connection (to your local network) OR
-   - **wlan0** - WiFi clients can connect to SSID "pimeleon"
+   - **wlan0** - WiFi clients can connect to SSID "pi-router"
 3. Power on the Pi
 4. Wait 1-2 minutes for first boot
 
-### Step 8: Access Your Pimeleon
+### Step 8: Access Your Pi Router
 
 Once booted, access via SSH:
 
@@ -196,10 +195,10 @@ Once booted, access via SSH:
 ssh pi@172.16.0.1
 
 # Via LAN interface
-ssh pi@192.168.42.1
+ssh pi@192.168.76.1
 
 # Via WiFi AP interface
-ssh pi@192.168.42.1
+ssh pi@192.168.77.1
 ```
 
 Use the SSH key you configured during build, or the password from `output/pi-initial-password.txt`.
@@ -208,7 +207,7 @@ Use the SSH key you configured during build, or the password from `output/pi-ini
 
 <div class="grid cards" markdown>
 
-- :material-file-document-edit:{ .lg .middle } **Customize Your Build**
+-   :material-file-document-edit:{ .lg .middle } __Customize Your Build__
 
     ---
 
@@ -216,7 +215,7 @@ Use the SSH key you configured during build, or the password from `output/pi-ini
 
     [:octicons-arrow-right-24: Customization Guide](../guides/customization.md)
 
-- :material-speedometer:{ .lg .middle } **Optimize Performance**
+-   :material-speedometer:{ .lg .middle } __Optimize Performance__
 
     ---
 
@@ -224,7 +223,7 @@ Use the SSH key you configured during build, or the password from `output/pi-ini
 
     [:octicons-arrow-right-24: Performance Guide](../guides/performance.md)
 
-- :material-bug:{ .lg .middle } **Troubleshooting**
+-   :material-bug:{ .lg .middle } __Troubleshooting__
 
     ---
 
@@ -232,7 +231,7 @@ Use the SSH key you configured during build, or the password from `output/pi-ini
 
     [:octicons-arrow-right-24: Troubleshooting](../guides/troubleshooting.md)
 
-- :material-book-open-variant:{ .lg .middle } **Deep Dive**
+-   :material-book-open-variant:{ .lg .middle } __Deep Dive__
 
     ---
 
@@ -253,16 +252,17 @@ Customize your build with environment variables:
 export DOCKER_BUILDKIT=1                    # Enable BuildKit
 
 # Target hardware
-export PIMELEON_RPI_MODEL=3B+               # Pi model (3B+, 4, Zero W)
-export PIMELEON_IMAGE_SIZE=4G               # Image size (4G, 8G)
+export PIROUTER_RPI_MODEL=3B+               # Pi model (3B+, 4, Zero W)
+export PIROUTER_IMAGE_SIZE=4G               # Image size (4G, 8G)
 
 # Network optimization
-export APT_PROXY=192.168.76.5:3142          # APT cache proxy (host:port)
-export RASPBIAN_MIRROR=http://mirrordirector.raspbian.org/raspbian/
+export APT_CACHE_SERVER=192.168.76.5        # APT cache proxy
+export APT_CACHE_PORT=3142                  # Cache port
+export RASPBIAN_MIRROR=http://archive.raspbian.org/raspbian/
 
 # Customization
-export PIMELEON_INITIAL_PASSWORD=mypassword  # Custom password
-```text
+export PIROUTER_INITIAL_PASSWORD=mypassword  # Custom password
+```
 
 See [Environment Variables Reference](../reference/environment-variables.md) for complete list.
 
@@ -277,7 +277,7 @@ make test               # Run test suite
 make test-smoke         # Quick smoke test
 make clean              # Clean build artifacts
 make shell              # Open builder shell for debugging
-```text
+```
 
 See [CLI Commands](../reference/cli-commands.md) for complete reference.
 
@@ -285,13 +285,13 @@ See [CLI Commands](../reference/cli-commands.md) for complete reference.
 
 - **Documentation**: You're reading it! Use the search bar above
 - **Common Issues**: Check [Troubleshooting Guide](../guides/troubleshooting.md)
-- **Bug Reports**: [GitHub Issues](https://github.com/yourusername/pimeleon/issues)
-- **Feature Requests**: [GitHub Discussions](https://github.com/yourusername/pimeleon/discussions)
+- **Bug Reports**: [GitHub Issues](https://github.com/yourusername/pi-router/issues)
+- **Feature Requests**: [GitHub Discussions](https://github.com/yourusername/pi-router/discussions)
 
 ## Summary
 
 ✅ You've successfully built a custom Raspberry Pi router image!
 ✅ You know how to flash it to an SD card
-✅ You can access your Pimeleon via SSH
+✅ You can access your Pi Router via SSH
 
 Now explore the guides to customize and optimize your builds!
