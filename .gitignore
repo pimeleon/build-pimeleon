@@ -72,3 +72,11 @@ vendor/
 *test*.*
 benchmarks/*
 output/*
+
+# MkDocs build output
+site/
+.venv/
+
+# MkDocs - exclude non-English lunr search language files
+site/assets/javascripts/lunr/min/lunr.*.min.js
+!site/assets/javascripts/lunr/min/lunr.stemmer.support.min.js

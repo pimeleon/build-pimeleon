@@ -1,0 +1,174 @@
+site_name: Pi Router Documentation
+site_url: https://docs.pimeleon.com
+site_description: Comprehensive documentation for the Pi Router build system - a Docker-based ARM cross-compilation environment for creating custom Raspberry Pi router images
+site_author: Pimeleon
+repo_url: https://github.com/yourusername/pimeleon
+repo_name: pimeleon
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  palette:
+    # Light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+  features:
+    - navigation.instant        # Instant loading
+    - navigation.tracking       # URL updates with scroll
+    - navigation.tabs           # Top-level sections as tabs
+    - navigation.tabs.sticky    # Sticky tabs
+    - navigation.sections       # Collapsible sections
+    - navigation.expand         # Expand all sections by default
+    - navigation.path           # Breadcrumbs
+    - navigation.top            # Back to top button
+    - navigation.footer         # Previous/Next buttons
+    - search.suggest            # Search suggestions
+    - search.highlight          # Highlight search terms
+    - search.share              # Share search results
+    - content.code.copy         # Copy code blocks
+    - content.code.annotate     # Code annotations
+    - content.tabs.link         # Link content tabs
+    - toc.follow                # TOC follows scroll
+    - toc.integrate             # TOC integrated in left sidebar
+
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+
+  favicon: assets/favicon.ico
+  logo: assets/logo.png
+
+# Extensions
+markdown_extensions:
+  # Python Markdown
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+  # Python Markdown Extensions
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Plugins
+plugins:
+  - search:
+      lang: en
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+  - minify:
+      minify_html: true
+
+# Extra
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/yourusername/pimeleon
+      name: GitHub Repository
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/r/yourusername/pimeleon
+      name: Docker Hub
+
+  version:
+    provider: mike
+    default: latest
+
+  analytics:
+    provider: google
+    property: G-XXXXXXXXXX  # Replace with your Google Analytics ID
+
+  consent:
+    title: Cookie consent
+    description: >-
+      We use cookies to recognize your repeated visits and preferences, as well
+      as to measure the effectiveness of our documentation and whether users
+      find what they're searching for. With your consent, you're helping us to
+      make our documentation better.
+
+# Navigation
+nav:
+  - Home: index.md
+
+  - Getting Started:
+    - getting-started/index.md
+    - Prerequisites: getting-started/prerequisites.md
+    - First Build: getting-started/first-build.md
+
+  - User Guides:
+    - Building Images: guides/building-images.md
+    - Customization: guides/customization.md
+    - Performance Optimization: guides/performance.md
+    - Troubleshooting: guides/troubleshooting.md
+
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Containers: architecture/containers.md
+    - Build Pipeline: architecture/build-pipeline.md
+    - Network Design: architecture/networking.md
+
+  - Reference:
+    - CLI Commands: reference/cli-commands.md
+    - Environment Variables: reference/environment-variables.md
+    - Configuration Files: reference/configuration-files.md
+    - Ansible Playbooks: reference/ansible-playbooks.md
+
+  - Contributing:
+    - Development Setup: contributing/development.md
+    - Testing: contributing/testing.md
+
+# Copyright
+copyright: Copyright &copy; 2024 Pimeleon - All rights reserved
+
+# Custom CSS/JS
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/extra.js
