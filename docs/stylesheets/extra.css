@@ -1,0 +1,105 @@
+/* Custom styles for Pi Router Documentation */
+
+/* Enhanced code blocks */
+.highlight {
+    border-radius: 0.2rem;
+}
+
+/* Grid cards styling */
+.grid.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.grid.cards > * {
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 0.2rem;
+    padding: 1rem;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.grid.cards > *:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+
+/* Admonition enhancements */
+.admonition {
+    border-radius: 0.2rem;
+}
+
+/* Table improvements */
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+table th {
+    background-color: var(--md-primary-fg-color);
+    color: var(--md-primary-bg-color);
+    font-weight: 600;
+}
+
+table td, table th {
+    border: 1px solid var(--md-default-fg-color--lightest);
+    padding: 0.6rem 1rem;
+}
+
+table tr:hover {
+    background-color: var(--md-default-fg-color--lightest);
+}
+
+/* Status badges */
+.status-badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.2rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.status-complete {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.status-progress {
+    background-color: #FF9800;
+    color: white;
+}
+
+.status-pending {
+    background-color: #9E9E9E;
+    color: white;
+}
+
+/* Command line styling */
+code.language-bash::before {
+    content: "$ ";
+    color: var(--md-code-hl-comment-color);
+}
+
+/* Mermaid diagram improvements */
+.mermaid {
+    text-align: center;
+    margin: 1.5rem 0;
+}
+
+/* Homepage hero section */
+.hero {
+    text-align: center;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+}
+
+.hero h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.hero p {
+    font-size: 1.2rem;
+    color: var(--md-default-fg-color--light);
+}
