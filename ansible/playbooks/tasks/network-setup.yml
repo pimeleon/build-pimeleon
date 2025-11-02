@@ -1,0 +1,179 @@
+---
+# Network setup tasks for Pi Router
+- name: Configure WAN interface
+  ansible.builtin.copy:
+    dest: /etc/systemd/network/10-wan.network
+    content: |
+      [Match]
+      Name={{ wan_interface }}
+
+      [Network]
+      DHCP=yes
+      IPForward=yes
+
+      [DHCP]
+      UseDNS=yes
+      UseNTP=yes
+    mode: '0644'
+
+- name: Configure LAN interface
+  ansible.builtin.copy:
+    dest: /etc/systemd/network/20-lan.network
+    content: |
+      [Match]
+      Name={{ lan_interface }}
+
+      [Network]
+      Address={{ lan_ip }}/24
+      IPForward=yes
+      IPMasquerade=yes
+
+      [Link]
+      RequiredForOnline=no
+    mode: '0644'
+
+- name: Configure management interface
+  ansible.builtin.copy:
+    dest: /etc/systemd/network/30-mgmt.network
+    content: |
+      [Match]
+      Name=eth0
+
+      [Network]
+      Address=172.16.0.1/24
+
+      [Address]
+      Address=172.16.0.1/24
+      Label=eth0:mgmt
+    mode: '0644'
+
+- name: Install dnsmasq for DHCP/DNS
+  ansible.builtin.apt:
+    name: dnsmasq
+    state: present
+  when: ansible_connection != "chroot"
+
+- name: Configure dnsmasq
+  ansible.builtin.copy:
+    dest: /etc/dnsmasq.d/pimeleon.conf
+    content: |
+      # Pi Router dnsmasq configuration
+      interface={{ lan_interface }}
+      bind-interfaces
+
+      # DHCP settings
+      dhcp-range={{ dhcp_range_start }},{{ dhcp_range_end }},12h
+      dhcp-option=option:router,{{ lan_ip }}
+      dhcp-option=option:dns-server,{{ lan_ip }}
+
+      # DNS settings
+      domain=lan
+      local=/lan/
+      expand-hosts
+
+      # Upstream DNS
+      server=8.8.8.8
+      server=8.8.4.4
+
+      # Cache settings
+      cache-size=1000
+
+      # Logging
+      log-queries
+      log-dhcp
+      log-facility=/var/log/dnsmasq.log
+    mode: '0644'
+
+- name: Configure hostapd for WiFi AP
+  ansible.builtin.copy:
+    dest: /etc/hostapd/hostapd.conf
+    content: |
+      interface={{ lan_interface }}
+      driver=nl80211
+      ssid=PiRouter
+      hw_mode=g
+      channel=6
+      ieee80211n=1
+      wmm_enabled=1
+      ht_capab=[HT40][SHORT-GI-20][DSSS_CCK-40]
+      macaddr_acl=0
+      auth_algs=1
+      ignore_broadcast_ssid=0
+      wpa=2
+      wpa_passphrase=changeme123
+      wpa_key_mgmt=WPA-PSK
+      rsn_pairwise=CCMP
+    mode: '0600'
+  when: "'wlan0' in ansible_interfaces"
+
+- name: Enable hostapd
+  ansible.builtin.lineinfile:
+    path: /etc/default/hostapd
+    regexp: '^#?DAEMON_CONF='
+    line: 'DAEMON_CONF="/etc/hostapd/hostapd.conf"'
+  when: "'wlan0' in ansible_interfaces"
+
+- name: Configure nftables firewall
+  ansible.builtin.copy:
+    dest: /etc/nftables.conf
+    content: |
+      #!/usr/sbin/nft -f
+
+      flush ruleset
+
+      table inet filter {
+          chain input {
+              type filter hook input priority 0; policy drop;
+
+              # Accept loopback
+              iif lo accept
+
+              # Accept established connections
+              ct state established,related accept
+
+              # Accept ICMP
+              ip protocol icmp accept
+              ip6 nexthdr icmpv6 accept
+
+              # Accept SSH on management network
+              tcp dport 22 ip saddr 172.16.0.0/24 accept
+
+              # Accept DHCP/DNS from LAN
+              iifname "{{ lan_interface }}" udp dport { 53, 67 } accept
+              iifname "{{ lan_interface }}" tcp dport 53 accept
+
+              # Log dropped packets
+              log prefix "[NFT-DROP-INPUT] " level info
+          }
+
+          chain forward {
+              type filter hook forward priority 0; policy drop;
+
+              # Accept established connections
+              ct state established,related accept
+
+              # Allow LAN to WAN
+              iifname "{{ lan_interface }}" oifname "{{ wan_interface }}" accept
+
+              # Log dropped packets
+              log prefix "[NFT-DROP-FORWARD] " level info
+          }
+
+          chain output {
+              type filter hook output priority 0; policy accept;
+          }
+      }
+
+      table ip nat {
+          chain prerouting {
+              type nat hook prerouting priority -100;
+          }
+
+          chain postrouting {
+              type nat hook postrouting priority 100;
+
+              # Masquerade LAN traffic going to WAN
+              oifname "{{ wan_interface }}" masquerade
+          }
+      }
+    mode: '0755'
