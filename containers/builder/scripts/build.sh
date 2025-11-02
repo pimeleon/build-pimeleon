@@ -13,11 +13,11 @@ IMAGE_NAME="pimeleon-$(date +%Y%m%d-%H%M%S).img"
 IMAGE_PATH="${OUTPUT_DIR}/${IMAGE_NAME}"
 LOG_FILE="${OUTPUT_DIR}/build-$(date +%Y%m%d-%H%M%S).log"
 
-# Default values
-RPI_MODEL="${RPI_MODEL:-3B+}"
-IMAGE_SIZE="${IMAGE_SIZE:-4G}"
-RASPBIAN_VERSION="${RASPBIAN_VERSION:-buster}"
-RASPBIAN_MIRROR="${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.org/raspbian/}"
+# Default values and export for all stages
+export PIMELEON_RPI_MODEL="${PIMELEON_RPI_MODEL:-3B+}"
+export PIMELEON_IMAGE_SIZE="${PIMELEON_IMAGE_SIZE:-4G}"
+export RASPBIAN_VERSION="${RASPBIAN_VERSION:-buster}"
+export RASPBIAN_MIRROR="${RASPBIAN_MIRROR:-http://archive.raspbian.org/raspbian/}"
 
 # Export APT cache configuration for all stages
 export APT_CACHE_SERVER="${APT_CACHE_SERVER:-}"
@@ -46,7 +46,7 @@ cd "${WORK_DIR}"
 
 # Stage 1: Base System
 log_section "Stage 1: Creating base system"
-/scripts/stage1-base.sh "${WORK_DIR}" "${IMAGE_PATH}" "${IMAGE_SIZE}"
+/scripts/stage1-base.sh "${WORK_DIR}" "${IMAGE_PATH}" "${PIMELEON_IMAGE_SIZE}"
 
 # Stage 2: Customization
 log_section "Stage 2: Customizing system"

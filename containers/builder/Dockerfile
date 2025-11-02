@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.6
 # Pi Router Build Container
 FROM debian:12-slim AS base
 

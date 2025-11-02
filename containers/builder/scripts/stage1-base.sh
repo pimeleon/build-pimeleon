@@ -17,8 +17,8 @@ fi
 
 MOUNT_POINT="${WORK_DIR}/mount"
 CACHE_VERSION="v1"  # Increment when base system changes significantly
-# Normalize RPI_MODEL for cache naming (3B+ -> rpi3, 4B -> rpi4, etc.)
-RPI_CACHE_NAME=$(echo "${RPI_MODEL}" | sed -E 's/^([0-9]+).*/rpi\1/')
+# Normalize PIMELEON_RPI_MODEL for cache naming (3B+ -> rpi3, 4B -> rpi4, etc.)
+RPI_CACHE_NAME=$(echo "${PIMELEON_RPI_MODEL}" | sed -E 's/^([0-9]+).*/rpi\1/')
 RASPBIAN_CACHE_KEY="pimeleon-${RPI_CACHE_NAME}-${RASPBIAN_VERSION}-base-${CACHE_VERSION}.tar.gz"
 
 log_info "Creating image file: ${IMAGE_PATH}"

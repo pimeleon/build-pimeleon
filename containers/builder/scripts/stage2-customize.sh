@@ -144,7 +144,7 @@ done
 log_info "Creating pi user"
 chroot_run "${MOUNT_POINT}" useradd -m -s /bin/bash -G sudo,adm,dialout,cdrom,audio,video,plugdev,games,users,input,netdev,gpio,i2c,spi pi
 # Set password - use environment variable or default thematic word
-TEMP_PASSWORD="${PI_INITIAL_PASSWORD:-netblox}"
+TEMP_PASSWORD="${PIMELEON_INITIAL_PASSWORD:-netblox}"
 echo "pi:${TEMP_PASSWORD}" | chroot_run "${MOUNT_POINT}" chpasswd
 echo "${TEMP_PASSWORD}" | sudo tee "${OUTPUT_DIR}/pi-initial-password.txt" > /dev/null
 sudo chmod 600 "${OUTPUT_DIR}/pi-initial-password.txt"
