@@ -1,4 +1,4 @@
-// Custom JavaScript for Pimeleon Documentation
+// Custom JavaScript for Pi Router Documentation
 
 document.addEventListener('DOMContentLoaded', function() {
     // Add copy button feedback
