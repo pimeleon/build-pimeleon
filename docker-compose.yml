@@ -22,10 +22,10 @@ services:
       - OUTPUT_DIR=/output
       - ANSIBLE_CONFIG=/ansible/ansible.cfg
       - DEBIAN_FRONTEND=noninteractive
-      - RPI_MODEL=${RPI_MODEL:-3B+}
-      - IMAGE_SIZE=${IMAGE_SIZE:-4G}
+      - PIROUTER_RPI_MODEL=${PIROUTER_RPI_MODEL:-3B+}
+      - PIROUTER_IMAGE_SIZE=${PIROUTER_IMAGE_SIZE:-4G}
       - RASPBIAN_VERSION=${RASPBIAN_VERSION:-buster}
-      - RASPBIAN_MIRROR=${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.org/raspbian/}
+      - RASPBIAN_MIRROR=${RASPBIAN_MIRROR:-http://archive.raspbian.org/raspbian/}
       - APT_CACHE_SERVER=${APT_CACHE_SERVER:-}
       - APT_CACHE_PORT=${APT_CACHE_PORT:-3142}
     privileged: true

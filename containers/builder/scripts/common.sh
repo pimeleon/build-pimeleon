@@ -179,7 +179,7 @@ generate_metadata() {
         "sha256": "$sha256sum"
     },
     "build_info": {
-        "rpi_model": "${RPI_MODEL:-3B+}",
+        "rpi_model": "${PIROUTER_RPI_MODEL:-3B+}",
         "raspbian_version": "${RASPBIAN_VERSION:-buster}",
         "builder_version": "1.0.0"
     }
