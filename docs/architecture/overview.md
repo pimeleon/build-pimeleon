@@ -1,7 +1,6 @@
 # Architecture Overview
 
-The Pimeleon Build System is a containerized, multi-stage build pipeline that creates
-bootable Raspberry Pi images using ARM cross-compilation and QEMU emulation.
+The Pi Router Build System is a containerized, multi-stage build pipeline that creates bootable Raspberry Pi images using ARM cross-compilation and QEMU emulation.
 
 ## High-Level Architecture
 
@@ -459,28 +458,22 @@ graph TB
 
 <div class="grid cards" markdown>
 
-- **Container Details**
+-   **Container Details**
 
     Detailed specifications of each container, Dockerfiles, and tools
 
     [:octicons-arrow-right-24: Containers](containers.md)
 
-- **Build Pipeline**
+-   **Build Pipeline**
 
     Deep dive into each build stage and what happens
 
     [:octicons-arrow-right-24: Build Pipeline](build-pipeline.md)
 
-- **Network Design**
+-   **Network Design**
 
     Network architecture, interfaces, and routing configuration
 
     [:octicons-arrow-right-24: Network Design](networking.md)
-
-- **CI/CD Infrastructure**
-
-    Automated build, test, and release pipelines
-
-    [:octicons-arrow-right-24: CI/CD Infrastructure](cicd.md)
 
 </div>
