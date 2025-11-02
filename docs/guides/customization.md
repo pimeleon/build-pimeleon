@@ -1,6 +1,6 @@
 # Customization Guide
 
-How to customize your Pimeleon builds.
+How to customize your Pi Router builds.
 
 ## Network Configuration
 

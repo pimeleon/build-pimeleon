@@ -8,7 +8,7 @@ Solutions for common build failures.
 
 ## Runtime Issues
 
-Troubleshooting deployed Pimeleon images.
+Troubleshooting deployed Pi Router images.
 
 ## Performance Problems
 
