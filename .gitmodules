@@ -1,4 +1,0 @@
-[submodule "docs-web"]
-	path = docs-web
-	url = ssh://git@gitlab.pimeleon.dev:2222/pimeleon/docs-web.git
-	branch = master
