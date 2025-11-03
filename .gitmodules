@@ -1,4 +1,0 @@
-[submodule "docs-web"]
-	path = docs-web
-	url = ssh://git@gitlab.pirouter.dev:2222/pirouter/docs-web.git
-	branch = master
