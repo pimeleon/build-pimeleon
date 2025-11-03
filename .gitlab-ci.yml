@@ -5,6 +5,7 @@ stages:
   - scan
   - publish
   - deploy
+  - docs
 
 variables:
   DOCKER_DRIVER: overlay2
@@ -203,3 +204,42 @@ deploy:production:
   only:
     - tags
   when: manual
+
+# Documentation deployment triggers
+docs:trigger-production:
+  stage: docs
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl git
+  script:
+    - |
+      # Update submodule to latest master
+      git submodule update --remote --merge docs-web
+      # Trigger docs-web pipeline for production deployment
+      curl --request POST \
+           --form token=$DOCS_WEB_TRIGGER_TOKEN \
+           --form ref=master \
+           "https://gitlab.pirouter.dev:8443/api/v4/projects/pirouter%2Fdocs-web/trigger/pipeline"
+  only:
+    - master
+    - tags
+  when: on_success
+
+docs:trigger-preview:
+  stage: docs
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl git
+  script:
+    - |
+      # Update submodule to latest preview
+      git submodule update --remote --merge docs-web
+      # Trigger docs-web pipeline for preview deployment
+      curl --request POST \
+           --form token=$DOCS_WEB_TRIGGER_TOKEN \
+           --form ref=preview \
+           "https://gitlab.pirouter.dev:8443/api/v4/projects/pirouter%2Fdocs-web/trigger/pipeline"
+  only:
+    - develop
+    - preview
+  when: on_success
