@@ -34,6 +34,14 @@
 
     [:octicons-arrow-right-24: Reference Docs](reference/cli-commands.md)
 
+-   :material-devices:{ .lg .middle } __Multi-Platform__
+
+    ---
+
+    Support for multiple ARM SBCs with hardware profiles
+
+    [:octicons-arrow-right-24: Platform Documentation](platforms/README.md)
+
 </div>
 
 ## Overview
@@ -75,8 +83,12 @@ The build system produces:
 
 Currently supports:
 
-- **Raspberry Pi 3B+** (primary target)
-- Future: Pi 4, Pi Zero W, Pi Zero 2 W
+- **Raspberry Pi 3B+** (primary target, stable)
+- **Raspberry Pi 4B** (planned)
+- **Orange Pi 5 Plus** (planned, proof-of-concept)
+- **Community platforms** (contribution framework ready)
+
+[:octicons-arrow-right-24: View Platform Comparison](platforms/README.md)
 
 ### Technology Stack
 
@@ -138,6 +150,10 @@ docker compose run --rm builder
 -   **Want to contribute?**
 
     See the [Development Setup](contributing/development.md) and [Testing Guide](contributing/testing.md)
+
+-   **Adding a new platform?**
+
+    Check out the [Multi-Platform Strategy](architecture/multi-platform-strategy.md) and [Platform Contribution Guide](contributing/adding-platforms.md)
 
 </div>
 
