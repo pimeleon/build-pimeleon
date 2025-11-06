@@ -56,6 +56,7 @@ htmlcov/
 secrets/
 .env
 .env.*
+!.env.example
 
 # VM images and states
 *.qcow2.backup
