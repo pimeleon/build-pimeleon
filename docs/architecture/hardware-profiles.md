@@ -2,9 +2,7 @@
 
 ## Overview
 
-Hardware profiles are YAML files that describe platform-specific configurations for building
-router images. Each profile contains all the information needed to build a bootable image for
-a specific ARM single-board computer.
+Hardware profiles are YAML files that describe platform-specific configurations for building router images. Each profile contains all the information needed to build a bootable image for a specific ARM single-board computer.
 
 **Location**: `platforms/${PLATFORM}/profiles/${MODEL}.yaml`
 
@@ -73,7 +71,7 @@ bootloader:
 # Operating system configuration
 os:
   distribution: raspbian       # raspbian, debian, ubuntu, armbian
-  version: bullseye            # Codename: bullseye, bookworm, trixie
+  version: buster              # Codename: buster, bullseye, bookworm, jammy
   mirror: http://archive.raspbian.org/raspbian/
   architecture: armhf          # Must match hardware.architecture
 
@@ -236,7 +234,6 @@ Describes the profile itself and its maintenance status.
 | `documentation_url` | string | No | Link to vendor documentation |
 
 **Example**:
-
 ```yaml
 metadata:
   platform: orangepi
@@ -261,7 +258,6 @@ Physical hardware specifications.
 | `storage_interface` | enum | Yes | `sdcard`, `emmc`, `nvme`, `sata` |
 
 **Example (Orange Pi 5+)**:
-
 ```yaml
 hardware:
   architecture: arm64
@@ -286,7 +282,6 @@ Bootloader and boot partition configuration.
 | `device_tree` | string | No | Device tree blob filename |
 
 **Example (U-Boot for Orange Pi)**:
-
 ```yaml
 bootloader:
   type: u-boot
@@ -312,7 +307,6 @@ Operating system and package repository configuration.
 | `additional_repos` | array | No | Extra APT repositories |
 
 **Example (Armbian)**:
-
 ```yaml
 os:
   distribution: armbian
@@ -338,7 +332,6 @@ Package selection for the platform.
 | `additional` | array | No | Other required packages |
 
 **Example**:
-
 ```yaml
 packages:
   kernel: linux-image-current-rockchip-rk3588
@@ -364,7 +357,6 @@ Storage device and partition configuration.
 | `root_fs` | string | Yes | Root filesystem type |
 
 **Device Naming Examples**:
-
 - SD card: `mmcblk0` → partitions: `mmcblk0p1`, `mmcblk0p2`
 - eMMC: `mmcblk1` → partitions: `mmcblk1p1`, `mmcblk1p2`
 - NVMe: `nvme0n1` → partitions: `nvme0n1p1`, `nvme0n1p2`
@@ -383,7 +375,6 @@ Hardware capabilities and required system groups.
 | `hardware_groups` | array | No | System groups to create |
 
 **Example**:
-
 ```yaml
 features:
   uart: true
@@ -408,7 +399,6 @@ Testing and validation configuration.
 | `platform_tests` | array | No | Platform-specific tests |
 
 **Example**:
-
 ```yaml
 testing:
   qemu_machine: raspi3b
@@ -427,8 +417,8 @@ testing:
 
 ```bash
 # Build script determines profile path
-PLATFORM="${PIMELEON_PLATFORM:-raspberrypi}"
-MODEL="${PIMELEON_MODEL:-3B+}"
+PLATFORM="${PIROUTER_PLATFORM:-raspberrypi}"
+MODEL="${PIROUTER_MODEL:-3B+}"
 PROFILE_PATH="platforms/${PLATFORM}/profiles/${MODEL}.yaml"
 ```
 
@@ -599,7 +589,7 @@ storage:
 yq eval '.' platforms/orangepi/profiles/5-plus.yaml
 
 # Test build
-PIMELEON_PLATFORM=orangepi PIMELEON_MODEL=5-plus make build
+PIROUTER_PLATFORM=orangepi PIROUTER_MODEL=5-plus make build
 ```
 
 ## Boot Configuration Templates
