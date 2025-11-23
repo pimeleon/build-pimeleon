@@ -9,10 +9,11 @@ Pi Router Build System supports Raspberry Pi single-board computers through a YA
 | Platform | Model | Architecture | Status | Maintainer |
 |----------|-------|--------------|--------|------------|
 | Raspberry Pi | 3 Model B+ | ARMv7 (32-bit) | ✅ Stable | Core Team |
-| Raspberry Pi | 4 Model B | ARMv8 (64-bit) | ✅ Stable | Core Team |
+| Raspberry Pi | 4 Model B | ARMv8 (64-bit capable) | 🚧 Partial | Core Team |
 
 **Status Levels**:
 - ✅ **Stable**: Production-ready, extensively tested, full support
+- 🚧 **Partial**: Builds work but not fully optimized for hardware
 
 ## Quick Platform Selection
 
@@ -25,6 +26,7 @@ Pi Router Build System supports Raspberry Pi single-board computers through a YA
 - **Best for**: Gigabit throughput, future-proof builds
 - **Estimated Cost**: ~$45-75 USD
 - **Throughput**: ~940 Mbps (true Gigabit Ethernet)
+- **Note**: Currently builds with 32-bit/Pi 3B+ config. See [Pi 4B Guide](raspberrypi/4b.md) for details.
 
 ## Platform Comparison
 
