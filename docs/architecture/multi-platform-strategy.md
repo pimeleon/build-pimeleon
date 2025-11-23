@@ -388,7 +388,7 @@ See [Migration Roadmap](migration-roadmap.md) for detailed phase-by-phase implem
 - [Hardware Profiles Schema](hardware-profiles.md) - YAML profile reference
 - [Migration Roadmap](migration-roadmap.md) - Detailed implementation plan
 - [Contributing Platforms](../contributing/adding-platforms.md) - Community contribution guide
-- [Platform Comparison](../platforms/index.md) - Supported platforms matrix
+- [Platform Comparison](../platforms/README.md) - Supported platforms matrix
 
 ## Revision History
 
