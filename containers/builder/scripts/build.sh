@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Pi Router Build Script
-# Main entry point for building Pi Router images
+# Pimeleon Build Script
+# Main entry point for building Pimeleon images
 
 # Source common functions
 source /scripts/common.sh
@@ -27,7 +27,7 @@ export APT_CACHE_PORT="${APT_CACHE_PORT:-3142}"
 exec > >(tee -a "${LOG_FILE}")
 exec 2>&1
 
-log_info "Pi Router Build System"
+log_info "Pimeleon Build System"
 log_info "====================="
 log_info "Build started at: $(date)"
 log_info "Output directory: ${OUTPUT_DIR}"

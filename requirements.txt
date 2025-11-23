@@ -1,4 +1,4 @@
-# MkDocs Material and dependencies for Pi Router documentation
+# MkDocs Material and dependencies for Pimeleon documentation
 # Install with: pip install -r requirements.txt
 
 # Core MkDocs

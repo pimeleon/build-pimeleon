@@ -1,4 +1,4 @@
-# Pi Router Build System
+# Pimeleon Build System
 
 A containerized build system for creating Raspberry Pi 3B+ router images with ARM emulation and automated testing.
 
@@ -23,7 +23,7 @@ cd pimeleon-build
 # Build containers (with APT cache optimization)
 docker compose build
 
-# Create Pi Router image
+# Create Pimeleon image
 docker compose run --rm builder
 ```
 

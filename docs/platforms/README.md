@@ -2,7 +2,7 @@
 
 ## Overview
 
-Pi Router Build System supports Raspberry Pi single-board computers through a YAML-based hardware profile system. The build system creates custom router images optimized for each supported model.
+Pimeleon Build System supports Raspberry Pi single-board computers through a YAML-based hardware profile system. The build system creates custom router images optimized for each supported model.
 
 ## Supported Platforms
 
@@ -104,4 +104,4 @@ See [Multi-Platform Strategy](../architecture/multi-platform-strategy.md) for th
 ---
 
 **Last Updated**: 2025-01-06
-**Maintained By**: Pi Router Core Team
+**Maintained By**: Pimeleon Core Team

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Common functions for Pi Router build scripts
+# Common functions for Pimeleon build scripts
 
 # Color codes for output
 RED='\033[0;31m'

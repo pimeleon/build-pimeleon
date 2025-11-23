@@ -1,5 +1,5 @@
 #!/bin/bash
-# benchmark-build.sh - Pi Router Build System Benchmarking Wrapper
+# benchmark-build.sh - Pimeleon Build System Benchmarking Wrapper
 # Collects comprehensive build metrics and system information
 
 set -e
@@ -10,7 +10,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🔬 Pi Router Build System - Benchmarking Tool${NC}"
+echo -e "${BLUE}🔬 Pimeleon Build System - Benchmarking Tool${NC}"
 echo "=========================================================="
 
 # Parse command line arguments
@@ -222,7 +222,7 @@ else
 fi
 
 if [[ $BUILD_EXIT_CODE -eq 0 ]]; then
-    echo -e "\n${BLUE}🚀 Running Pi Router image build...${NC}"
+    echo -e "\n${BLUE}🚀 Running Pimeleon image build...${NC}"
     docker compose run --rm builder >/dev/null 2>&1 || BUILD_EXIT_CODE=$?
 fi
 

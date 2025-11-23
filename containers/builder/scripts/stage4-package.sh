@@ -71,14 +71,14 @@ cp "${IMAGE_PATH}.version.txt" "${RELEASE_DIR}/"
 
 # Create README for the release
 cat > "${RELEASE_DIR}/README.txt" <<EOF
-Pi Router Image Release
+Pimeleon Image Release
 ======================
 
 Release: ${RELEASE_NAME}
 Date: $(date)
 
 Contents:
-- $(basename ${IMAGE_PATH}.xz) - Compressed Pi Router image
+- $(basename ${IMAGE_PATH}.xz) - Compressed Pimeleon image
 - *.md5, *.sha256 - Checksum files
 - metadata.json - Build metadata
 - packages.txt - Installed package list

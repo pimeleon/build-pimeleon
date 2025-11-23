@@ -69,7 +69,7 @@ libvirt/images/
 node_modules/
 vendor/
 
-# Pi Router build system
+# Pimeleon build system
 *test*.*
 benchmarks/*
 output/*

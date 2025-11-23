@@ -1,5 +1,5 @@
 ---
-# Base setup tasks for Pi Router
+# Base setup tasks for Pimeleon
 - name: Set system hostname
   ansible.builtin.hostname:
     name: pimeleon
@@ -154,7 +154,7 @@
   ansible.builtin.copy:
     dest: /etc/dhcp/dhcpd.conf
     content: |
-      # Basic DHCP configuration for Pi Router
+      # Basic DHCP configuration for Pimeleon
       option domain-name "lan";
       option domain-name-servers 192.168.76.1, 192.168.77.1;
 
@@ -195,7 +195,7 @@
   ansible.builtin.copy:
     dest: /etc/hostapd/hostapd.conf
     content: |
-      # Basic hostapd configuration for Pi Router
+      # Basic hostapd configuration for Pimeleon
       interface=wlan0
       driver=nl80211
 

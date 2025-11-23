@@ -2,11 +2,11 @@
 
 # Default target
 help:
-	@echo "Pi Router Build System"
+	@echo "Pimeleon Build System"
 	@echo "====================="
 	@echo ""
 	@echo "Available targets:"
-	@echo "  make build       - Build Pi Router image"
+	@echo "  make build       - Build Pimeleon image"
 	@echo "  make test        - Run all tests"
 	@echo "  make test-smoke  - Run smoke tests only"
 	@echo "  make clean       - Clean build artifacts"
@@ -18,12 +18,12 @@ help:
 
 # Build targets
 build:
-	@echo "Building Pi Router image..."
+	@echo "Building Pimeleon image..."
 	docker-compose build builder
 	docker-compose run --rm builder
 
 build-nocache:
-	@echo "Building Pi Router image (no cache)..."
+	@echo "Building Pimeleon image (no cache)..."
 	docker-compose build --no-cache builder
 	docker-compose run --rm builder
 
@@ -86,7 +86,7 @@ docs:
 	@mkdir -p docs
 	@docker run --rm -v $(PWD):/workspace -w /workspace \
 		sphinxdoc/sphinx-latexpdf \
-		sphinx-quickstart -q -p "Pi Router Build System" -a "Pi Router Team" -v "1.0" --ext-autodoc --ext-viewcode --makefile docs/
+		sphinx-quickstart -q -p "Pimeleon Build System" -a "Pimeleon Team" -v "1.0" --ext-autodoc --ext-viewcode --makefile docs/
 
 # Cleanup targets
 clean:
@@ -117,7 +117,7 @@ ci-local:
 
 # Version information
 version:
-	@echo "Pi Router Build System v1.0.0"
+	@echo "Pimeleon Build System v1.0.0"
 	@echo "Docker version:"
 	@docker --version
 	@echo "Docker Compose version:"

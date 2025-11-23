@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Smoke tests for Pi Router
+# Smoke tests for Pimeleon
 # Quick validation of basic functionality
 
 source /scripts/test-common.sh

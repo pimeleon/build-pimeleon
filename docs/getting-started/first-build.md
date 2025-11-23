@@ -1,6 +1,6 @@
 # Your First Build
 
-This guide walks you through building your first Pi Router image step-by-step, explaining what happens at each stage.
+This guide walks you through building your first Pimeleon image step-by-step, explaining what happens at each stage.
 
 ## Before You Start
 
@@ -79,7 +79,7 @@ Successfully tagged pimeleon-builder:latest
 
 ### 4. Run Your First Build
 
-Now create your first Pi Router image:
+Now create your first Pimeleon image:
 
 === "Quick Build (Default)"
 
@@ -165,7 +165,7 @@ You'll see output organized by stages:
 ═══════════════════════════════════════════════════════════
 
 [INFO] Running Ansible playbooks...
-PLAY [Pi Router Complete Setup] ************************************
+PLAY [Pimeleon Complete Setup] ************************************
 
 TASK [Set system hostname] *****************************************
 changed: [pimeleon]
@@ -422,7 +422,7 @@ docker compose run --rm builder
 
 ## Next Steps
 
-Congratulations! You've successfully built and deployed your first Pi Router image. 🎉
+Congratulations! You've successfully built and deployed your first Pimeleon image. 🎉
 
 Now you can:
 

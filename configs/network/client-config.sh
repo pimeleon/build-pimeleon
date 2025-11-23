@@ -1,5 +1,5 @@
 #!/bin/bash
-# APT Cache Client Configuration Script for Pi Router Network
+# APT Cache Client Configuration Script for Pimeleon Network
 # This script configures any Debian-based system to use the APT cache
 
 set -e
@@ -36,7 +36,7 @@ else
     exit 1
 fi
 
-print_msg "=== APT Cache Configuration for Pi Router Network ===" "$GREEN"
+print_msg "=== APT Cache Configuration for Pimeleon Network ===" "$GREEN"
 print_msg "Detected: $DISTRO $VERSION" "$YELLOW"
 print_msg "Cache Server: $PROXY_URL" "$YELLOW"
 
@@ -67,7 +67,7 @@ configure_apt() {
     
     # Create proxy configuration
     cat > "$proxy_conf" << EOF
-# APT Cacher NG Proxy Configuration - Pi Router Network
+# APT Cacher NG Proxy Configuration - Pimeleon Network
 # Generated: $(date)
 # Cache Server: $CACHE_SERVER
 
@@ -85,7 +85,7 @@ Acquire::http::ConnectionAttemptDelayMsec "500";
 Acquire::http::Pipeline-Depth "5";
 
 # Cache-specific headers
-Acquire::http::User-Agent "Pi-Router-Client/1.0";
+Acquire::http::User-Agent "Pimeleon-Client/1.0";
 EOF
     
     print_msg "✓ APT proxy configuration created" "$GREEN"
@@ -143,9 +143,9 @@ remove_configuration() {
     fi
 }
 
-# Function for Pi Router auto-discovery setup
+# Function for Pimeleon auto-discovery setup
 setup_autodiscovery() {
-    print_msg "\nSetting up auto-discovery for Pi Router network..." "$YELLOW"
+    print_msg "\nSetting up auto-discovery for Pimeleon network..." "$YELLOW"
     
     # Create systemd service for DHCP option injection
     cat > /etc/systemd/system/apt-cache-announce.service << EOF
@@ -169,12 +169,12 @@ EOF
 # Main menu
 show_menu() {
     echo
-    print_msg "=== Pi Router APT Cache Configuration ===" "$GREEN"
+    print_msg "=== Pimeleon APT Cache Configuration ===" "$GREEN"
     echo "1) Configure this system to use cache"
     echo "2) Test cache connectivity"
     echo "3) Show cache statistics"
     echo "4) Remove cache configuration"
-    echo "5) Setup auto-discovery (Pi Router only)"
+    echo "5) Setup auto-discovery (Pimeleon only)"
     echo "6) Exit"
     echo
     read -p "Select option: " choice
@@ -217,7 +217,7 @@ elif [ "$1" = "--test" ]; then
     test_cache && test_configuration
 elif [ "$1" = "--help" ]; then
     echo "Usage: $0 [OPTION]"
-    echo "Configure APT to use Pi Router cache server"
+    echo "Configure APT to use Pimeleon cache server"
     echo
     echo "Options:"
     echo "  --auto    Configure automatically"

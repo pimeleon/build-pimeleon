@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Pi Router Test Runner
+# Pimeleon Test Runner
 # Main entry point for running all tests
 
 # Configuration
@@ -53,7 +53,7 @@ init_results() {
 
 # Main test execution
 main() {
-    log_info "Pi Router Test Suite"
+    log_info "Pimeleon Test Suite"
     log_info "==================="
     log_info "Test suite: ${TEST_SUITE}"
     

@@ -1,4 +1,4 @@
-# Pi Router Test Container
+# Pimeleon Test Container
 FROM ubuntu:22.04
 
 # Prevent interactive prompts

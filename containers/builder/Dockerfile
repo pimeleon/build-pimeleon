@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.6
-# Pi Router Build Container
+# Pimeleon Build Container
 FROM debian:12-slim AS base
 
 # Build arguments for APT cache configuration

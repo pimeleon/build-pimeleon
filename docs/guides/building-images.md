@@ -1,6 +1,6 @@
 # Building Images
 
-Complete guide to building Pi Router images.
+Complete guide to building Pimeleon images.
 
 ## Basic Build
 

@@ -1,5 +1,5 @@
 {
-    "name": "Pi Router Build System",
+    "name": "Pimeleon Build System",
     "dockerComposeFile": "docker-compose.yml",
     "service": "dev",
     "workspaceFolder": "/workspace",

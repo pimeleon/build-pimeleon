@@ -1,6 +1,6 @@
 # Getting Started
 
-Welcome to the Pi Router Build System! This guide will help you build your first custom Raspberry Pi router image in just a few minutes.
+Welcome to the Pimeleon Build System! This guide will help you build your first custom Raspberry Pi router image in just a few minutes.
 
 ## What You'll Build
 
@@ -75,7 +75,7 @@ docker compose build
 
 ### Step 4: Create Your First Image
 
-Run the builder to create a Pi Router image:
+Run the builder to create a Pimeleon image:
 
 === "With APT Cache (Recommended)"
 
@@ -176,7 +176,7 @@ Flash the image to a microSD card (8GB minimum):
 !!! warning "Data Loss Warning"
     Double-check the device name! `dd` will overwrite all data on the target device.
 
-### Step 7: Boot Your Pi Router
+### Step 7: Boot Your Pimeleon
 
 1. Insert the SD card into your Raspberry Pi 3B+
 2. Connect:
@@ -186,7 +186,7 @@ Flash the image to a microSD card (8GB minimum):
 3. Power on the Pi
 4. Wait 1-2 minutes for first boot
 
-### Step 8: Access Your Pi Router
+### Step 8: Access Your Pimeleon
 
 Once booted, access via SSH:
 
@@ -292,6 +292,6 @@ See [CLI Commands](../reference/cli-commands.md) for complete reference.
 
 ✅ You've successfully built a custom Raspberry Pi router image!
 ✅ You know how to flash it to an SD card
-✅ You can access your Pi Router via SSH
+✅ You can access your Pimeleon via SSH
 
 Now explore the guides to customize and optimize your builds!

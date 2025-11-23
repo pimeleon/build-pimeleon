@@ -11,7 +11,7 @@ cat > "$REPORT_FILE" <<'EOF'
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Pi Router Test Report</title>
+    <title>Pimeleon Test Report</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -89,7 +89,7 @@ cat > "$REPORT_FILE" <<'EOF'
 </head>
 <body>
     <div class="container">
-        <h1>Pi Router Test Report</h1>
+        <h1>Pimeleon Test Report</h1>
         <p class="timestamp">Generated: $(date)</p>
         
         <div class="summary">

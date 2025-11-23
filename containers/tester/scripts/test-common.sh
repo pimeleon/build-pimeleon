@@ -1,5 +1,5 @@
 #!/bin/bash
-# Common functions for Pi Router tests
+# Common functions for Pimeleon tests
 
 # Color codes for output
 RED='\033[0;31m'

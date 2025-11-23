@@ -73,7 +73,7 @@ wget -O /dev/null http://localhost:3142/debian/dists/bookworm/Release
 wget -O /dev/null http://localhost:3142/raspbian.raspberrypi.org/raspbian/dists/buster/Release
 
 # Test from your build machine (replace with your machine's IP)
-# Run this from your Pi Router build machine:
+# Run this from your Pimeleon build machine:
 # curl -I http://192.168.76.5:3142/debian/dists/bookworm/Release
 ```
 
@@ -95,7 +95,7 @@ grep -r "remap" /etc/apt-cacher-ng/ | grep -v ^#
 
 ### 7. Debug from Docker Build Container
 
-**From your Pi Router build machine:**
+**From your Pimeleon build machine:**
 
 ```bash
 # Check if container has proxy configuration

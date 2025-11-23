@@ -2,7 +2,7 @@
 
 ## Overview
 
-Thank you for your interest in adding support for a new ARM platform to Pi Router! This guide will walk you through the process of contributing a new hardware platform.
+Thank you for your interest in adding support for a new ARM platform to Pimeleon! This guide will walk you through the process of contributing a new hardware platform.
 
 **Target Audience**: Community members who want to add support for new ARM single-board computers (Orange Pi, Rock Pi, Nano Pi, etc.)
 

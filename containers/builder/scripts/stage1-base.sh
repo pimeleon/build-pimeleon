@@ -166,7 +166,7 @@ fi
 # Configure basic boot files (firmware will be installed in stage2)
 log_info "Configuring basic boot files"
 sudo tee "${MOUNT_POINT}/boot/config.txt" > /dev/null <<EOF
-# Pi Router Boot Configuration
+# Pimeleon Boot Configuration
 enable_uart=1
 dtparam=spi=on
 dtparam=i2c_arm=on

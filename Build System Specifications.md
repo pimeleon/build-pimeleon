@@ -1,4 +1,4 @@
-# Pi Router Containerized Build System - Technical Specifications
+# Pimeleon Containerized Build System - Technical Specifications
 
 ## 1. System Architecture
 
@@ -29,7 +29,7 @@ Networks:
   lan_network:
     type: isolated
     subnet: 192.168.100.0/24
-    dhcp: false  # Pi Router provides DHCP
+    dhcp: false  # Pimeleon provides DHCP
     
   mgmt_network:
     type: bridge
@@ -43,7 +43,7 @@ Networks:
 ### 2.1 Build Container
 
 ```yaml
-Purpose: Create Pi Router images
+Purpose: Create Pimeleon images
 Tools:
   - debootstrap (Raspbian bootstrap)
   - qemu-user-static (ARM chroot)
@@ -52,13 +52,13 @@ Tools:
 Volumes:
   - ./builds:/output (generated images)
   - ./cache:/cache (package cache)
-  - ./configs:/configs (Pi Router configs)
+  - ./configs:/configs (Pimeleon configs)
 ```
 
 ### 2.2 Test Container
 
 ```yaml
-Purpose: Run and test Pi Router
+Purpose: Run and test Pimeleon
 Components:
   - libvirtd daemon
   - QEMU ARM system emulation
@@ -94,7 +94,7 @@ graph LR
     - Create loop devices
     - Bootstrap base system
 2. **Stage 2 - Customization**
-    - Install Pi Router packages
+    - Install Pimeleon packages
     - Configure networking
     - Apply security policies
 3. **Stage 3 - Optimization**

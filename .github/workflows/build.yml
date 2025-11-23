@@ -1,4 +1,4 @@
-name: Build Pi Router Image
+name: Build Pimeleon Image
 
 on:
   push:
@@ -50,7 +50,7 @@ jobs:
         continue-on-error: true
 
   build:
-    name: Build Pi Router Image
+    name: Build Pimeleon Image
     runs-on: ubuntu-latest
     needs: lint
     permissions:
@@ -85,7 +85,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
-      - name: Build Pi Router image
+      - name: Build Pimeleon image
         run: |
           docker run --rm \
             --privileged \
@@ -107,7 +107,7 @@ jobs:
           retention-days: 30
 
   test:
-    name: Test Pi Router Image
+    name: Test Pimeleon Image
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name != 'schedule'
@@ -200,7 +200,7 @@ jobs:
           prerelease: false
           files: output/*.tar.gz
           body: |
-            Pi Router Image Release
+            Pimeleon Image Release
             
             ## Changes
             - Built from commit: ${{ github.sha }}

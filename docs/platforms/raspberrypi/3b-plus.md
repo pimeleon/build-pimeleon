@@ -1,6 +1,6 @@
 # Raspberry Pi 3 Model B+
 
-The Raspberry Pi 3B+ is the **primary, fully-supported platform** for Pi Router. All build scripts are optimized and tested for this hardware.
+The Raspberry Pi 3B+ is the **primary, fully-supported platform** for Pimeleon. All build scripts are optimized and tested for this hardware.
 
 ## Status
 
@@ -44,7 +44,7 @@ export DOCKER_BUILDKIT=1 && \
 The build creates this optimized `config.txt`:
 
 ```ini
-# Pi Router Boot Configuration
+# Pimeleon Boot Configuration
 enable_uart=1
 dtparam=spi=on
 dtparam=i2c_arm=on
