@@ -1,5 +1,5 @@
 #!/bin/bash
-# Common functions for Pi Router tests
+# Common functions for Pimeleon tests
 
 # Color codes for output
 RED='\033[0;31m'
@@ -195,7 +195,7 @@ cleanup_on_exit() {
     log_info "Cleaning up test environment..."
     
     # Stop all test VMs
-    for vm in $(virsh list --name | grep -E "(test-|pi-router-)"); do
+    for vm in $(virsh list --name | grep -E "(test-|pimeleon-)"); do
         cleanup_vm "$vm"
     done
 }

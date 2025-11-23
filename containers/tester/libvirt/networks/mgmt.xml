@@ -5,7 +5,7 @@
   <ip address='172.16.0.1' netmask='255.255.255.0'>
     <dhcp>
       <range start='172.16.0.100' end='172.16.0.200'/>
-      <host mac='52:54:00:00:00:02' name='pi-router-mgmt' ip='172.16.0.10'/>
+      <host mac='52:54:00:00:00:02' name='pimeleon-mgmt' ip='172.16.0.10'/>
     </dhcp>
   </ip>
 </network>

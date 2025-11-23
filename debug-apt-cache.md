@@ -73,7 +73,7 @@ wget -O /dev/null http://localhost:3142/debian/dists/bookworm/Release
 wget -O /dev/null http://localhost:3142/raspbian.raspberrypi.org/raspbian/dists/buster/Release
 
 # Test from your build machine (replace with your machine's IP)
-# Run this from your Pi Router build machine:
+# Run this from your Pimeleon build machine:
 # curl -I http://192.168.76.5:3142/debian/dists/bookworm/Release
 ```
 
@@ -95,30 +95,30 @@ grep -r "remap" /etc/apt-cacher-ng/ | grep -v ^#
 
 ### 7. Debug from Docker Build Container
 
-**From your Pi Router build machine:**
+**From your Pimeleon build machine:**
 
 ```bash
 # Check if container has proxy configuration
-docker exec pi-router-builder cat /etc/apt/apt.conf.d/01proxy 2>/dev/null || echo "No proxy config found"
+docker exec pimeleon-builder cat /etc/apt/apt.conf.d/01proxy 2>/dev/null || echo "No proxy config found"
 
 # Test connectivity from inside container
-docker exec pi-router-builder curl -I http://192.168.76.5:3142/ 2>/dev/null || echo "Cannot reach cache server"
+docker exec pimeleon-builder curl -I http://192.168.76.5:3142/ 2>/dev/null || echo "Cannot reach cache server"
 
 # Test APT proxy from inside container
-docker exec pi-router-builder apt-get -o Debug::Acquire::http=true update | grep "Proxy"
+docker exec pimeleon-builder apt-get -o Debug::Acquire::http=true update | grep "Proxy"
 
 # Check container's APT configuration
-docker exec pi-router-builder apt-config dump | grep -i proxy
+docker exec pimeleon-builder apt-config dump | grep -i proxy
 
 # Test downloading a package through cache
-docker exec pi-router-builder apt-get -o Debug::Acquire::http=true install -y --download-only curl | grep "192.168.76.5"
+docker exec pimeleon-builder apt-get -o Debug::Acquire::http=true install -y --download-only curl | grep "192.168.76.5"
 
 # Check container's resolv.conf and routing
-docker exec pi-router-builder cat /etc/resolv.conf
-docker exec pi-router-builder ip route
+docker exec pimeleon-builder cat /etc/resolv.conf
+docker exec pimeleon-builder ip route
 
 # Test if container can reach cache server directly
-docker exec pi-router-builder telnet 192.168.76.5 3142 <<< 'quit'
+docker exec pimeleon-builder telnet 192.168.76.5 3142 <<< 'quit'
 ```
 
 **Monitor during container build:**
@@ -128,7 +128,7 @@ docker exec pi-router-builder telnet 192.168.76.5 3142 <<< 'quit'
 APT_CACHE_SERVER=192.168.76.5 docker compose run --rm -e DEBIAN_FRONTEND=noninteractive builder bash -c "apt-get -o Debug::Acquire::http=true update"
 
 # Terminal 2: Watch docker container logs
-docker logs -f pi-router-builder 2>&1 | grep -E "(192.168.76.5|proxy|cache)"
+docker logs -f pimeleon-builder 2>&1 | grep -E "(192.168.76.5|proxy|cache)"
 
 # Terminal 3: Monitor network from host
 sudo tcpdump -i any host 192.168.76.5 and port 3142 -v
@@ -164,10 +164,10 @@ grep -E "(Remap|PassThroughPattern)" /etc/apt-cacher-ng/acng.conf
 
 ```bash
 # On build machine, check if proxy is configured
-docker exec pi-router-builder cat /etc/apt/apt.conf.d/01proxy
+docker exec pimeleon-builder cat /etc/apt/apt.conf.d/01proxy
 
 # Test proxy from inside container
-docker exec pi-router-builder curl -I http://192.168.76.5:3142/
+docker exec pimeleon-builder curl -I http://192.168.76.5:3142/
 ```
 
 ### Issue: Docker Container Cannot Reach Cache Server
@@ -181,16 +181,16 @@ telnet 192.168.76.5 3142
 
 # Check Docker bridge network
 docker network ls
-docker network inspect pi-router-build_build-network
+docker network inspect pimeleon-build_build-network
 
 # Test from container with more verbose output
-docker exec pi-router-builder apt-get -o Debug::Acquire::http=true -o Debug::pkgAcquire::Worker=true update 2>&1 | head -50
+docker exec pimeleon-builder apt-get -o Debug::Acquire::http=true -o Debug::pkgAcquire::Worker=true update 2>&1 | head -50
 
 # Check if proxy environment variables are set in container
-docker exec pi-router-builder env | grep -i proxy
+docker exec pimeleon-builder env | grep -i proxy
 
 # Verify container can resolve DNS
-docker exec pi-router-builder nslookup 192.168.76.5 || docker exec pi-router-builder dig 192.168.76.5
+docker exec pimeleon-builder nslookup 192.168.76.5 || docker exec pimeleon-builder dig 192.168.76.5
 ```
 
 ### Issue: Build Args Not Passed to Container
@@ -199,13 +199,13 @@ docker exec pi-router-builder nslookup 192.168.76.5 || docker exec pi-router-bui
 
 ```bash
 # Check if build args were passed correctly
-docker image inspect pi-router-build-builder | jq '.[0].Config.Env' | grep -i cache
+docker image inspect pimeleon-build-builder | jq '.[0].Config.Env' | grep -i cache
 
 # Rebuild container with verbose output
 APT_CACHE_SERVER=192.168.76.5 docker compose build --no-cache --progress plain builder
 
 # Check environment variables in running container
-docker exec pi-router-builder env | grep APT_CACHE
+docker exec pimeleon-builder env | grep APT_CACHE
 ```
 
 ### Real-Time Debugging During Build

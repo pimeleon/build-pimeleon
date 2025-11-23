@@ -1,11 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-# Pi Router Test Runner
+# Pimeleon Test Runner
 # Main entry point for running all tests
 
 # Configuration
-TEST_IMAGE="${TEST_IMAGE:-/images/pi-router-*.img}"
+TEST_IMAGE="${TEST_IMAGE:-/images/pimeleon-*.img}"
 RESULTS_DIR="${TEST_RESULTS_DIR:-/results}"
 TEST_SUITE="${TEST_SUITE:-all}"
 
@@ -53,7 +53,7 @@ init_results() {
 
 # Main test execution
 main() {
-    log_info "Pi Router Test Suite"
+    log_info "Pimeleon Test Suite"
     log_info "==================="
     log_info "Test suite: ${TEST_SUITE}"
     

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Pi Router Build System supports Raspberry Pi single-board computers through a YAML-based hardware profile system. The build system creates custom router images optimized for each supported model.
+Pimeleon Build System supports Raspberry Pi single-board computers through a YAML-based hardware profile system. The build system creates custom router images optimized for each supported model.
 
 ## Supported Platforms
 
@@ -60,7 +60,7 @@ export DOCKER_BUILDKIT=1 && docker compose run --rm builder
 
 # Or explicitly:
 export DOCKER_BUILDKIT=1 && \
-  PIROUTER_RPI_MODEL=3B+ \
+  PIMELEON_RPI_MODEL=3B+ \
   docker compose run --rm builder
 ```
 
@@ -68,7 +68,7 @@ export DOCKER_BUILDKIT=1 && \
 
 ```bash
 export DOCKER_BUILDKIT=1 && \
-  PIROUTER_RPI_MODEL=4B \
+  PIMELEON_RPI_MODEL=4B \
   docker compose run --rm builder
 ```
 
@@ -84,7 +84,7 @@ export DOCKER_BUILDKIT=1 && \
 lsblk
 
 # Flash image (replace /dev/sdX with your device)
-sudo dd if=output/pi-router-*.img of=/dev/sdX bs=4M status=progress
+sudo dd if=output/pimeleon-*.img of=/dev/sdX bs=4M status=progress
 sudo sync
 ```
 
@@ -104,4 +104,4 @@ See [Multi-Platform Strategy](../architecture/multi-platform-strategy.md) for th
 ---
 
 **Last Updated**: 2025-01-06
-**Maintained By**: Pi Router Core Team
+**Maintained By**: Pimeleon Core Team

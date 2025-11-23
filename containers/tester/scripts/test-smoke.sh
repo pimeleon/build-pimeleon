@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Smoke tests for Pi Router
+# Smoke tests for Pimeleon
 # Quick validation of basic functionality
 
 source /scripts/test-common.sh
@@ -9,7 +9,7 @@ source /scripts/test-common.sh
 log_section "Starting smoke tests"
 
 # Test configuration
-VM_NAME="pi-router-smoke"
+VM_NAME="pimeleon-smoke"
 TIMEOUT=300  # 5 minutes
 RESULTS_FILE="${TEST_RESULTS_PATH}/smoke-test-results.txt"
 

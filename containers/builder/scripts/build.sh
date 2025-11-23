@@ -1,21 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
-# Pi Router Build Script
-# Main entry point for building Pi Router images
+# Pimeleon Build Script
+# Main entry point for building Pimeleon images
 
 # Source common functions
 source /scripts/common.sh
 
 # Configuration
 WORK_DIR="/tmp/build"
-IMAGE_NAME="pi-router-$(date +%Y%m%d-%H%M%S).img"
+IMAGE_NAME="pimeleon-$(date +%Y%m%d-%H%M%S).img"
 IMAGE_PATH="${OUTPUT_DIR}/${IMAGE_NAME}"
 LOG_FILE="${OUTPUT_DIR}/build-$(date +%Y%m%d-%H%M%S).log"
 
 # Default values and export for all stages
-export PIROUTER_RPI_MODEL="${PIROUTER_RPI_MODEL:-3B+}"
-export PIROUTER_IMAGE_SIZE="${PIROUTER_IMAGE_SIZE:-4G}"
+export PIMELEON_RPI_MODEL="${PIMELEON_RPI_MODEL:-3B+}"
+export PIMELEON_IMAGE_SIZE="${PIMELEON_IMAGE_SIZE:-4G}"
 export RASPBIAN_VERSION="${RASPBIAN_VERSION:-buster}"
 export RASPBIAN_MIRROR="${RASPBIAN_MIRROR:-http://archive.raspbian.org/raspbian/}"
 
@@ -27,7 +27,7 @@ export APT_CACHE_PORT="${APT_CACHE_PORT:-3142}"
 exec > >(tee -a "${LOG_FILE}")
 exec 2>&1
 
-log_info "Pi Router Build System"
+log_info "Pimeleon Build System"
 log_info "====================="
 log_info "Build started at: $(date)"
 log_info "Output directory: ${OUTPUT_DIR}"
@@ -46,7 +46,7 @@ cd "${WORK_DIR}"
 
 # Stage 1: Base System
 log_section "Stage 1: Creating base system"
-/scripts/stage1-base.sh "${WORK_DIR}" "${IMAGE_PATH}" "${PIROUTER_IMAGE_SIZE}"
+/scripts/stage1-base.sh "${WORK_DIR}" "${IMAGE_PATH}" "${PIMELEON_IMAGE_SIZE}"
 
 # Stage 2: Customization
 log_section "Stage 2: Customizing system"

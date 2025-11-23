@@ -1,4 +1,4 @@
-# Pi Router Build System - Current Status Summary
+# Pimeleon Build System - Current Status Summary
 
 ## 🎯 What's Working Now
 
@@ -20,7 +20,7 @@ A **production-ready containerized build system** that successfully creates boot
 - **Build time**: 15 minutes (cached) vs 45 minutes (fresh)
 
 ### Build Outputs
-- **4GB bootable images** - `output/pi-router-YYYYMMDD-HHMMSS.img`
+- **4GB bootable images** - `output/pimeleon-YYYYMMDD-HHMMSS.img`
 - **Detailed build logs** - `output/build-YYYYMMDD-HHMMSS.log`
 - **Generated credentials** - `output/pi-initial-password.txt`
 
@@ -89,7 +89,7 @@ APT_CACHE_PORT=3142              # Standard apt-cacher-ng port
 ### Build Artifacts Generated
 ```
 output/
-├── pi-router-20250829-153148.img    # 4GB bootable image
+├── pimeleon-20250829-153148.img    # 4GB bootable image
 ├── build-20250829-153148.log        # Detailed build log
 └── pi-initial-password.txt          # Generated Pi password
 
@@ -122,7 +122,7 @@ cache/
 ```bash
 # Standard workflow
 git clone <repo>
-cd pi-router-build
+cd pimeleon-build
 docker compose build
 docker compose run --rm builder
 

@@ -1,6 +1,6 @@
 # Your First Build
 
-This guide walks you through building your first Pi Router image step-by-step, explaining what happens at each stage.
+This guide walks you through building your first Pimeleon image step-by-step, explaining what happens at each stage.
 
 ## Before You Start
 
@@ -18,8 +18,8 @@ Make sure you've completed the [Prerequisites](prerequisites.md):
 If you haven't already:
 
 ```bash
-git clone https://github.com/yourusername/pi-router.git
-cd pi-router
+git clone https://github.com/yourusername/pimeleon.git
+cd pimeleon
 ```
 
 ### 2. Review Project Structure
@@ -31,7 +31,7 @@ tree -L 2
 ```
 
 ```
-pi-router/
+pimeleon/
 ├── docker-compose.yml          # Container orchestration
 ├── Makefile                    # Build automation
 ├── containers/                 # Dockerfiles and scripts
@@ -74,12 +74,12 @@ docker compose build
  => [builder] installing debootstrap
  => [builder] installing Ansible
  => exporting to image
-Successfully tagged pi-router-builder:latest
+Successfully tagged pimeleon-builder:latest
 ```
 
 ### 4. Run Your First Build
 
-Now create your first Pi Router image:
+Now create your first Pimeleon image:
 
 === "Quick Build (Default)"
 
@@ -112,9 +112,9 @@ Now create your first Pi Router image:
 
     ```bash
     export DOCKER_BUILDKIT=1
-    export PIROUTER_RPI_MODEL=3B+
-    export PIROUTER_IMAGE_SIZE=8G
-    export PIROUTER_INITIAL_PASSWORD=mysecurepassword
+    export PIMELEON_RPI_MODEL=3B+
+    export PIMELEON_IMAGE_SIZE=8G
+    export PIMELEON_INITIAL_PASSWORD=mysecurepassword
     export APT_CACHE_SERVER=192.168.76.5
     export RASPBIAN_MIRROR=http://archive.raspbian.org/raspbian/
 
@@ -149,7 +149,7 @@ You'll see output organized by stages:
 [INFO] Installing Raspberry Pi firmware...
 [INFO] Installing kernel...
 [INFO] Creating base system cache...
-[SUCCESS] Stage 1 complete! (cache/pirouter-rpi3-buster-base-v1.tar.gz)
+[SUCCESS] Stage 1 complete! (cache/pimeleon-rpi3-buster-base-v1.tar.gz)
 ```
 
 !!! tip "Build Time: Stage 1"
@@ -165,24 +165,24 @@ You'll see output organized by stages:
 ═══════════════════════════════════════════════════════════
 
 [INFO] Running Ansible playbooks...
-PLAY [Pi Router Complete Setup] ************************************
+PLAY [Pimeleon Complete Setup] ************************************
 
 TASK [Set system hostname] *****************************************
-changed: [pi_router]
+changed: [pimeleon]
 
 TASK [Configure timezone] ******************************************
-changed: [pi_router]
+changed: [pimeleon]
 
 TASK [Install base packages] ***************************************
-changed: [pi_router] => (item=vim-tiny)
-changed: [pi_router] => (item=htop)
+changed: [pimeleon] => (item=vim-tiny)
+changed: [pimeleon] => (item=htop)
 ...
 
 TASK [Configure nftables firewall] *********************************
-changed: [pi_router]
+changed: [pimeleon]
 
 PLAY RECAP *********************************************************
-pi_router : ok=42   changed=38   unreachable=0    failed=0
+pimeleon : ok=42   changed=38   unreachable=0    failed=0
 
 [SUCCESS] Stage 2 complete!
 ```
@@ -207,7 +207,7 @@ pi_router : ok=42   changed=38   unreachable=0    failed=0
   BUILD COMPLETE!
 ═══════════════════════════════════════════════════════════
 
-Output: /output/pi-router-20241102-103045.img
+Output: /output/pimeleon-20241102-103045.img
 Size: 4.0GB
 Build time: 12m 34s
 Log: /output/build-20241102-103045.log
@@ -224,8 +224,8 @@ ls -lh output/
 You should see:
 
 ```
--rw-r--r-- 1 builder builder 4.0G Nov  2 10:30 pi-router-20241102-103045.img
--rw-r--r-- 1 builder builder  256 Nov  2 10:30 pi-router-20241102-103045.img.sha256
+-rw-r--r-- 1 builder builder 4.0G Nov  2 10:30 pimeleon-20241102-103045.img
+-rw-r--r-- 1 builder builder  256 Nov  2 10:30 pimeleon-20241102-103045.img.sha256
 -rw-r--r-- 1 builder builder 1.2M Nov  2 10:30 build-20241102-103045.log
 -rw-r--r-- 1 builder builder   32 Nov  2 10:30 pi-initial-password.txt
 ```
@@ -234,20 +234,20 @@ You should see:
 
 ```bash
 # Check file type
-file output/pi-router-*.img
+file output/pimeleon-*.img
 # Output: DOS/MBR boot sector
 
 # View partition table
-fdisk -l output/pi-router-*.img
+fdisk -l output/pimeleon-*.img
 ```
 
 Expected output:
 
 ```
-Disk output/pi-router-20241102-103045.img: 4 GiB
+Disk output/pimeleon-20241102-103045.img: 4 GiB
 Device                                Boot  Start     End Sectors  Size Id Type
-output/pi-router-20241102-103045.img1 *      8192  532479  524288  256M  c W95 FAT32 (LBA)
-output/pi-router-20241102-103045.img2      532480 8388607 7856128  3.8G 83 Linux
+output/pimeleon-20241102-103045.img1 *      8192  532479  524288  256M  c W95 FAT32 (LBA)
+output/pimeleon-20241102-103045.img2      532480 8388607 7856128  3.8G 83 Linux
 ```
 
 #### Check Build Log
@@ -294,7 +294,7 @@ graph LR
 |-----------|--------------|
 | **bond0** (WAN) | DHCP, bonded eth0+eth1 |
 | **eth1** (LAN) | Static 192.168.76.1/24 |
-| **wlan0** (WiFi AP) | Static 192.168.77.1/24, SSID: pi-router |
+| **wlan0** (WiFi AP) | Static 192.168.77.1/24, SSID: pimeleon |
 
 #### Security Features
 
@@ -312,7 +312,7 @@ Now flash your image to an SD card:
 lsblk
 
 # Flash image (CAREFUL: this erases the SD card!)
-sudo dd if=output/pi-router-*.img of=/dev/sdX bs=4M status=progress conv=fsync
+sudo dd if=output/pimeleon-*.img of=/dev/sdX bs=4M status=progress conv=fsync
 
 # Sync
 sync
@@ -325,7 +325,7 @@ sync
 
 1. Insert SD card into Raspberry Pi 3B+
 2. Connect ethernet cable to eth0 (WAN) - to your internet router
-3. Connect to eth1 (LAN) or WiFi SSID "pi-router"
+3. Connect to eth1 (LAN) or WiFi SSID "pimeleon"
 4. Power on
 5. Wait 1-2 minutes for first boot
 
@@ -350,7 +350,7 @@ Once logged in:
 ```bash
 # Check system
 uname -a
-# Linux pi-router 5.10.* #1 SMP Debian * armv7l GNU/Linux
+# Linux pimeleon 5.10.* #1 SMP Debian * armv7l GNU/Linux
 
 # Check network interfaces
 ip addr show
@@ -422,7 +422,7 @@ docker compose run --rm builder
 
 ## Next Steps
 
-Congratulations! You've successfully built and deployed your first Pi Router image. 🎉
+Congratulations! You've successfully built and deployed your first Pimeleon image. 🎉
 
 Now you can:
 

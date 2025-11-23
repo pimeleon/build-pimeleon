@@ -17,9 +17,9 @@ fi
 
 MOUNT_POINT="${WORK_DIR}/mount"
 CACHE_VERSION="v1"  # Increment when base system changes significantly
-# Normalize PIROUTER_RPI_MODEL for cache naming (3B+ -> rpi3, 4B -> rpi4, etc.)
-RPI_CACHE_NAME=$(echo "${PIROUTER_RPI_MODEL}" | sed -E 's/^([0-9]+).*/rpi\1/')
-RASPBIAN_CACHE_KEY="pirouter-${RPI_CACHE_NAME}-${RASPBIAN_VERSION}-base-${CACHE_VERSION}.tar.gz"
+# Normalize PIMELEON_RPI_MODEL for cache naming (3B+ -> rpi3, 4B -> rpi4, etc.)
+RPI_CACHE_NAME=$(echo "${PIMELEON_RPI_MODEL}" | sed -E 's/^([0-9]+).*/rpi\1/')
+RASPBIAN_CACHE_KEY="pimeleon-${RPI_CACHE_NAME}-${RASPBIAN_VERSION}-base-${CACHE_VERSION}.tar.gz"
 
 log_info "Creating image file: ${IMAGE_PATH}"
 
@@ -166,7 +166,7 @@ fi
 # Configure basic boot files (firmware will be installed in stage2)
 log_info "Configuring basic boot files"
 sudo tee "${MOUNT_POINT}/boot/config.txt" > /dev/null <<EOF
-# Pi Router Boot Configuration
+# Pimeleon Boot Configuration
 enable_uart=1
 dtparam=spi=on
 dtparam=i2c_arm=on
@@ -192,7 +192,7 @@ proc            /proc           proc    defaults          0       0
 EOF
 
 # Set hostname
-echo "pi-router" | sudo tee "${MOUNT_POINT}/etc/hostname" > /dev/null
+echo "pimeleon" | sudo tee "${MOUNT_POINT}/etc/hostname" > /dev/null
 
 # Unmount
 sudo umount "${MOUNT_POINT}/boot"

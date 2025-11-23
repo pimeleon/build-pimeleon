@@ -1,12 +1,12 @@
 ---
-# Main playbook for Pi Router configuration
-- name: Pi Router Complete Setup
-  hosts: pi_router
+# Main playbook for Pimeleon configuration
+- name: Pimeleon Complete Setup
+  hosts: pimeleon
 
   pre_tasks:
     - name: Display build information
       ansible.builtin.debug:
-        msg: "Building Pi Router image for {{ ansible_hostname }}"
+        msg: "Building Pimeleon image for {{ ansible_hostname }}"
 
   tasks:
     - name: Run base setup
@@ -24,7 +24,7 @@
   post_tasks:
     - name: Display completion message
       ansible.builtin.debug:
-        msg: "Pi Router configuration completed successfully!"
+        msg: "Pimeleon configuration completed successfully!"
 
   handlers:
     - name: Restart SSH

@@ -57,7 +57,7 @@ sha256sum "$(basename ${IMAGE_PATH}.xz)" > "${IMAGE_PATH}.xz.sha256"
 
 # Create release archive
 log_info "Creating release archive"
-RELEASE_NAME="pi-router-$(date +%Y%m%d-%H%M%S)"
+RELEASE_NAME="pimeleon-$(date +%Y%m%d-%H%M%S)"
 RELEASE_DIR="${OUTPUT_DIR}/${RELEASE_NAME}"
 mkdir -p "${RELEASE_DIR}"
 
@@ -71,14 +71,14 @@ cp "${IMAGE_PATH}.version.txt" "${RELEASE_DIR}/"
 
 # Create README for the release
 cat > "${RELEASE_DIR}/README.txt" <<EOF
-Pi Router Image Release
+Pimeleon Image Release
 ======================
 
 Release: ${RELEASE_NAME}
 Date: $(date)
 
 Contents:
-- $(basename ${IMAGE_PATH}.xz) - Compressed Pi Router image
+- $(basename ${IMAGE_PATH}.xz) - Compressed Pimeleon image
 - *.md5, *.sha256 - Checksum files
 - metadata.json - Build metadata
 - packages.txt - Installed package list
@@ -102,7 +102,7 @@ Default credentials:
 
 IMPORTANT: Change the default password on first login!
 
-For more information, visit: https://github.com/your-repo/pi-router
+For more information, visit: https://github.com/your-repo/pimeleon
 EOF
 
 # Create tarball of release

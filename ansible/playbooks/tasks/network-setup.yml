@@ -1,5 +1,5 @@
 ---
-# Network setup tasks for Pi Router
+# Network setup tasks for Pimeleon
 - name: Configure WAN interface
   ansible.builtin.copy:
     dest: /etc/systemd/network/10-wan.network
@@ -55,9 +55,9 @@
 
 - name: Configure dnsmasq
   ansible.builtin.copy:
-    dest: /etc/dnsmasq.d/pi-router.conf
+    dest: /etc/dnsmasq.d/pimeleon.conf
     content: |
-      # Pi Router dnsmasq configuration
+      # Pimeleon dnsmasq configuration
       interface={{ lan_interface }}
       bind-interfaces
 
@@ -90,7 +90,7 @@
     content: |
       interface={{ lan_interface }}
       driver=nl80211
-      ssid=PiRouter
+      ssid=Pimeleon
       hw_mode=g
       channel=6
       ieee80211n=1

@@ -417,8 +417,8 @@ testing:
 
 ```bash
 # Build script determines profile path
-PLATFORM="${PIROUTER_PLATFORM:-raspberrypi}"
-MODEL="${PIROUTER_MODEL:-3B+}"
+PLATFORM="${PIMELEON_PLATFORM:-raspberrypi}"
+MODEL="${PIMELEON_MODEL:-3B+}"
 PROFILE_PATH="platforms/${PLATFORM}/profiles/${MODEL}.yaml"
 ```
 
@@ -589,7 +589,7 @@ storage:
 yq eval '.' platforms/orangepi/profiles/5-plus.yaml
 
 # Test build
-PIROUTER_PLATFORM=orangepi PIROUTER_MODEL=5-plus make build
+PIMELEON_PLATFORM=orangepi PIMELEON_MODEL=5-plus make build
 ```
 
 ## Boot Configuration Templates

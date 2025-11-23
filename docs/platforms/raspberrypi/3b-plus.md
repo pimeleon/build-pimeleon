@@ -1,6 +1,6 @@
 # Raspberry Pi 3 Model B+
 
-The Raspberry Pi 3B+ is the **primary, fully-supported platform** for Pi Router. All build scripts are optimized and tested for this hardware.
+The Raspberry Pi 3B+ is the **primary, fully-supported platform** for Pimeleon. All build scripts are optimized and tested for this hardware.
 
 ## Status
 
@@ -33,7 +33,7 @@ Or explicitly:
 
 ```bash
 export DOCKER_BUILDKIT=1 && \
-  PIROUTER_RPI_MODEL=3B+ \
+  PIMELEON_RPI_MODEL=3B+ \
   docker compose run --rm builder
 ```
 
@@ -44,7 +44,7 @@ export DOCKER_BUILDKIT=1 && \
 The build creates this optimized `config.txt`:
 
 ```ini
-# Pi Router Boot Configuration
+# Pimeleon Boot Configuration
 enable_uart=1
 dtparam=spi=on
 dtparam=i2c_arm=on
@@ -80,7 +80,7 @@ For higher throughput, consider Raspberry Pi 4B.
 
 ## Caching
 
-Base system cache: `cache/pirouter-rpi3-buster-base-v1.tar.gz`
+Base system cache: `cache/pimeleon-rpi3-buster-base-v1.tar.gz`
 
 Subsequent builds reuse this cache, reducing build time from ~15 min to ~8 min.
 

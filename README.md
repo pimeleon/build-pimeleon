@@ -1,4 +1,4 @@
-# Pi Router Build System
+# Pimeleon Build System
 
 A containerized build system for creating Raspberry Pi 3B+ router images with ARM emulation and automated testing.
 
@@ -18,16 +18,16 @@ A containerized build system for creating Raspberry Pi 3B+ router images with AR
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd pi-router-build
+cd pimeleon-build
 
 # Build containers (with APT cache optimization)
 docker compose build
 
-# Create Pi Router image
+# Create Pimeleon image
 docker compose run --rm builder
 ```
 
-The resulting image will be in `output/pi-router-YYYYMMDD-HHMMSS.img`
+The resulting image will be in `output/pimeleon-YYYYMMDD-HHMMSS.img`
 
 ## 🏗️ System Architecture
 
@@ -45,7 +45,7 @@ The system uses a **2-stage** build process (currently implemented):
 ### Key Features
 - ✅ **ARM Emulation**: Build ARM images on x86 hardware with QEMU user-mode
 - ✅ **Pi Boot Firmware**: Includes complete Raspberry Pi firmware (bootcode.bin, start.elf, kernels)
-- ✅ **Smart Build Caching**: Hardware-specific caches (`pirouter-rpi3-buster-base-v1.tar.gz`)
+- ✅ **Smart Build Caching**: Hardware-specific caches (`pimeleon-rpi3-buster-base-v1.tar.gz`)
 - ✅ **APT Cache Integration**: TrueNAS apt-cacher-ng support (192.168.76.5:3142) with 95% hit rate
 - ✅ **Pi Foundation Repository**: Official Pi packages (raspberrypi-kernel, libraspberrypi-bin)
 - ✅ **systemd-networkd**: Production-matched networking configuration
@@ -101,7 +101,7 @@ docker compose run --rm builder
 ## 📁 Project Structure
 
 ```shell
-pi-router-build/
+pimeleon-build/
 ├── containers/
 │   ├── builder/                    # Build container
 │   │   ├── Dockerfile              # Multi-stage build definition
@@ -136,11 +136,11 @@ pi-router-build/
 
 ### Build Outputs
 
-- **Images**: `output/pi-router-YYYYMMDD-HHMMSS.img` (4GB bootable image with Pi firmware)
+- **Images**: `output/pimeleon-YYYYMMDD-HHMMSS.img` (4GB bootable image with Pi firmware)
 - **Logs**: `output/build-YYYYMMDD-HHMMSS.log` (detailed build logs)
 - **Credentials**: `output/pi-initial-password.txt` (generated password for pi user)
 - **Benchmarks**: `benchmarks/build-benchmark-YYYYMMDD-HHMMSS.json` (performance metrics)
-- **Cache**: `cache/pirouter-rpi3-buster-base-v1.tar.gz` (reusable base system)
+- **Cache**: `cache/pimeleon-rpi3-buster-base-v1.tar.gz` (reusable base system)
 
 ## 🚨 Common Issues & Solutions
 
@@ -187,7 +187,7 @@ df -h
 **Slow builds:**
 
 - **APT Cache**: Builds use TrueNAS apt-cacher-ng automatically (95% hit rate)
-- **Smart Caching**: Base system cached as `pirouter-rpi3-buster-base-v1.tar.gz` 
+- **Smart Caching**: Base system cached as `pimeleon-rpi3-buster-base-v1.tar.gz` 
 - **Hardware-specific**: Separate caches for different Pi models and OS versions
 - Use SSD storage for better I/O performance
 - Run `./scripts/benchmark-build.sh` to analyze build performance
@@ -204,8 +204,8 @@ df -h
 **❓ Duplicate network creation messages during tester startup:**
 ```
 [+] Creating 5/5uter-build_lan-network   Created
-✔ Network pi-router-build_wan-network   Created
-✔ Network pi-router-build_wan-network   Created  # <- Duplicate line
+✔ Network pimeleon-build_wan-network   Created
+✔ Network pimeleon-build_wan-network   Created  # <- Duplicate line
 ```
 
 This is a **harmless Docker Compose display glitch** that occurs during parallel network creation. The networks are created correctly (verify with `docker network ls`). To suppress the confusing output:
@@ -266,7 +266,7 @@ docker compose run --rm builder bash
 docker compose run --rm tester
 
 # Manual testing with QEMU
-qemu-system-arm -M raspi3 -kernel output/pi-router-*.img
+qemu-system-arm -M raspi3 -kernel output/pimeleon-*.img
 ```
 
 ## 🔒 Security Notes
@@ -317,7 +317,7 @@ qemu-system-arm -M raspi3 -kernel output/pi-router-*.img
 #### Subsequent Builds (Cached Base System)  
 - **With APT Cache**: ~5-8 minutes (base system reuse + cached packages)
 - **Cache Hit Rate**: 95%+ on TrueNAS APT cache (192.168.76.5:3142)
-- **Base System Caching**: 85% time reduction when `pirouter-rpi3-buster-base-v1.tar.gz` exists
+- **Base System Caching**: 85% time reduction when `pimeleon-rpi3-buster-base-v1.tar.gz` exists
 
 #### Build Analysis Tools
 - **Benchmarking**: `./scripts/benchmark-build.sh` - Comprehensive performance analysis

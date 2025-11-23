@@ -1,4 +1,4 @@
-# Pi Router Build System
+# Pimeleon Build System
 
 <div class="grid cards" markdown>
 
@@ -6,7 +6,7 @@
 
     ---
 
-    Get your first Pi Router image built in minutes
+    Get your first Pimeleon image built in minutes
 
     [:octicons-arrow-right-24: Getting Started](getting-started/index.md)
 
@@ -14,7 +14,7 @@
 
     ---
 
-    Learn how to build, customize, and optimize your Pi Router images
+    Learn how to build, customize, and optimize your Pimeleon images
 
     [:octicons-arrow-right-24: View Guides](guides/building-images.md)
 
@@ -46,7 +46,7 @@
 
 ## Overview
 
-The **Pi Router Build System** is a containerized, Docker-based ARM cross-compilation environment for creating custom Raspberry Pi router images. It automates the entire process of building bootable SD card images with networking, security, and routing capabilities pre-configured.
+The **Pimeleon Build System** is a containerized, Docker-based ARM cross-compilation environment for creating custom Raspberry Pi router images. It automates the entire process of building bootable SD card images with networking, security, and routing capabilities pre-configured.
 
 ### Key Features
 
@@ -107,7 +107,7 @@ graph LR
 
 ### Quick Example
 
-```bash title="Build a Pi Router Image"
+```bash title="Build a Pimeleon Image"
 # Build with APT cache support
 export DOCKER_BUILDKIT=1
 export APT_PROXY=192.168.76.5:3142
@@ -118,7 +118,7 @@ docker compose run --rm builder
 ```bash title="Result"
 ✓ Stage 1: Base system created (149MB cache)
 ✓ Stage 2: Packages installed and configured
-✓ Output: output/pi-router-20241102-103045.img (4GB)
+✓ Output: output/pimeleon-20241102-103045.img (4GB)
 ✓ Build time: 10:12 (with APT cache)
 ```
 
@@ -160,8 +160,8 @@ docker compose run --rm builder
 ## Support
 
 - **Documentation**: [https://docs.pimeleon.com](https://docs.pimeleon.com)
-- **Repository**: [GitHub](https://github.com/yourusername/pi-router)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/pi-router/issues)
+- **Repository**: [GitHub](https://github.com/yourusername/pimeleon)
+- **Issues**: [GitHub Issues](https://github.com/yourusername/pimeleon/issues)
 
 ---
 

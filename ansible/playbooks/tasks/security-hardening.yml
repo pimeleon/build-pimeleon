@@ -1,5 +1,5 @@
 ---
-# Security hardening tasks for Pi Router
+# Security hardening tasks for Pimeleon
 - name: Configure SSH security
   ansible.builtin.lineinfile:
     path: /etc/ssh/sshd_config
@@ -91,7 +91,7 @@
 
 - name: Configure audit rules
   ansible.builtin.copy:
-    dest: /etc/audit/rules.d/pi-router.rules
+    dest: /etc/audit/rules.d/pimeleon.rules
     content: |
       # Monitor authentication
       -w /var/log/auth.log -p wa -k authentication
@@ -113,7 +113,7 @@
     mode: '0755'
     content: |
       #!/bin/bash
-      echo "Pi Router Security Check - $(date)"
+      echo "Pimeleon Security Check - $(date)"
       echo "================================"
       echo
       echo "Failed login attempts:"

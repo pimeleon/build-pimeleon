@@ -1,5 +1,5 @@
 #!/bin/bash
-# Common functions for Pi Router build scripts
+# Common functions for Pimeleon build scripts
 
 # Color codes for output
 RED='\033[0;31m'
@@ -179,7 +179,7 @@ generate_metadata() {
         "sha256": "$sha256sum"
     },
     "build_info": {
-        "rpi_model": "${PIROUTER_RPI_MODEL:-3B+}",
+        "rpi_model": "${PIMELEON_RPI_MODEL:-3B+}",
         "raspbian_version": "${RASPBIAN_VERSION:-buster}",
         "builder_version": "1.0.0"
     }

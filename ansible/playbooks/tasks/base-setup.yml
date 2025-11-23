@@ -1,14 +1,14 @@
 ---
-# Base setup tasks for Pi Router
+# Base setup tasks for Pimeleon
 - name: Set system hostname
   ansible.builtin.hostname:
-    name: pi-router
+    name: pimeleon
 
 - name: Update hostname in /etc/hosts
   ansible.builtin.lineinfile:
     path: /etc/hosts
     regexp: '^127\.0\.1\.1'
-    line: '127.0.1.1 pi-router'
+    line: '127.0.1.1 pimeleon'
 
 - name: Configure timezone
   community.general.timezone:
@@ -68,9 +68,9 @@
     state: directory
     mode: '0755'
   loop:
-    - /etc/pi-router
-    - /var/log/pi-router
-    - /var/lib/pi-router
+    - /etc/pimeleon
+    - /var/log/pimeleon
+    - /var/lib/pimeleon
 
 - name: Install base packages
   ansible.builtin.apt:
@@ -154,7 +154,7 @@
   ansible.builtin.copy:
     dest: /etc/dhcp/dhcpd.conf
     content: |
-      # Basic DHCP configuration for Pi Router
+      # Basic DHCP configuration for Pimeleon
       option domain-name "lan";
       option domain-name-servers 192.168.76.1, 192.168.77.1;
 
@@ -195,12 +195,12 @@
   ansible.builtin.copy:
     dest: /etc/hostapd/hostapd.conf
     content: |
-      # Basic hostapd configuration for Pi Router
+      # Basic hostapd configuration for Pimeleon
       interface=wlan0
       driver=nl80211
 
       # Basic AP settings
-      ssid=pi-router
+      ssid=pimeleon
       hw_mode=g
       channel=6
       country_code=US
@@ -236,7 +236,7 @@
 
       flush ruleset
 
-      table inet pirouter {
+      table inet pimeleon {
         chain input {
           type filter hook input priority filter; policy drop;
 

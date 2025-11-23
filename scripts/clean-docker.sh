@@ -9,7 +9,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🧹 Pi Router Build System - Selective Docker Cleanup${NC}"
+echo -e "${BLUE}🧹 Pimeleon Build System - Selective Docker Cleanup${NC}"
 echo "============================================================"
 
 # Function to print colored output
@@ -150,7 +150,7 @@ if [[ "$CLEAN_OUTPUT" == "true" ]] && [[ -d "./output" ]]; then
         LATEST_IMG=$(find ./output -name "*.img" -type f -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
         if [[ -n "$LATEST_IMG" ]]; then
             LATEST_BASENAME=$(basename "$LATEST_IMG" .img)
-            LATEST_LOG="./output/build-${LATEST_BASENAME#pi-router-}.log"
+            LATEST_LOG="./output/build-${LATEST_BASENAME#pimeleon-}.log"
             
             print_warning "Preserving latest image: $(basename "$LATEST_IMG")"
             if [[ -f "$LATEST_LOG" ]]; then
@@ -203,7 +203,7 @@ fi
 
 if [[ "$PRESERVE_VOLUMES" == "true" ]]; then
     echo "✅ Docker volumes preserved:"
-    docker volume ls --filter name=pi-router-build 2>/dev/null || echo "  (no volumes found)"
+    docker volume ls --filter name=pimeleon-build 2>/dev/null || echo "  (no volumes found)"
 else
     echo "❌ All Docker volumes removed"
 fi

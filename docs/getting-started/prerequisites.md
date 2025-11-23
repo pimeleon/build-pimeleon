@@ -1,6 +1,6 @@
 # Prerequisites
 
-Before building Pi Router images, ensure your system meets the following requirements.
+Before building Pimeleon images, ensure your system meets the following requirements.
 
 ## Hardware Requirements
 
@@ -241,7 +241,7 @@ Run these commands to verify your system is ready:
 ```bash title="System Verification Script"
 #!/bin/bash
 
-echo "=== Pi Router Build System Prerequisites Check ==="
+echo "=== Pimeleon Build System Prerequisites Check ==="
 echo
 
 # Docker version
@@ -351,4 +351,4 @@ Once you've verified all prerequisites:
 ---
 
 !!! question "Still having issues?"
-    Check the [Troubleshooting Guide](../guides/troubleshooting.md) or [open an issue](https://github.com/yourusername/pi-router/issues).
+    Check the [Troubleshooting Guide](../guides/troubleshooting.md) or [open an issue](https://github.com/yourusername/pimeleon/issues).

@@ -1,9 +1,9 @@
-site_name: Pi Router Documentation
+site_name: Pimeleon Documentation
 site_url: https://docs.pimeleon.com
-site_description: Comprehensive documentation for the Pi Router build system - a Docker-based ARM cross-compilation environment for creating custom Raspberry Pi router images
+site_description: Comprehensive documentation for the Pimeleon build system - a Docker-based ARM cross-compilation environment for creating custom Raspberry Pi router images
 site_author: Pimeleon
-repo_url: https://github.com/yourusername/pi-router
-repo_name: pi-router
+repo_url: https://github.com/yourusername/pimeleon
+repo_name: pimeleon
 edit_uri: edit/main/docs/
 
 theme:
@@ -112,10 +112,10 @@ plugins:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/yourusername/pi-router
+      link: https://github.com/yourusername/pimeleon
       name: GitHub Repository
     - icon: fontawesome/brands/docker
-      link: https://hub.docker.com/r/yourusername/pi-router
+      link: https://hub.docker.com/r/yourusername/pimeleon
       name: Docker Hub
 
   version:

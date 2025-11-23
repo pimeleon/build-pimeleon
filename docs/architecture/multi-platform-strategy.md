@@ -2,13 +2,13 @@
 
 ## Overview
 
-This document describes the strategic approach for evolving `pi-router-build` from a Raspberry Pi-specific build system into a multi-platform ARM router build system while maintaining backward compatibility and the "Pi Router" brand identity.
+This document describes the strategic approach for evolving `pimeleon-build` from a Raspberry Pi-specific build system into a multi-platform ARM router build system while maintaining backward compatibility and the "Pimeleon" brand identity.
 
 **Strategy**: Enhanced Monorepo with Platform Profiles
 **Timeline**: 3-6 months (5 phases)
 **Complexity**: Moderate (YAML-based profiles with conditional logic)
 **Community Model**: Hybrid (core platforms + community contributions)
-**Branding**: Keep "Pi Router" primary, add platforms quietly
+**Branding**: Keep "Pimeleon" primary, add platforms quietly
 
 ## Strategic Goals
 
@@ -26,7 +26,7 @@ This document describes the strategic approach for evolving `pi-router-build` fr
 - Platform-specific support handled by platform maintainers
 
 ### Marketing Goals
-- Maintain "Pi Router" as primary brand identity
+- Maintain "Pimeleon" as primary brand identity
 - Raspberry Pi remains the flagship, primary platform
 - Multi-platform support as value-add, not main selling point
 - Attract broader ARM SBC community without diluting Pi focus
@@ -34,7 +34,7 @@ This document describes the strategic approach for evolving `pi-router-build` fr
 ## Repository Structure
 
 ```
-pi-router-build/
+pimeleon-build/
 ├── platforms/
 │   ├── core/                          # Shared base implementations
 │   │   ├── profiles/
@@ -142,23 +142,23 @@ fi
 
 ### 3. Backward Compatibility Layer
 
-**Problem**: Existing users have scripts using `PIROUTER_RPI_MODEL`.
+**Problem**: Existing users have scripts using `PIMELEON_RPI_MODEL`.
 
 **Solution**: Alias old variables to new ones, maintain API compatibility.
 
 **Implementation**:
 ```bash
 # New variables
-PIROUTER_PLATFORM="${PIROUTER_PLATFORM:-raspberrypi}"
-PIROUTER_MODEL="${PIROUTER_MODEL:-3B+}"
+PIMELEON_PLATFORM="${PIMELEON_PLATFORM:-raspberrypi}"
+PIMELEON_MODEL="${PIMELEON_MODEL:-3B+}"
 
 # Backward compatibility
-PIROUTER_RPI_MODEL="${PIROUTER_RPI_MODEL:-${PIROUTER_MODEL}}"
+PIMELEON_RPI_MODEL="${PIMELEON_RPI_MODEL:-${PIMELEON_MODEL}}"
 
 # Allow old variable to override new
-if [[ -n "${PIROUTER_RPI_MODEL}" ]]; then
-    PIROUTER_PLATFORM="raspberrypi"
-    PIROUTER_MODEL="${PIROUTER_RPI_MODEL}"
+if [[ -n "${PIMELEON_RPI_MODEL}" ]]; then
+    PIMELEON_PLATFORM="raspberrypi"
+    PIMELEON_MODEL="${PIMELEON_RPI_MODEL}"
 fi
 ```
 
@@ -190,7 +190,7 @@ fi
 
 **Before**:
 ```bash
-CACHE_KEY="pirouter-rpi3-buster-base-v1.tar.gz"
+CACHE_KEY="pimeleon-rpi3-buster-base-v1.tar.gz"
 ```
 
 **After**:
@@ -261,7 +261,7 @@ See [Contributing Platforms](../contributing/adding-platforms.md) for detailed g
 
 ### Brand Identity Preservation
 
-**Primary Message**: "Pi Router - Containerized build system for Raspberry Pi routers"
+**Primary Message**: "Pimeleon - Containerized build system for Raspberry Pi routers"
 
 **Secondary Message**: "Also supports Orange Pi, Rock Pi, and custom ARM SBCs"
 
@@ -362,7 +362,7 @@ See [Contributing Platforms](../contributing/adding-platforms.md) for detailed g
 - 🎯 **Primary SEO**: Top 5 for "raspberry pi router build"
 - 🎯 **Secondary SEO**: Appear in "orange pi router" searches
 - 🎯 **Traffic**: 50+ doc views/week from non-Pi platforms
-- 🎯 **Brand**: Maintain "Pi Router" recognition in community
+- 🎯 **Brand**: Maintain "Pimeleon" recognition in community
 
 ### Maintenance Success (ongoing)
 

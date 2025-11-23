@@ -1,5 +1,5 @@
 ---
-# Ansible-lint configuration for Pi Router project
+# Ansible-lint configuration for Pimeleon project
 
 # Define file kinds to help ansible-lint identify file types correctly
 kinds:

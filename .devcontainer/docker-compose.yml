@@ -6,7 +6,7 @@ services:
       context: ../containers/builder
       dockerfile: Dockerfile
       target: development
-    container_name: pi-router-devcontainer
+    container_name: pimeleon-devcontainer
     volumes:
       - ..:/workspace:cached
       - ~/.ssh:/home/builder/.ssh:ro
