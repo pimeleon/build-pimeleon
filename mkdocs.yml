@@ -8,6 +8,7 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  custom_dir: docs/overrides
   language: en
   palette:
     # Light mode
@@ -90,6 +91,7 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+  # Note: Mermaid diagrams require mkdocs-material 9.x built-in support
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.tasklist:
@@ -152,6 +154,14 @@ nav:
     - Containers: architecture/containers.md
     - Build Pipeline: architecture/build-pipeline.md
     - Network Design: architecture/networking.md
+    - Multi-Platform Strategy: architecture/multi-platform-strategy.md
+    - Hardware Profiles: architecture/hardware-profiles.md
+    - Migration Roadmap: architecture/migration-roadmap.md
+
+  - Platforms:
+    - Overview: platforms/README.md
+    - Raspberry Pi 3B+: platforms/raspberrypi/3b-plus.md
+    - Raspberry Pi 4B: platforms/raspberrypi/4b.md
 
   - Reference:
     - CLI Commands: reference/cli-commands.md
@@ -162,6 +172,7 @@ nav:
   - Contributing:
     - Development Setup: contributing/development.md
     - Testing: contributing/testing.md
+    - Adding Platforms: contributing/adding-platforms.md
 
 # Copyright
 copyright: Copyright &copy; 2024 Pimeleon - All rights reserved
