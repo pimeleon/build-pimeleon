@@ -25,8 +25,9 @@ export PIMELEON_RPI_MODEL="${PIMELEON_RPI_MODEL:-3B+}"
 export PIMELEON_IMAGE_SIZE="${PIMELEON_IMAGE_SIZE:-4G}"
 export PIMELEON_PROFILE="${PIMELEON_PROFILE:-development}"
 export RASPBIAN_VERSION="${RASPBIAN_VERSION:-bullseye}"
-export RASPBIAN_MIRROR="${RASPBIAN_MIRROR:-http://mirrordirector.raspbian.org/raspbian/}"
-export APT_PROXY="${APT_PROXY:-}"
+export RASPBIAN_MIRROR="${RASPBIAN_MIRROR:-http://archive.raspbian.org/raspbian/}"
+export APT_CACHE_SERVER="${APT_CACHE_SERVER:-}"
+export APT_CACHE_PORT="${APT_CACHE_PORT:-3142}"
 export DEBIAN_FRONTEND=noninteractive
 
 # Directories
@@ -95,9 +96,6 @@ main() {
     check_deps
     source_common
 
-    # Setup cleanup trap
-    trap 'cleanup_on_exit' EXIT ERR INT TERM
-
     # Create work directory
     log_section "Setting up build environment"
     rm -rf "${WORK_DIR}"
@@ -122,28 +120,26 @@ main() {
         log_warn "Stage 3 skipped (set ENABLE_STAGE3=true to enable)"
     fi
 
-    # Stage 4: Packaging and Metadata (CI/Release only)
-    if [[ -n "${CI:-}" || "${ENABLE_STAGE4:-false}" == "true" ]]; then
+    # Stage 4: Packaging (if enabled)
+    if [[ "${ENABLE_STAGE4:-false}" == "true" ]]; then
         log_section "Stage 4: Packaging image"
         "${BUILDER_SCRIPTS}/stage4-package.sh" "${WORK_DIR}" "${IMAGE_PATH}"
-
-        log_section "Generating metadata"
-        generate_metadata "${IMAGE_PATH}"
     else
-        log_warn "Skipping Stage 4 (Packaging) and Metadata generation for local build"
+        log_info "Stage 4 skipped (set ENABLE_STAGE4=true to enable)"
     fi
+
+    # Generate metadata
+    log_section "Generating metadata"
+    generate_metadata "${IMAGE_PATH}"
 
     # Cleanup
     log_section "Cleaning up"
     rm -rf "${WORK_DIR}"
 
     # Summary
-    local duration
-    duration=$((SECONDS - start_time))
-    local minutes
-    minutes=$((duration / 60))
-    local seconds
-    seconds=$((duration % 60))
+    local duration=$((SECONDS - start_time))
+    local minutes=$((duration / 60))
+    local seconds=$((duration % 60))
 
     echo ""
     log_success "Build completed successfully!"
@@ -191,7 +187,7 @@ Examples:
     sudo $0 --profile production
 
     # With APT cache
-    sudo $0 --with-cache 192.168.42.5
+    sudo $0 --with-cache 192.168.76.5
 
     # Pi 4B with Bookworm
     sudo $0 --model 4B --version bookworm
