@@ -214,7 +214,7 @@ build:pimeleon:
   stage: build
   needs: ["warm-cache", "build:containers"]
   cache:
-    key: base-system-${PIMELEON_RPI_MODEL}-${RASPBIAN_VERSION}-${CI_COMMIT_SHA}
+    key: base-system-${PIMELEON_RPI_MODEL:-3B+}-${RASPBIAN_VERSION:-bookworm}
     paths:
       - cache/
     policy: pull
@@ -239,7 +239,7 @@ build:pimeleon:
         RASPBIAN_VERSION: "bookworm"
     - when: on_success
   script:
-    - echo "Building Pimeleon for ${PIMELEON_RPI_MODEL} (${RASPBIAN_VERSION})..."
+    - echo "Building Pimeleon for ${PIMELEON_RPI_MODEL:-3B+} (${RASPBIAN_VERSION:-bookworm})..."
     - |
       docker run --rm \
         --privileged \
@@ -249,8 +249,8 @@ build:pimeleon:
         -v $CI_PROJECT_DIR/ansible:/ansible \
         -e BUILD_CACHE_DIR=/cache \
         -e OUTPUT_DIR=/output \
-        -e PIMELEON_RPI_MODEL=${PIMELEON_RPI_MODEL} \
-        -e RASPBIAN_VERSION=${RASPBIAN_VERSION} \
+        -e PIMELEON_RPI_MODEL=${PIMELEON_RPI_MODEL:-3B+} \
+        -e RASPBIAN_VERSION=${RASPBIAN_VERSION:-bookworm} \
         -e APT_CACHE_SERVER=${APT_PROXY%:*} \
         $BUILD_IMAGE
   artifacts:
