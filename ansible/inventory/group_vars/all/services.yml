@@ -1,0 +1,30 @@
+---
+# Service configuration defaults
+
+# Services to enable
+enabled_services:
+  essential:
+    - ssh
+    - systemd-networkd
+    - systemd-resolved
+    - rsyslog
+  network:
+    - isc-dhcp-server
+    - nftables
+  optional:
+    - hostapd
+
+# Services to disable
+disabled_services:
+  - dhcpcd
+  - networking
+  - wpa_supplicant
+  - bluetooth
+  - avahi-daemon
+
+# Service package mapping
+service_packages:
+  dhcp: "isc-dhcp-server"
+  dns: "dnsmasq"
+  wifi_ap: "hostapd"
+  firewall: "nftables"

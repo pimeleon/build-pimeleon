@@ -1,0 +1,70 @@
+---
+# WiFi Setup Task
+# Configures hostapd for wireless access point
+
+- name: Install hostapd
+  apt:
+    name: hostapd
+    state: present
+  when: services_enabled.hostapd | default(true)
+
+- name: Stop hostapd for configuration
+  systemd:
+    name: hostapd
+    state: stopped
+  when: services_enabled.hostapd | default(true)
+  ignore_errors: yes
+
+- name: Configure hostapd
+  template:
+    src: hostapd/hostapd.conf.j2
+    dest: /etc/hostapd/hostapd.conf
+    mode: '0600'
+  when: services_enabled.hostapd | default(true)
+  notify: restart hostapd
+
+- name: Configure hostapd defaults
+  lineinfile:
+    path: /etc/default/hostapd
+    regexp: '^#?DAEMON_CONF='
+    line: 'DAEMON_CONF="/etc/hostapd/hostapd.conf"'
+    create: yes
+    mode: '0644'
+  when: services_enabled.hostapd | default(true)
+
+- name: Unmask hostapd service
+  systemd:
+    name: hostapd
+    masked: no
+  when: services_enabled.hostapd | default(true)
+
+- name: Enable hostapd service
+  systemd:
+    name: hostapd
+    enabled: yes
+  when: services_enabled.hostapd | default(true)
+
+# Configure wlan0 interface via systemd-networkd
+- name: Configure WiFi interface network
+  template:
+    src: network/wlan0.network.j2
+    dest: /etc/systemd/network/30-wlan0.network
+    mode: '0644'
+  when: services_enabled.hostapd | default(true)
+  notify: restart systemd-networkd
+
+# Regulatory domain configuration
+- name: Install wireless regulatory database
+  apt:
+    name: wireless-regdb
+    state: present
+  when: services_enabled.hostapd | default(true)
+
+- name: Set WiFi regulatory domain
+  copy:
+    content: |
+      # WiFi regulatory domain
+      REGDOMAIN={{ wifi_country_code | default('US') }}
+    dest: /etc/default/crda
+    mode: '0644'
+  when: services_enabled.hostapd | default(true)
