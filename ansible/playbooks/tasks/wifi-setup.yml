@@ -3,20 +3,20 @@
 # Configures hostapd for wireless access point
 
 - name: Install hostapd
-  apt:
+  ansible.builtin.apt:
     name: hostapd
     state: present
   when: services_enabled.hostapd | default(true)
 
 - name: Stop hostapd for configuration
-  systemd:
+  ansible.builtin.systemd:
     name: hostapd
     state: stopped
   when: services_enabled.hostapd | default(true)
-  ignore_errors: yes
+  failed_when: false
 
 - name: Configure hostapd
-  template:
+  ansible.builtin.template:
     src: hostapd/hostapd.conf.j2
     dest: /etc/hostapd/hostapd.conf
     mode: '0600'
@@ -24,29 +24,29 @@
   notify: restart hostapd
 
 - name: Configure hostapd defaults
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/default/hostapd
     regexp: '^#?DAEMON_CONF='
     line: 'DAEMON_CONF="/etc/hostapd/hostapd.conf"'
-    create: yes
+    create: true
     mode: '0644'
   when: services_enabled.hostapd | default(true)
 
 - name: Unmask hostapd service
-  systemd:
+  ansible.builtin.systemd:
     name: hostapd
-    masked: no
+    masked: false
   when: services_enabled.hostapd | default(true)
 
 - name: Enable hostapd service
-  systemd:
+  ansible.builtin.systemd:
     name: hostapd
-    enabled: yes
+    enabled: true
   when: services_enabled.hostapd | default(true)
 
 # Configure wlan0 interface via systemd-networkd
 - name: Configure WiFi interface network
-  template:
+  ansible.builtin.template:
     src: network/wlan0.network.j2
     dest: /etc/systemd/network/30-wlan0.network
     mode: '0644'
@@ -55,13 +55,13 @@
 
 # Regulatory domain configuration
 - name: Install wireless regulatory database
-  apt:
+  ansible.builtin.apt:
     name: wireless-regdb
     state: present
   when: services_enabled.hostapd | default(true)
 
 - name: Set WiFi regulatory domain
-  copy:
+  ansible.builtin.copy:
     content: |
       # WiFi regulatory domain
       REGDOMAIN={{ wifi_country_code | default('US') }}

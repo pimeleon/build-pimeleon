@@ -17,8 +17,10 @@
 
     - name: Load profile configuration
       ansible.builtin.include_vars:
-        file: "{{ playbook_dir }}/../../inventory/group_vars/all/profiles/{{ pimeleon_profile | default('development') }}.yml"
-      ignore_errors: yes
+        file: >-
+          {{ playbook_dir }}/../../inventory/group_vars/all/profiles/{{
+          pimeleon_profile | default('development') }}.yml
+      failed_when: false
 
   tasks:
     # Tier 1: Core setup (always run)
@@ -75,66 +77,67 @@
         state: restarted
 
     # Network
-    - name: restart systemd-networkd
+    - name: Restart systemd-networkd
       ansible.builtin.systemd:
         name: systemd-networkd
         state: restarted
 
     # DNS
-    - name: restart bind9
+    - name: Restart bind9
       ansible.builtin.systemd:
         name: bind9
         state: restarted
 
-    - name: restart dnscrypt-proxy
+    - name: Restart dnscrypt-proxy
       ansible.builtin.systemd:
         name: dnscrypt-proxy
         state: restarted
 
     # DHCP
-    - name: restart isc-dhcp-server
+    - name: Restart isc-dhcp-server
       ansible.builtin.systemd:
         name: isc-dhcp-server
         state: restarted
 
     # WiFi
-    - name: restart hostapd
+    - name: Restart hostapd
       ansible.builtin.systemd:
         name: hostapd
         state: restarted
 
     # Firewall
-    - name: reload nftables
+    - name: Reload nftables
       ansible.builtin.systemd:
         name: nftables
         state: reloaded
 
-    - name: restart fail2ban
+    - name: Restart fail2ban
       ansible.builtin.systemd:
         name: fail2ban
         state: restarted
 
     # Proxy
-    - name: restart privoxy
+    - name: Restart privoxy
       ansible.builtin.systemd:
         name: privoxy
         state: restarted
 
-    - name: restart squid
+    - name: Restart squid
       ansible.builtin.systemd:
         name: squid
         state: restarted
 
-    - name: restart tor
+    - name: Restart tor
       ansible.builtin.systemd:
         name: tor
         state: restarted
 
     # File sharing
-    - name: restart smbd
+    - name: Restart smbd
       ansible.builtin.systemd:
         name: smbd
         state: restarted
 
-    - name: reload nfs-exports
+    - name: Reload nfs-exports
       ansible.builtin.command: exportfs -ra
+      changed_when: false

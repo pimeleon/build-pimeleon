@@ -4,13 +4,13 @@
 
 # Privoxy - Privacy enhancing proxy
 - name: Install Privoxy
-  apt:
+  ansible.builtin.apt:
     name: privoxy
     state: present
   when: services_enabled.privoxy | default(true)
 
 - name: Configure Privoxy
-  template:
+  ansible.builtin.template:
     src: privoxy/config.j2
     dest: /etc/privoxy/config
     mode: '0644'
@@ -18,21 +18,21 @@
   notify: restart privoxy
 
 - name: Enable Privoxy service
-  systemd:
+  ansible.builtin.systemd:
     name: privoxy
-    enabled: yes
+    enabled: true
     state: started
   when: services_enabled.privoxy | default(true)
 
 # Squid - Caching proxy (development only)
 - name: Install Squid
-  apt:
+  ansible.builtin.apt:
     name: squid
     state: present
   when: services_enabled.squid | default(false)
 
 - name: Configure Squid
-  template:
+  ansible.builtin.template:
     src: squid/squid.conf.j2
     dest: /etc/squid/squid.conf
     mode: '0644'
@@ -40,30 +40,30 @@
   notify: restart squid
 
 - name: Create Squid cache directory
-  file:
+  ansible.builtin.file:
     path: /var/spool/squid
     state: directory
     owner: proxy
-    group: proxy
+    ansible.builtin.group: proxy
     mode: '0755'
   when: services_enabled.squid | default(false)
 
 - name: Enable Squid service
-  systemd:
+  ansible.builtin.systemd:
     name: squid
-    enabled: yes
+    enabled: true
     state: started
   when: services_enabled.squid | default(false)
 
 # Tor - Anonymizing network (development only)
 - name: Install Tor
-  apt:
+  ansible.builtin.apt:
     name: tor
     state: present
   when: services_enabled.tor | default(false)
 
 - name: Configure Tor
-  template:
+  ansible.builtin.template:
     src: tor/torrc.j2
     dest: /etc/tor/torrc
     mode: '0644'
@@ -71,25 +71,25 @@
   notify: restart tor
 
 - name: Enable Tor service
-  systemd:
+  ansible.builtin.systemd:
     name: tor
-    enabled: yes
+    enabled: true
     state: started
   when: services_enabled.tor | default(false)
 
 # Disable services not in profile
 - name: Disable Squid if not enabled
-  systemd:
+  ansible.builtin.systemd:
     name: squid
-    enabled: no
+    enabled: false
     state: stopped
   when: not (services_enabled.squid | default(false))
-  ignore_errors: yes
+  failed_when: false
 
 - name: Disable Tor if not enabled
-  systemd:
+  ansible.builtin.systemd:
     name: tor
-    enabled: no
+    enabled: false
     state: stopped
   when: not (services_enabled.tor | default(false))
-  ignore_errors: yes
+  failed_when: false
