@@ -138,7 +138,7 @@ gantt
 
    os:
      distribution: raspbian
-     version: buster
+     version: bullseye
      mirror: http://archive.raspbian.org/raspbian/
      architecture: armhf
 
@@ -471,14 +471,14 @@ gantt
    ```bash
    # Use platform-specific cache key from profile
    CACHE_KEY=$(generate_cache_key "base" "${CACHE_VERSION}")
-   # Example output: raspberrypi-3B+-buster-armhf-base-v1.tar.gz
+   # Example output: raspberrypi-3B+-bullseye-armhf-base-v1.tar.gz
    ```
 
 2. **Refactor debootstrap calls** (3 hours)
 
    **Before**:
    ```bash
-   debootstrap --arch=armhf buster "${MOUNT_POINT}" http://archive.raspbian.org/raspbian/
+   debootstrap --arch=armhf bullseye "${MOUNT_POINT}" http://archive.raspbian.org/raspbian/
    ```
 
    **After**:

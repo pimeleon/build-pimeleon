@@ -80,7 +80,7 @@ For higher throughput, consider Raspberry Pi 4B.
 
 ## Caching
 
-Base system cache: `cache/pimeleon-rpi3-buster-base-v1.tar.gz`
+Base system cache: `cache/pimeleon-rpi3-bullseye-base-v1.tar.gz`
 
 Subsequent builds reuse this cache, reducing build time from ~15 min to ~8 min.
 

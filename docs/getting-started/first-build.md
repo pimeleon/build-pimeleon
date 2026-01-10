@@ -91,7 +91,7 @@ Now create your first Pimeleon image:
 
     - Pi Model: 3B+
     - Image Size: 4G
-    - Raspbian: Buster (from archive)
+    - Raspbian: Bullseye (default)
     - No APT cache
 
 === "Optimized Build (Recommended)"
@@ -149,7 +149,7 @@ You'll see output organized by stages:
 [INFO] Installing Raspberry Pi firmware...
 [INFO] Installing kernel...
 [INFO] Creating base system cache...
-[SUCCESS] Stage 1 complete! (cache/pimeleon-rpi3-buster-base-v1.tar.gz)
+[SUCCESS] Stage 1 complete! (cache/pimeleon-rpi3-bullseye-base-v1.tar.gz)
 ```
 
 !!! tip "Build Time: Stage 1"
@@ -275,7 +275,7 @@ graph LR
     A --> C[Root Partition<br/>3.8GB ext4]
 
     B --> D[bootcode.bin<br/>start.elf<br/>kernel*.img<br/>config.txt]
-    C --> E[Raspbian Buster<br/>Networking<br/>Security<br/>Services]
+    C --> E[Raspbian Bullseye<br/>Networking<br/>Security<br/>Services]
 ```
 
 #### Installed Packages
