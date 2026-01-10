@@ -32,13 +32,9 @@ default:
   interruptible: true
 
 # Docker job template with registry authentication
+# Runner has host docker socket mounted, no dind needed
 .docker-job:
   image: docker:latest
-  services:
-    - docker:dind
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
   tags:
