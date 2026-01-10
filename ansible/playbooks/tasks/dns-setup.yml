@@ -1,0 +1,108 @@
+---
+# DNS Setup Task
+# Configures BIND9, Pi-hole, and dnscrypt-proxy
+
+- name: Install DNS packages
+  apt:
+    name:
+      - bind9
+      - bind9utils
+      - dnsutils
+    state: present
+  when: services_enabled.dns_server | default(true)
+
+- name: Install dnscrypt-proxy
+  apt:
+    name: dnscrypt-proxy
+    state: present
+  when: services_enabled.dnscrypt_proxy | default(true)
+
+- name: Create BIND9 configuration directory
+  file:
+    path: /etc/bind
+    state: directory
+    mode: '0755'
+  when: services_enabled.dns_server | default(true)
+
+- name: Configure BIND9 options
+  template:
+    src: bind/named.conf.options.j2
+    dest: /etc/bind/named.conf.options
+    mode: '0644'
+  when: services_enabled.dns_server | default(true)
+  notify: restart bind9
+
+- name: Configure BIND9 local zones
+  template:
+    src: bind/named.conf.local.j2
+    dest: /etc/bind/named.conf.local
+    mode: '0644'
+  when: services_enabled.dns_server | default(true)
+  notify: restart bind9
+
+- name: Create DNS zone directory
+  file:
+    path: /var/lib/bind
+    state: directory
+    owner: bind
+    group: bind
+    mode: '0755'
+  when: services_enabled.dns_server | default(true)
+
+- name: Configure dnscrypt-proxy
+  template:
+    src: dnscrypt-proxy/dnscrypt-proxy.toml.j2
+    dest: /etc/dnscrypt-proxy/dnscrypt-proxy.toml
+    mode: '0644'
+  when: services_enabled.dnscrypt_proxy | default(true)
+  notify: restart dnscrypt-proxy
+
+- name: Enable BIND9 service
+  systemd:
+    name: bind9
+    enabled: yes
+    state: started
+  when: services_enabled.dns_server | default(true)
+
+- name: Enable dnscrypt-proxy service
+  systemd:
+    name: dnscrypt-proxy
+    enabled: yes
+    state: started
+  when: services_enabled.dnscrypt_proxy | default(true)
+
+# Pi-hole installation (if enabled)
+- name: Check if Pi-hole is installed
+  stat:
+    path: /usr/local/bin/pihole
+  register: pihole_installed
+  when: services_enabled.pihole | default(true)
+
+- name: Create Pi-hole configuration directory
+  file:
+    path: /etc/pihole
+    state: directory
+    mode: '0755'
+  when: services_enabled.pihole | default(true)
+
+- name: Configure Pi-hole setupVars
+  template:
+    src: pihole/setupVars.conf.j2
+    dest: /etc/pihole/setupVars.conf
+    mode: '0644'
+  when: services_enabled.pihole | default(true)
+
+# Note: Pi-hole installation requires internet access and is typically
+# done via their install script. This task prepares the configuration.
+- name: Create Pi-hole install script marker
+  copy:
+    content: |
+      #!/bin/bash
+      # Pi-hole installation should be run manually or via first-boot script
+      # curl -sSL https://install.pi-hole.net | bash /dev/stdin --unattended
+      echo "Pi-hole pre-configured. Run install script on first boot."
+    dest: /opt/pihole-install.sh
+    mode: '0755'
+  when:
+    - services_enabled.pihole | default(true)
+    - not pihole_installed.stat.exists | default(true)

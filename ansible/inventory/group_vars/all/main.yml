@@ -1,0 +1,62 @@
+---
+# Global defaults for all platforms
+# Override in platform-specific group_vars
+
+# Platform identification
+platform_family: "raspberrypi"
+platform_model: "3B+"
+display_name: "Raspberry Pi 3 Model B+"
+
+# Debian version (bullseye, bookworm, trixie)
+debian_version: "{{ lookup('env', 'RASPBIAN_VERSION') | default('bullseye', true) }}"
+debian_codename: "{{ debian_version }}"
+
+# System settings
+system_hostname: "pimeleon"
+system_timezone: "Etc/UTC"
+system_locale: "en_US.UTF-8"
+
+# User configuration
+pimeleon_user: "pi"
+pimeleon_initial_password: "{{ lookup('env', 'PIMELEON_INITIAL_PASSWORD') | default('netblox', true) }}"
+
+# Hardware specs defaults
+architecture: "armhf"
+cpu_cores: 4
+ram_mb: 1024
+
+# Hardware feature flags
+hardware_features:
+  uart: true
+  spi: true
+  i2c: true
+  gpio: true
+  wifi: true
+  bluetooth: true
+
+# Hardware groups to create
+hardware_groups:
+  - gpio
+  - i2c
+  - spi
+  - video
+  - audio
+  - input
+  - netdev
+  - dialout
+
+# Version-specific configuration
+# Use: version_specific[debian_version].key
+version_specific:
+  bullseye:
+    python_package: "python3"
+    nftables_default: true
+    kernel_suffix: ""
+  bookworm:
+    python_package: "python3"
+    nftables_default: true
+    kernel_suffix: ""
+  trixie:
+    python_package: "python3"
+    nftables_default: true
+    kernel_suffix: ""

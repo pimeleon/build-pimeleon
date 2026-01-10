@@ -1,0 +1,60 @@
+---
+# DHCP Setup Task
+# Configures isc-dhcp-server for LAN and WiFi networks
+
+- name: Install DHCP server
+  apt:
+    name: isc-dhcp-server
+    state: present
+  when: services_enabled.dhcp_server | default(true)
+
+- name: Configure DHCP server defaults
+  template:
+    src: dhcp/isc-dhcp-server.j2
+    dest: /etc/default/isc-dhcp-server
+    mode: '0644'
+  when: services_enabled.dhcp_server | default(true)
+  notify: restart isc-dhcp-server
+
+- name: Configure DHCP server
+  template:
+    src: dhcp/dhcpd.conf.j2
+    dest: /etc/dhcp/dhcpd.conf
+    mode: '0644'
+  when: services_enabled.dhcp_server | default(true)
+  notify: restart isc-dhcp-server
+
+- name: Create DHCP lease directory
+  file:
+    path: /var/lib/dhcp
+    state: directory
+    mode: '0755'
+  when: services_enabled.dhcp_server | default(true)
+
+- name: Touch DHCP lease file
+  file:
+    path: /var/lib/dhcp/dhcpd.leases
+    state: touch
+    mode: '0644'
+  when: services_enabled.dhcp_server | default(true)
+
+- name: Enable DHCP server service
+  systemd:
+    name: isc-dhcp-server
+    enabled: yes
+  when: services_enabled.dhcp_server | default(true)
+
+# DDNS configuration for BIND9 integration
+- name: Configure DDNS key for DHCP-DNS integration
+  template:
+    src: dhcp/ddns-keys.conf.j2
+    dest: /etc/dhcp/ddns-keys.conf
+    mode: '0640'
+    owner: root
+    group: root
+  when:
+    - services_enabled.dhcp_server | default(true)
+    - services_enabled.dns_server | default(true)
+  notify:
+    - restart isc-dhcp-server
+    - restart bind9

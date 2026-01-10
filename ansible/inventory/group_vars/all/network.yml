@@ -1,0 +1,46 @@
+---
+# Network configuration defaults
+# These fix the undefined variables in network-setup.yml
+
+# Interface naming
+wan_interface: "eth0"
+lan_interface: "eth1"
+wifi_interface: "wlan0"
+mgmt_interface: "eth0:0"
+
+# Ethernet availability (override for Zero W)
+ethernet_available: true
+
+# LAN network settings
+lan_ip: "192.168.76.1"
+lan_netmask: "255.255.255.0"
+lan_network: "192.168.76.0/24"
+
+# WiFi AP network settings
+wifi_ap_ip: "192.168.77.1"
+wifi_ap_netmask: "255.255.255.0"
+wifi_ap_network: "192.168.77.0/24"
+
+# Management network
+mgmt_ip: "172.16.0.1"
+mgmt_netmask: "255.255.255.0"
+
+# DHCP configuration
+dhcp_range_start: "192.168.76.100"
+dhcp_range_end: "192.168.76.200"
+dhcp_lease_time: "12h"
+
+wifi_dhcp_range_start: "192.168.77.100"
+wifi_dhcp_range_end: "192.168.77.200"
+
+# WiFi AP configuration
+wifi_ssid: "pimeleon"
+wifi_passphrase: "changeme123"
+wifi_channel: 6
+wifi_hw_mode: "g"
+wifi_country_code: "US"
+
+# DNS servers
+upstream_dns:
+  - "8.8.8.8"
+  - "8.8.4.4"

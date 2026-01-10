@@ -1,0 +1,120 @@
+---
+# Firewall Setup Task
+# Configures nftables for routing, NAT, and security
+
+- name: Install nftables
+  apt:
+    name: nftables
+    state: present
+  when: services_enabled.firewall | default(true)
+
+- name: Remove iptables (replaced by nftables)
+  apt:
+    name:
+      - iptables
+    state: absent
+    purge: yes
+  when: services_enabled.firewall | default(true)
+  ignore_errors: yes
+
+- name: Create nftables configuration directory
+  file:
+    path: /etc/nftables.d
+    state: directory
+    mode: '0755'
+  when: services_enabled.firewall | default(true)
+
+- name: Configure main nftables rules
+  template:
+    src: nftables/nftables.conf.j2
+    dest: /etc/nftables.conf
+    mode: '0644'
+  when: services_enabled.firewall | default(true)
+  notify: reload nftables
+
+- name: Configure NAT rules
+  template:
+    src: nftables/nat.nft.j2
+    dest: /etc/nftables.d/nat.nft
+    mode: '0644'
+  when: services_enabled.firewall | default(true)
+  notify: reload nftables
+
+- name: Configure input filter rules
+  template:
+    src: nftables/filter-input.nft.j2
+    dest: /etc/nftables.d/filter-input.nft
+    mode: '0644'
+  when: services_enabled.firewall | default(true)
+  notify: reload nftables
+
+- name: Configure forward filter rules
+  template:
+    src: nftables/filter-forward.nft.j2
+    dest: /etc/nftables.d/filter-forward.nft
+    mode: '0644'
+  when: services_enabled.firewall | default(true)
+  notify: reload nftables
+
+- name: Enable IP forwarding (IPv4)
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes
+  when: services_enabled.firewall | default(true)
+
+- name: Enable IP forwarding (IPv6)
+  sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes
+  when: services_enabled.firewall | default(true)
+
+- name: Configure security sysctl parameters
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_set: yes
+    state: present
+    reload: yes
+  loop:
+    - { name: 'net.ipv4.conf.all.send_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.all.accept_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.all.accept_source_route', value: '0' }
+    - { name: 'net.ipv4.conf.all.log_martians', value: '1' }
+    - { name: 'net.ipv4.tcp_syncookies', value: '1' }
+    - { name: 'net.ipv4.icmp_echo_ignore_broadcasts', value: '1' }
+  when: services_enabled.firewall | default(true)
+
+- name: Enable nftables service
+  systemd:
+    name: nftables
+    enabled: yes
+    state: started
+  when: services_enabled.firewall | default(true)
+
+# Fail2ban configuration
+- name: Install fail2ban
+  apt:
+    name: fail2ban
+    state: present
+  when: services_enabled.fail2ban | default(true)
+
+- name: Configure fail2ban jail
+  template:
+    src: fail2ban/jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    mode: '0644'
+  when: services_enabled.fail2ban | default(true)
+  notify: restart fail2ban
+
+- name: Enable fail2ban service
+  systemd:
+    name: fail2ban
+    enabled: yes
+    state: started
+  when: services_enabled.fail2ban | default(true)

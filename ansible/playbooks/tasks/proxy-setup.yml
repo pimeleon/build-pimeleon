@@ -1,0 +1,95 @@
+---
+# Proxy Setup Task
+# Configures Privoxy, Squid, and Tor (based on profile)
+
+# Privoxy - Privacy enhancing proxy
+- name: Install Privoxy
+  apt:
+    name: privoxy
+    state: present
+  when: services_enabled.privoxy | default(true)
+
+- name: Configure Privoxy
+  template:
+    src: privoxy/config.j2
+    dest: /etc/privoxy/config
+    mode: '0644'
+  when: services_enabled.privoxy | default(true)
+  notify: restart privoxy
+
+- name: Enable Privoxy service
+  systemd:
+    name: privoxy
+    enabled: yes
+    state: started
+  when: services_enabled.privoxy | default(true)
+
+# Squid - Caching proxy (development only)
+- name: Install Squid
+  apt:
+    name: squid
+    state: present
+  when: services_enabled.squid | default(false)
+
+- name: Configure Squid
+  template:
+    src: squid/squid.conf.j2
+    dest: /etc/squid/squid.conf
+    mode: '0644'
+  when: services_enabled.squid | default(false)
+  notify: restart squid
+
+- name: Create Squid cache directory
+  file:
+    path: /var/spool/squid
+    state: directory
+    owner: proxy
+    group: proxy
+    mode: '0755'
+  when: services_enabled.squid | default(false)
+
+- name: Enable Squid service
+  systemd:
+    name: squid
+    enabled: yes
+    state: started
+  when: services_enabled.squid | default(false)
+
+# Tor - Anonymizing network (development only)
+- name: Install Tor
+  apt:
+    name: tor
+    state: present
+  when: services_enabled.tor | default(false)
+
+- name: Configure Tor
+  template:
+    src: tor/torrc.j2
+    dest: /etc/tor/torrc
+    mode: '0644'
+  when: services_enabled.tor | default(false)
+  notify: restart tor
+
+- name: Enable Tor service
+  systemd:
+    name: tor
+    enabled: yes
+    state: started
+  when: services_enabled.tor | default(false)
+
+# Disable services not in profile
+- name: Disable Squid if not enabled
+  systemd:
+    name: squid
+    enabled: no
+    state: stopped
+  when: not (services_enabled.squid | default(false))
+  ignore_errors: yes
+
+- name: Disable Tor if not enabled
+  systemd:
+    name: tor
+    enabled: no
+    state: stopped
+  when: not (services_enabled.tor | default(false))
+  ignore_errors: yes

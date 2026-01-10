@@ -3,31 +3,138 @@
 - name: Pimeleon Complete Setup
   hosts: pimeleon
 
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
   pre_tasks:
     - name: Display build information
       ansible.builtin.debug:
-        msg: "Building Pimeleon image for {{ ansible_hostname }}"
+        msg: |
+          Building Pimeleon image
+          Profile: {{ pimeleon_profile | default('development') }}
+          Platform: {{ platform_model | default('3B+') }}
+          Debian: {{ debian_version | default('bullseye') }}
+
+    - name: Load profile configuration
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../inventory/group_vars/all/profiles/{{ pimeleon_profile | default('development') }}.yml"
+      ignore_errors: yes
 
   tasks:
+    # Tier 1: Core setup (always run)
     - name: Run base setup
       ansible.builtin.include_tasks: tasks/base-setup.yml
-      tags: [base]
+      tags: [base, core]
 
     - name: Run network setup
       ansible.builtin.include_tasks: tasks/network-setup.yml
-      tags: [network]
+      tags: [network, core]
+
+    - name: Run WiFi setup
+      ansible.builtin.include_tasks: tasks/wifi-setup.yml
+      tags: [wifi, network, core]
+
+    - name: Run DHCP setup
+      ansible.builtin.include_tasks: tasks/dhcp-setup.yml
+      tags: [dhcp, network, core]
+
+    - name: Run DNS setup
+      ansible.builtin.include_tasks: tasks/dns-setup.yml
+      tags: [dns, network, core]
+
+    - name: Run firewall setup
+      ansible.builtin.include_tasks: tasks/firewall-setup.yml
+      tags: [firewall, security, core]
 
     - name: Run security hardening
       ansible.builtin.include_tasks: tasks/security-hardening.yml
-      tags: [security]
+      tags: [security, core]
+
+    # Tier 2: Proxy services
+    - name: Run proxy setup
+      ansible.builtin.include_tasks: tasks/proxy-setup.yml
+      tags: [proxy, services]
+
+    # Tier 3: File sharing (development profile)
+    - name: Run file sharing setup
+      ansible.builtin.include_tasks: tasks/filesharing-setup.yml
+      tags: [filesharing, services, development]
 
   post_tasks:
     - name: Display completion message
       ansible.builtin.debug:
-        msg: "Pimeleon configuration completed successfully!"
+        msg: |
+          Pimeleon configuration completed!
+          Profile: {{ pimeleon_profile | default('development') }}
 
   handlers:
+    # SSH
     - name: Restart SSH
       ansible.builtin.systemd:
         name: ssh
         state: restarted
+
+    # Network
+    - name: restart systemd-networkd
+      ansible.builtin.systemd:
+        name: systemd-networkd
+        state: restarted
+
+    # DNS
+    - name: restart bind9
+      ansible.builtin.systemd:
+        name: bind9
+        state: restarted
+
+    - name: restart dnscrypt-proxy
+      ansible.builtin.systemd:
+        name: dnscrypt-proxy
+        state: restarted
+
+    # DHCP
+    - name: restart isc-dhcp-server
+      ansible.builtin.systemd:
+        name: isc-dhcp-server
+        state: restarted
+
+    # WiFi
+    - name: restart hostapd
+      ansible.builtin.systemd:
+        name: hostapd
+        state: restarted
+
+    # Firewall
+    - name: reload nftables
+      ansible.builtin.systemd:
+        name: nftables
+        state: reloaded
+
+    - name: restart fail2ban
+      ansible.builtin.systemd:
+        name: fail2ban
+        state: restarted
+
+    # Proxy
+    - name: restart privoxy
+      ansible.builtin.systemd:
+        name: privoxy
+        state: restarted
+
+    - name: restart squid
+      ansible.builtin.systemd:
+        name: squid
+        state: restarted
+
+    - name: restart tor
+      ansible.builtin.systemd:
+        name: tor
+        state: restarted
+
+    # File sharing
+    - name: restart smbd
+      ansible.builtin.systemd:
+        name: smbd
+        state: restarted
+
+    - name: reload nfs-exports
+      ansible.builtin.command: exportfs -ra
