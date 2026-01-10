@@ -83,22 +83,31 @@ warm-cache:
   script:
     - |
       CACHE_FILE="cache/pimeleon-${PIMELEON_RPI_MODEL:-3B+}-${RASPBIAN_VERSION:-bookworm}-base.tar.gz"
+      BUILDER_IMAGE="${BUILD_IMAGE:-${CI_REGISTRY_IMAGE}/builder:latest}"
+
       if [ -f "$CACHE_FILE" ]; then
         echo "Cache exists: $CACHE_FILE"
         ls -lh "$CACHE_FILE"
       else
-        echo "Cache not found, building base system..."
-        mkdir -p cache
-        docker run --rm --privileged \
-          -v $CI_PROJECT_DIR/cache:/cache \
-          -e PIMELEON_RPI_MODEL=${PIMELEON_RPI_MODEL:-3B+} \
-          -e RASPBIAN_VERSION=${RASPBIAN_VERSION:-bookworm} \
-          -e BUILD_CACHE_DIR=/cache \
-          -e APT_CACHE_SERVER=${APT_PROXY%:*} \
-          ${BUILD_IMAGE:-${CI_REGISTRY_IMAGE}/builder:latest} \
-          /scripts/stage1-base.sh /tmp/build /tmp/build/base.img 4G
-        echo "Base system cache created"
-        ls -lh "$CACHE_FILE"
+        echo "Cache not found, checking if builder image exists..."
+        if docker pull "$BUILDER_IMAGE" 2>/dev/null; then
+          echo "Builder image available, creating cache..."
+          mkdir -p cache
+          docker run --rm --privileged \
+            -v $CI_PROJECT_DIR/cache:/cache \
+            -e PIMELEON_RPI_MODEL=${PIMELEON_RPI_MODEL:-3B+} \
+            -e RASPBIAN_VERSION=${RASPBIAN_VERSION:-bookworm} \
+            -e BUILD_CACHE_DIR=/cache \
+            -e APT_CACHE_SERVER=${APT_PROXY%:*} \
+            "$BUILDER_IMAGE" \
+            /scripts/stage1-base.sh /tmp/build /tmp/build/base.img 4G
+          echo "Base system cache created"
+          ls -lh "$CACHE_FILE"
+        else
+          echo "Builder image not available yet, skipping cache warm-up"
+          echo "Cache will be created during build:pimeleon job"
+          mkdir -p cache
+        fi
       fi
 
 # ============================================
