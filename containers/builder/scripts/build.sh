@@ -16,7 +16,8 @@ LOG_FILE="${OUTPUT_DIR}/build-$(date +%Y%m%d-%H%M%S).log"
 # Default values and export for all stages
 export PIMELEON_RPI_MODEL="${PIMELEON_RPI_MODEL:-3B+}"
 export PIMELEON_IMAGE_SIZE="${PIMELEON_IMAGE_SIZE:-4G}"
-export RASPBIAN_VERSION="${RASPBIAN_VERSION:-buster}"
+export PIMELEON_PROFILE="${PIMELEON_PROFILE:-development}"
+export RASPBIAN_VERSION="${RASPBIAN_VERSION:-bullseye}"
 export RASPBIAN_MIRROR="${RASPBIAN_MIRROR:-http://archive.raspbian.org/raspbian/}"
 
 # Export APT cache configuration for all stages
@@ -30,6 +31,9 @@ exec 2>&1
 log_info "Pimeleon Build System"
 log_info "====================="
 log_info "Build started at: $(date)"
+log_info "Profile: ${PIMELEON_PROFILE}"
+log_info "Pi Model: ${PIMELEON_RPI_MODEL}"
+log_info "Debian Version: ${RASPBIAN_VERSION}"
 log_info "Output directory: ${OUTPUT_DIR}"
 log_info "Cache directory: ${CACHE_DIR}"
 log_info "Image name: ${IMAGE_NAME}"
