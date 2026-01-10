@@ -65,7 +65,7 @@ warm-cache:
   services:
     - docker:dind
   tags:
-    - heavy
+    - containers
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
       when: never
@@ -172,9 +172,11 @@ lint:shell:
 
 build:containers:
   stage: build
+  image: docker:latest
+  services:
+    - docker:dind
   tags:
-    - docker
-    - heavy
+    - containers
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
       when: never
@@ -189,9 +191,11 @@ build:containers:
 
 build:pimeleon:
   stage: build
+  image: docker:latest
+  services:
+    - docker:dind
   tags:
-    - docker
-    - heavy
+    - containers
   needs: ["warm-cache", "build:containers"]
   cache:
     key: base-system-${PIMELEON_RPI_MODEL}-${RASPBIAN_VERSION}-${CI_COMMIT_SHA}
@@ -246,8 +250,11 @@ build:pimeleon:
 
 test:smoke:
   stage: test
+  image: docker:latest
+  services:
+    - docker:dind
   tags:
-    - docker
+    - containers
   needs: ["build:pimeleon"]
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
@@ -271,8 +278,11 @@ test:smoke:
 
 test:integration:
   stage: test
+  image: docker:latest
+  services:
+    - docker:dind
   tags:
-    - docker
+    - containers
   needs: ["build:pimeleon"]
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
@@ -296,7 +306,7 @@ test:integration:
 publish:image:
   stage: publish
   tags:
-    - docker
+    - containers
   needs: ["build:pimeleon", "test:smoke"]
   rules:
     # Publish on platform release branches
