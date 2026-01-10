@@ -48,7 +48,7 @@ repos:
 
   # Secret detection (runs on both commit and push)
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.18.1
+    rev: v8.21.2
     hooks:
       - id: gitleaks
         stages: [pre-commit]

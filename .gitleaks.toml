@@ -4,8 +4,7 @@ title = "Pimeleon Gitleaks configuration"
 # Extend the default gitleaks config
 useDefault = true
 
-# Disable rules that flag test/example credentials
-disabledRules = ["generic-api-key", "jwt"]
+# No disabled rules - strict detection, add exceptions as needed
 
 # Allow certain paths
 [allowlist]
