@@ -37,11 +37,14 @@ workflow:
     # Run on master/develop (protected branches)
     - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop"'
       when: always
+    # Run on platform release branches
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
+      when: always
     # Run on all tags
     - if: '$CI_COMMIT_TAG'
       when: always
-    # Run on merge requests targeting master or develop
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+    # Run on merge requests targeting develop
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
       when: always
     # Manual workflow dispatch
     - if: '$CI_PIPELINE_SOURCE == "web"'
@@ -173,12 +176,29 @@ build:pimeleon:
     - heavy
   needs: ["build:containers"]
   rules:
+    # Skip on feature branches
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
       when: never
+    # RPi 3B+ builds (release/rpi3-* branches)
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi3-/'
+      variables:
+        PIMELEON_RPI_MODEL: "3B+"
+        RASPBIAN_VERSION: "bookworm"
+    # RPi 4B builds (release/rpi4-* branches)
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi4-/'
+      variables:
+        PIMELEON_RPI_MODEL: "4B"
+        RASPBIAN_VERSION: "bookworm"
+    # Default for develop/master (use RPi 3B+ as reference)
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "master"'
+      variables:
+        PIMELEON_RPI_MODEL: "3B+"
+        RASPBIAN_VERSION: "bookworm"
     - when: on_success
   before_script:
     - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
   script:
+    - echo "Building Pimeleon for ${PIMELEON_RPI_MODEL} (${RASPBIAN_VERSION})..."
     - |
       docker run --rm \
         --privileged \
@@ -188,8 +208,8 @@ build:pimeleon:
         -v $CI_PROJECT_DIR/ansible:/ansible \
         -e BUILD_CACHE_DIR=/cache \
         -e OUTPUT_DIR=/output \
-        -e PIMELEON_RPI_MODEL=3B+ \
-        -e RASPBIAN_VERSION=bookworm \
+        -e PIMELEON_RPI_MODEL=${PIMELEON_RPI_MODEL} \
+        -e RASPBIAN_VERSION=${RASPBIAN_VERSION} \
         -e APT_CACHE_SERVER=${APT_PROXY%:*} \
         $BUILD_IMAGE
   artifacts:
@@ -358,6 +378,88 @@ release:production:
     - |
       if [ -n "$NEXT_VERSION" ]; then
         echo "Creating release tag v${NEXT_VERSION}..."
+        if ! release --skip-ssl-verify tag 2>&1 | tee /tmp/release.log; then
+          if grep -q "no changes found" /tmp/release.log; then
+            echo "No releasable changes - skipping tag"
+          else
+            cat /tmp/release.log
+            exit 1
+          fi
+        fi
+      else
+        echo "No version bump needed"
+      fi
+
+# Platform-specific release: RPi 3B+ Bookworm
+release:rpi3-bookworm:
+  stage: release
+  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
+  cache: {}
+  needs:
+    - job: build:pimeleon
+      artifacts: false
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "release/rpi3-bookworm"'
+      when: on_success
+    - when: never
+  variables:
+    GIT_SSL_NO_VERIFY: "1"
+    GITLAB_URL: "https://192.168.76.5:8443/api/v4"
+    GSG_TOKEN: $GITLAB_TOKEN
+    GSG_RELEASE_BRANCHES: "release/rpi3-bookworm"
+    GSG_PRE_TMPL: 'rpi3-bookworm'
+  script:
+    - echo "Calculating next version for RPi 3B+ Bookworm..."
+    - NEXT_VERSION=$(release --skip-ssl-verify next-version --allow-current)
+    - echo "Next version - ${NEXT_VERSION}"
+    - |
+      if [ -n "$NEXT_VERSION" ]; then
+        echo "Creating tag v${NEXT_VERSION}..."
+        if ! release --skip-ssl-verify tag 2>&1 | tee /tmp/release.log; then
+          if grep -q "no changes found" /tmp/release.log; then
+            echo "No releasable changes - skipping tag"
+          else
+            cat /tmp/release.log
+            exit 1
+          fi
+        fi
+      else
+        echo "No version bump needed"
+      fi
+
+# Platform-specific release: RPi 4B Bookworm
+release:rpi4-bookworm:
+  stage: release
+  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
+  cache: {}
+  needs:
+    - job: build:pimeleon
+      artifacts: false
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "release/rpi4-bookworm"'
+      when: on_success
+    - when: never
+  variables:
+    GIT_SSL_NO_VERIFY: "1"
+    GITLAB_URL: "https://192.168.76.5:8443/api/v4"
+    GSG_TOKEN: $GITLAB_TOKEN
+    GSG_RELEASE_BRANCHES: "release/rpi4-bookworm"
+    GSG_PRE_TMPL: 'rpi4-bookworm'
+  script:
+    - echo "Calculating next version for RPi 4B Bookworm..."
+    - NEXT_VERSION=$(release --skip-ssl-verify next-version --allow-current)
+    - echo "Next version - ${NEXT_VERSION}"
+    - |
+      if [ -n "$NEXT_VERSION" ]; then
+        echo "Creating tag v${NEXT_VERSION}..."
         if ! release --skip-ssl-verify tag 2>&1 | tee /tmp/release.log; then
           if grep -q "no changes found" /tmp/release.log; then
             echo "No releasable changes - skipping tag"
