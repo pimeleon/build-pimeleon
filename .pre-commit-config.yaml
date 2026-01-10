@@ -46,10 +46,10 @@ repos:
       - id: markdownlint
         args: ['--fix']
 
-  # Secret detection (pre-push only, also runs in CI/CD)
+  # Secret detection (pre-push only - scans working directory)
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.21.2
     hooks:
       - id: gitleaks
         stages: [pre-push]
-        args: ['detect', '--verbose', '--redact']
+        args: ['dir', '.', '--verbose', '--redact']

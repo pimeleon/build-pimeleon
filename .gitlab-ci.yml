@@ -77,11 +77,25 @@ warm-cache:
       when: never
     - when: on_success
   cache:
-    key: base-system-${PIMELEON_RPI_MODEL:-3B+}-${RASPBIAN_VERSION:-bookworm}-${CI_COMMIT_SHA}
-    paths:
-      - cache/
-    policy: pull-push
+    - key: base-system-${PIMELEON_RPI_MODEL:-3B+}-${RASPBIAN_VERSION:-bookworm}
+      paths:
+        - cache/
+      policy: pull-push
+    - key: gitleaks-baseline
+      paths:
+        - .gitleaks-baseline.json
+      policy: pull-push
   script:
+    - |
+      # Generate gitleaks baseline if not cached
+      if [ ! -f .gitleaks-baseline.json ]; then
+        echo "Creating gitleaks baseline from full git history..."
+        docker run --rm -v $CI_PROJECT_DIR:/repo zricethezav/gitleaks:v8.21.2 \
+          git /repo --log-opts="--all" --report-path /repo/.gitleaks-baseline.json --config /repo/.gitleaks.toml
+        echo "Gitleaks baseline created"
+      else
+        echo "Gitleaks baseline exists, using cached version"
+      fi
     - |
       CACHE_FILE="cache/pimeleon-${PIMELEON_RPI_MODEL:-3B+}-${RASPBIAN_VERSION:-bookworm}-base.tar.gz"
       BUILDER_IMAGE="${BUILD_IMAGE:-${CI_REGISTRY_IMAGE}/builder:latest}"
@@ -129,14 +143,29 @@ security:trivy:
 security:gitleaks:
   stage: scan
   image: zricethezav/gitleaks:v8.21.2
+  needs:
+    - job: warm-cache
+      optional: true
   rules:
     - if: '$CI_COMMIT_TAG'
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - when: on_success
+  cache:
+    key: gitleaks-baseline
+    paths:
+      - .gitleaks-baseline.json
+    policy: pull
   script:
-    - gitleaks git . --verbose --redact --baseline-path .gitleaks-baseline.json --config .gitleaks.toml
+    - |
+      if [ -f .gitleaks-baseline.json ]; then
+        echo "Using cached baseline"
+        gitleaks git . --verbose --redact --baseline-path .gitleaks-baseline.json --config .gitleaks.toml
+      else
+        echo "No baseline found, scanning without baseline"
+        gitleaks git . --verbose --redact --config .gitleaks.toml
+      fi
 
 # ============================================
 # LINT STAGE
