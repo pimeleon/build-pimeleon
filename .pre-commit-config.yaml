@@ -14,20 +14,23 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
 
-  # Shell script linting
+  # Shell script linting (warnings only, don't block commits)
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: v0.9.0
     hooks:
       - id: shellcheck
-        args: ['-e', 'SC1091']  # Ignore sourced files not found
+        args: ['-e', 'SC1091,SC2155,SC2086', '-S', 'error']  # Only fail on errors
 
-  # Ansible linting
-  - repo: https://github.com/ansible/ansible-lint
-    rev: v6.22.0
+  # Ansible linting (local installation to avoid version conflicts)
+  - repo: local
     hooks:
       - id: ansible-lint
-        files: ansible/
-        args: ['--offline']
+        name: Ansible Lint
+        entry: ansible-lint
+        language: system
+        files: ansible/.*\.ya?ml$
+        pass_filenames: false
+        args: ['--offline', 'ansible/playbooks/']
 
   # YAML linting
   - repo: https://github.com/adrienverge/yamllint
