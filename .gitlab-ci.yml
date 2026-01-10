@@ -68,8 +68,6 @@ warm-cache:
     - if: '$CI_REGISTRY && $CI_REGISTRY_IMAGE'
       when: on_success
     - when: never
-  before_script:
-    - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
   script:
     - echo "Warming Docker cache..."
     - docker pull ${CI_REGISTRY_IMAGE}/builder:latest || true
@@ -159,8 +157,6 @@ build:containers:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
       when: never
     - when: on_success
-  before_script:
-    - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
   script:
     - docker build --cache-from ${CI_REGISTRY_IMAGE}/builder:latest -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest ./containers/builder
     - docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest ./containers/tester
@@ -195,8 +191,6 @@ build:pimeleon:
         PIMELEON_RPI_MODEL: "3B+"
         RASPBIAN_VERSION: "bookworm"
     - when: on_success
-  before_script:
-    - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
   script:
     - echo "Building Pimeleon for ${PIMELEON_RPI_MODEL} (${RASPBIAN_VERSION})..."
     - |
@@ -232,8 +226,6 @@ test:smoke:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
       when: never
     - when: on_success
-  before_script:
-    - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
   script:
     - |
       docker run --rm \
@@ -259,8 +251,6 @@ test:integration:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
       when: never
     - when: on_success
-  before_script:
-    - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
   script:
     - |
       docker run --rm \
