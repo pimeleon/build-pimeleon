@@ -31,6 +31,21 @@ default:
       - scheduler_failure
   interruptible: true
 
+# Docker job template with registry authentication
+.docker-job:
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_CERT_PATH: "/certs/client"
+    DOCKER_TLS_VERIFY: 1
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
+  tags:
+    - containers
+
 # Workflow rules - smart pipeline triggering
 workflow:
   rules:
@@ -60,12 +75,8 @@ workflow:
 # ============================================
 
 warm-cache:
+  extends: .docker-job
   stage: .pre
-  image: docker:latest
-  services:
-    - docker:dind
-  tags:
-    - containers
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
       when: never
@@ -171,12 +182,8 @@ lint:shell:
 # ============================================
 
 build:containers:
+  extends: .docker-job
   stage: build
-  image: docker:latest
-  services:
-    - docker:dind
-  tags:
-    - containers
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
       when: never
@@ -190,12 +197,8 @@ build:containers:
     - docker push ${CI_REGISTRY_IMAGE}/tester:latest
 
 build:pimeleon:
+  extends: .docker-job
   stage: build
-  image: docker:latest
-  services:
-    - docker:dind
-  tags:
-    - containers
   needs: ["warm-cache", "build:containers"]
   cache:
     key: base-system-${PIMELEON_RPI_MODEL}-${RASPBIAN_VERSION}-${CI_COMMIT_SHA}
@@ -249,12 +252,8 @@ build:pimeleon:
 # ============================================
 
 test:smoke:
+  extends: .docker-job
   stage: test
-  image: docker:latest
-  services:
-    - docker:dind
-  tags:
-    - containers
   needs: ["build:pimeleon"]
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
@@ -277,12 +276,8 @@ test:smoke:
     expire_in: 1 week
 
 test:integration:
+  extends: .docker-job
   stage: test
-  image: docker:latest
-  services:
-    - docker:dind
-  tags:
-    - containers
   needs: ["build:pimeleon"]
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
