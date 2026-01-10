@@ -63,16 +63,36 @@ warm-cache:
   stage: .pre
   tags:
     - docker
+    - heavy
   rules:
-    # Only run if container registry is configured
-    - if: '$CI_REGISTRY && $CI_REGISTRY_IMAGE'
-      when: on_success
-    - when: never
+    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
+      when: never
+    - when: on_success
+  cache:
+    key: base-system-${PIMELEON_RPI_MODEL:-3B+}-${RASPBIAN_VERSION:-bookworm}-${CI_COMMIT_SHA}
+    paths:
+      - cache/
+    policy: pull-push
   script:
-    - echo "Warming Docker cache..."
-    - docker pull ${CI_REGISTRY_IMAGE}/builder:latest || true
-    - docker pull ${CI_REGISTRY_IMAGE}/tester:latest || true
-    - echo "Cache warmed successfully"
+    - |
+      CACHE_FILE="cache/pimeleon-${PIMELEON_RPI_MODEL:-3B+}-${RASPBIAN_VERSION:-bookworm}-base.tar.gz"
+      if [ -f "$CACHE_FILE" ]; then
+        echo "Cache exists: $CACHE_FILE"
+        ls -lh "$CACHE_FILE"
+      else
+        echo "Cache not found, building base system..."
+        mkdir -p cache
+        docker run --rm --privileged \
+          -v $CI_PROJECT_DIR/cache:/cache \
+          -e PIMELEON_RPI_MODEL=${PIMELEON_RPI_MODEL:-3B+} \
+          -e RASPBIAN_VERSION=${RASPBIAN_VERSION:-bookworm} \
+          -e BUILD_CACHE_DIR=/cache \
+          -e APT_CACHE_SERVER=${APT_PROXY%:*} \
+          ${BUILD_IMAGE:-${CI_REGISTRY_IMAGE}/builder:latest} \
+          /scripts/stage1-base.sh /tmp/build /tmp/build/base.img 4G
+        echo "Base system cache created"
+        ls -lh "$CACHE_FILE"
+      fi
 
 # ============================================
 # SECURITY SCAN STAGE
@@ -170,7 +190,12 @@ build:pimeleon:
   tags:
     - docker
     - heavy
-  needs: ["build:containers"]
+  needs: ["warm-cache", "build:containers"]
+  cache:
+    key: base-system-${PIMELEON_RPI_MODEL}-${RASPBIAN_VERSION}-${CI_COMMIT_SHA}
+    paths:
+      - cache/
+    policy: pull
   rules:
     # Skip on feature branches
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
