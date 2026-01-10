@@ -20,19 +20,19 @@ echo "================================" >> "$RESULTS_FILE"
 # Test 1: Image integrity
 test_image_integrity() {
     log_test "Image integrity check"
-    
+
     if [[ ! -f "$TEST_IMAGE_PATH" ]]; then
         log_fail "Image file not found: $TEST_IMAGE_PATH"
         return 1
     fi
-    
+
     # Check image size
     local size=$(stat -c%s "$TEST_IMAGE_PATH")
     if [[ $size -lt 1000000000 ]]; then  # Less than 1GB
         log_fail "Image size too small: $size bytes"
         return 1
     fi
-    
+
     log_pass "Image integrity check passed"
     return 0
 }
@@ -40,7 +40,7 @@ test_image_integrity() {
 # Test 2: VM creation
 test_vm_creation() {
     log_test "VM creation"
-    
+
     # Convert image to qcow2 for QEMU
     local qcow2_image="/tmp/${VM_NAME}.qcow2"
     if [[ "$TEST_IMAGE_PATH" == *.xz ]]; then
@@ -48,7 +48,7 @@ test_vm_creation() {
     else
         qemu-img convert -f raw -O qcow2 "$TEST_IMAGE_PATH" "$qcow2_image"
     fi
-    
+
     # Create VM
     virt-install \
         --name "$VM_NAME" \
@@ -64,7 +64,7 @@ test_vm_creation() {
         --noautoconsole \
         --arch armv7l \
         --machine virt
-    
+
     if virsh list --all | grep -q "$VM_NAME"; then
         log_pass "VM created successfully"
         return 0
@@ -77,10 +77,10 @@ test_vm_creation() {
 # Test 3: VM boot
 test_vm_boot() {
     log_test "VM boot sequence"
-    
+
     # Start VM
     virsh start "$VM_NAME"
-    
+
     # Wait for boot
     local elapsed=0
     while [[ $elapsed -lt 60 ]]; do
@@ -91,7 +91,7 @@ test_vm_boot() {
         sleep 5
         elapsed=$((elapsed + 5))
     done
-    
+
     log_fail "VM failed to start within timeout"
     return 1
 }
@@ -99,15 +99,15 @@ test_vm_boot() {
 # Test 4: Network connectivity
 test_network_connectivity() {
     log_test "Network connectivity"
-    
+
     # Get VM IP address
     local ip=$(virsh domifaddr "$VM_NAME" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)
-    
+
     if [[ -z "$ip" ]]; then
         log_warn "Could not get VM IP address"
         return 1
     fi
-    
+
     # Test ping
     if ping -c 3 -W 5 "$ip" > /dev/null 2>&1; then
         log_pass "Network connectivity established"
@@ -121,14 +121,14 @@ test_network_connectivity() {
 # Test 5: SSH access
 test_ssh_access() {
     log_test "SSH access"
-    
+
     # Get management IP
     local mgmt_ip=$(virsh domifaddr "$VM_NAME" --source agent | grep "172.16.0" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)
-    
+
     if [[ -z "$mgmt_ip" ]]; then
         mgmt_ip="172.16.0.10"
     fi
-    
+
     # Test SSH with timeout
     if timeout 30 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 pi@"$mgmt_ip" "echo 'SSH test successful'" 2>/dev/null; then
         log_pass "SSH access successful"
@@ -143,23 +143,23 @@ test_ssh_access() {
 run_smoke_tests() {
     local passed=0
     local failed=0
-    
+
     # Run tests
     if test_image_integrity; then ((passed++)); else ((failed++)); fi
     if test_vm_creation; then ((passed++)); else ((failed++)); fi
     if test_vm_boot; then ((passed++)); else ((failed++)); fi
     if test_network_connectivity; then ((passed++)); else ((failed++)); fi
     if test_ssh_access; then ((passed++)); else ((failed++)); fi
-    
+
     # Summary
     echo "" >> "$RESULTS_FILE"
     echo "Summary:" >> "$RESULTS_FILE"
     echo "Passed: $passed" >> "$RESULTS_FILE"
     echo "Failed: $failed" >> "$RESULTS_FILE"
-    
+
     # Cleanup
     cleanup_vm "$VM_NAME"
-    
+
     # Return status
     if [[ $failed -eq 0 ]]; then
         log_info "All smoke tests passed!"
@@ -174,10 +174,10 @@ run_smoke_tests() {
 main() {
     run_smoke_tests
     local status=$?
-    
+
     # Generate summary
     echo "SMOKE_TEST_STATUS=$([[ $status -eq 0 ]] && echo 'PASSED' || echo 'FAILED')" > "${TEST_RESULTS_PATH}/summary.txt"
-    
+
     return $status
 }
 

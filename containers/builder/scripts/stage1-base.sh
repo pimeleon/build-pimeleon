@@ -81,33 +81,33 @@ if cache_exists "${RASPBIAN_CACHE_KEY}"; then
     sudo tar -xzf "${WORK_DIR}/raspbian-base.tar.gz" -C "${MOUNT_POINT}"
 else
     log_info "Bootstrapping Raspbian ${RASPBIAN_VERSION}"
-    
+
     # First stage debootstrap with keyring handling
     # For Raspbian, disable GPG verification as keyring is not readily available in Debian
     KEYRING_OPT="--no-check-gpg"
     log_warn "Disabling GPG verification for Raspbian bootstrap"
-    
+
     # ARM binary format registration handled by host system
     # Host should have: sudo apt install binfmt-support qemu-user-static
     log_info "Relying on host system ARM binary format registration"
-    
+
     # Configure proxy environment for debootstrap if available
     DEBOOTSTRAP_ENV=""
     if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
         log_info "Configuring APT proxy for debootstrap: ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
         DEBOOTSTRAP_ENV="http_proxy=http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142} HTTP_PROXY=http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
     fi
-    
+
     # Bootstrap base system without Pi-specific packages first
     # Exclude DHCP packages since systemd handles networking
     sudo env ${DEBOOTSTRAP_ENV} debootstrap --foreign --arch=armhf \
         --exclude=isc-dhcp-common,isc-dhcp-client \
         ${KEYRING_OPT} \
         "${RASPBIAN_VERSION}" "${MOUNT_POINT}" "${RASPBIAN_MIRROR}"
-    
+
     # Setup chroot for second stage
     setup_chroot "${MOUNT_POINT}"
-    
+
     # Configure proxy for second stage debootstrap if available
     if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
         sudo mkdir -p "${MOUNT_POINT}/etc/apt/apt.conf.d"
@@ -117,15 +117,15 @@ Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
 Acquire::https::Proxy "DIRECT";
 EOF
     fi
-    
+
     # Second stage debootstrap
     chroot_run "${MOUNT_POINT}" /debootstrap/debootstrap --second-stage
-    
+
     # Remove temporary proxy config
     if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
         sudo rm -f "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy-temp"
     fi
-    
+
     # Configure apt sources with all required components
     sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
 deb ${RASPBIAN_MIRROR} ${RASPBIAN_VERSION} main contrib non-free rpi
@@ -153,12 +153,12 @@ Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
 Acquire::https::Proxy "DIRECT";
 EOF
     fi
-    
+
     # Cache the base system
     log_info "Caching base system for future builds"
     sudo tar -czf "${WORK_DIR}/raspbian-base.tar.gz" -C "${MOUNT_POINT}" .
     cache_put "${WORK_DIR}/raspbian-base.tar.gz" "${RASPBIAN_CACHE_KEY}"
-    
+
     # Cleanup chroot
     cleanup_chroot "${MOUNT_POINT}"
 fi

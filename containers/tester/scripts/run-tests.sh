@@ -56,19 +56,19 @@ main() {
     log_info "Pimeleon Test Suite"
     log_info "==================="
     log_info "Test suite: ${TEST_SUITE}"
-    
+
     # Find image to test
     local image_path=$(find_test_image)
     log_info "Testing image: $image_path"
-    
+
     # Initialize results directory
     local results_path=$(init_results)
     log_info "Results directory: $results_path"
-    
+
     # Export for test scripts
     export TEST_IMAGE_PATH="$image_path"
     export TEST_RESULTS_PATH="$results_path"
-    
+
     # Run test suites based on selection
     case "$TEST_SUITE" in
         smoke|quick)
@@ -100,16 +100,16 @@ main() {
             exit 1
             ;;
     esac
-    
+
     # Generate test report
     log_section "Generating test report"
     /scripts/generate-report.sh "$results_path"
-    
+
     # Summary
     log_info ""
     log_info "Test run completed!"
     log_info "Results: $results_path/report.html"
-    
+
     # Check for failures
     if grep -q "FAILED" "$results_path/summary.txt" 2>/dev/null; then
         log_error "Some tests failed. Check the report for details."

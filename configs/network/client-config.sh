@@ -56,15 +56,15 @@ test_cache() {
 configure_apt() {
     local apt_conf_dir="/etc/apt/apt.conf.d"
     local proxy_conf="${apt_conf_dir}/02proxy"
-    
+
     print_msg "\nConfiguring APT to use cache..." "$YELLOW"
-    
+
     # Backup existing configuration
     if [ -f "$proxy_conf" ]; then
         cp "$proxy_conf" "${proxy_conf}.backup.$(date +%Y%m%d_%H%M%S)"
         print_msg "Backed up existing configuration" "$YELLOW"
     fi
-    
+
     # Create proxy configuration
     cat > "$proxy_conf" << EOF
 # APT Cacher NG Proxy Configuration - Pimeleon Network
@@ -87,7 +87,7 @@ Acquire::http::Pipeline-Depth "5";
 # Cache-specific headers
 Acquire::http::User-Agent "Pimeleon-Client/1.0";
 EOF
-    
+
     print_msg "✓ APT proxy configuration created" "$GREEN"
 }
 
@@ -95,7 +95,7 @@ EOF
 configure_raspbian() {
     if [ "$DISTRO" = "raspbian" ] || [ -f /etc/rpi-issue ]; then
         print_msg "\nDetected Raspberry Pi - applying specific configuration..." "$YELLOW"
-        
+
         # Ensure Raspberry Pi archive is also proxied
         local rpi_list="/etc/apt/sources.list.d/raspi.list"
         if [ -f "$rpi_list" ]; then
@@ -107,7 +107,7 @@ configure_raspbian() {
 # Function to test configuration
 test_configuration() {
     print_msg "\nTesting APT configuration..." "$YELLOW"
-    
+
     # Update package lists through cache
     if apt-get update 2>&1 | grep -q "Hit:.*${CACHE_SERVER}"; then
         print_msg "✓ APT is successfully using the cache" "$GREEN"
@@ -122,7 +122,7 @@ test_configuration() {
 show_stats() {
     print_msg "\nCache Statistics:" "$YELLOW"
     local stats_url="${PROXY_URL}/acng-report.html"
-    
+
     if command -v curl &> /dev/null; then
         curl -s "$stats_url" | grep -E "Total|Hit|Miss|Data" | head -5 || true
     else
@@ -133,7 +133,7 @@ show_stats() {
 # Function to remove configuration
 remove_configuration() {
     print_msg "\nRemoving APT cache configuration..." "$YELLOW"
-    
+
     local proxy_conf="/etc/apt/apt.conf.d/02proxy"
     if [ -f "$proxy_conf" ]; then
         rm "$proxy_conf"
@@ -146,7 +146,7 @@ remove_configuration() {
 # Function for Pimeleon auto-discovery setup
 setup_autodiscovery() {
     print_msg "\nSetting up auto-discovery for Pimeleon network..." "$YELLOW"
-    
+
     # Create systemd service for DHCP option injection
     cat > /etc/systemd/system/apt-cache-announce.service << EOF
 [Unit]
@@ -161,7 +161,7 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 EOF
-    
+
     systemctl daemon-reload
     print_msg "✓ Auto-discovery service created" "$GREEN"
 }
@@ -178,7 +178,7 @@ show_menu() {
     echo "6) Exit"
     echo
     read -p "Select option: " choice
-    
+
     case $choice in
         1)
             test_cache && configure_apt && configure_raspbian && test_configuration
