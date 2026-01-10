@@ -46,8 +46,13 @@ repos:
       - id: markdownlint
         args: ['--fix']
 
-  # Secret detection
+  # Secret detection (runs on both commit and push)
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.18.1
     hooks:
       - id: gitleaks
+        stages: [pre-commit]
+      - id: gitleaks
+        name: gitleaks (pre-push scan)
+        stages: [pre-push]
+        args: ['detect', '--verbose', '--redact']
