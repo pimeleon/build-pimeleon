@@ -37,12 +37,11 @@ fi
 log_info "Updating package lists"
 chroot_run "${MOUNT_POINT}" apt-get update
 
-# Install essential packages (systemd-resolved is separate package in Bookworm+)
+# Install essential packages
 log_info "Installing essential packages"
 chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     systemd \
     systemd-sysv \
-    systemd-resolved \
     udev \
     dbus \
     sudo \
@@ -54,8 +53,16 @@ chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     iproute2 \
     iptables \
     wireless-tools \
-    firmware-brcm80211 \
     rsyslog
+
+# Install WiFi firmware (may fail if non-free not available)
+log_info "Installing WiFi firmware"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
+    firmware-brcm80211 || log_warn "WiFi firmware not available, wireless may not work"
+
+# Install resolvconf for DNS resolution (systemd-resolved not available in Bookworm)
+log_info "Installing resolvconf for DNS management"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends resolvconf || true
 
 # Install Pi-specific packages (kernel, bootloader, firmware)
 log_info "Installing Raspberry Pi kernel and firmware"
@@ -86,6 +93,12 @@ chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     dnsmasq \
     hostapd \
     wpasupplicant
+
+# Disable NetworkManager (Bookworm default) in favor of systemd-networkd
+log_info "Configuring systemd-networkd as network manager"
+chroot_run "${MOUNT_POINT}" systemctl disable NetworkManager 2>/dev/null || true
+chroot_run "${MOUNT_POINT}" systemctl disable ModemManager 2>/dev/null || true
+chroot_run "${MOUNT_POINT}" systemctl mask NetworkManager 2>/dev/null || true
 
 # Configure system
 log_info "Configuring system"
@@ -136,7 +149,13 @@ sudo sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' "${MOUNT_POINT}/etc/ssh/s
 sudo sed -i 's/#PasswordAuthentication.*/PasswordAuthentication no/' "${MOUNT_POINT}/etc/ssh/sshd_config"
 echo "AllowUsers pi" | sudo tee -a "${MOUNT_POINT}/etc/ssh/sshd_config" > /dev/null
 
-# Create Pi-specific groups first
+# Create standard groups if they don't exist
+log_info "Ensuring standard groups exist"
+for group in adm dialout cdrom audio video plugdev games users input netdev; do
+    chroot_run "${MOUNT_POINT}" groupadd -f "$group" 2>/dev/null || true
+done
+
+# Create Pi-specific groups
 log_info "Creating Pi-specific groups"
 for group in gpio i2c spi; do
     chroot_run "${MOUNT_POINT}" groupadd -f -r "$group" || true
@@ -154,19 +173,19 @@ log_warn "Initial password saved to: ${OUTPUT_DIR}/pi-initial-password.txt"
 
 # Create restricted sudo access for pi user
 sudo mkdir -p "${MOUNT_POINT}/etc/sudoers.d"
-sudo chmod 777 "${MOUNT_POINT}/etc/sudoers.d"
+sudo chmod 755 "${MOUNT_POINT}/etc/sudoers.d"
 cat > /tmp/sudoers-pi << EOF
 pi ALL=(ALL) PASSWD: /sbin/reboot, /sbin/poweroff, /usr/bin/systemctl
 EOF
 sudo cp /tmp/sudoers-pi "${MOUNT_POINT}/etc/sudoers.d/010_pi-restricted"
-sudo chmod 777 "${MOUNT_POINT}/etc/sudoers.d/010_pi-restricted"
+sudo chmod 440 "${MOUNT_POINT}/etc/sudoers.d/010_pi-restricted"
 
-# Configure basic services (systemd-resolved service is part of systemd package)
+# Configure basic services
 log_info "Configuring services"
 chroot_run "${MOUNT_POINT}" systemctl enable ssh
 chroot_run "${MOUNT_POINT}" systemctl enable rsyslog
 chroot_run "${MOUNT_POINT}" systemctl enable systemd-networkd
-chroot_run "${MOUNT_POINT}" systemctl enable systemd-resolved
+# Note: Using resolvconf for DNS instead of systemd-resolved (not available in Bookworm)
 
 # Apply Ansible playbooks if available
 if [[ -d "${ANSIBLE_DIR}/playbooks" ]] && [[ -n "$(ls -A ${ANSIBLE_DIR}/playbooks/*.yml 2>/dev/null)" ]]; then
