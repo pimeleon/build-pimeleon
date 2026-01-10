@@ -4,7 +4,7 @@
 
 # Samba - SMB/CIFS file sharing
 - name: Install Samba
-  apt:
+  ansible.builtin.apt:
     name:
       - samba
       - samba-common-bin
@@ -12,7 +12,7 @@
   when: services_enabled.samba | default(false)
 
 - name: Configure Samba
-  template:
+  ansible.builtin.template:
     src: samba/smb.conf.j2
     dest: /etc/samba/smb.conf
     mode: '0644'
@@ -20,11 +20,11 @@
   notify: restart smbd
 
 - name: Create Samba share directories
-  file:
+  ansible.builtin.file:
     path: "{{ item.path }}"
     state: directory
     owner: pi
-    group: pi
+    ansible.builtin.group: pi
     mode: '0755'
   loop: "{{ samba.shares | default([]) }}"
   when:
@@ -32,17 +32,19 @@
     - samba.shares is defined
 
 - name: Set Samba password for pi user
-  shell: |
+  ansible.builtin.shell: |
+    set -o pipefail
     (echo "{{ pimeleon_initial_password }}"; echo "{{ pimeleon_initial_password }}") | smbpasswd -a pi -s
   args:
+    executable: /bin/bash
     creates: /var/lib/samba/private/passdb.tdb
   when: services_enabled.samba | default(false)
   no_log: true
 
 - name: Enable Samba services
-  systemd:
+  ansible.builtin.systemd:
     name: "{{ item }}"
-    enabled: yes
+    enabled: true
     state: started
   loop:
     - smbd
@@ -51,13 +53,13 @@
 
 # NFS - Network File System
 - name: Install NFS server
-  apt:
+  ansible.builtin.apt:
     name: nfs-kernel-server
     state: present
   when: services_enabled.nfs | default(false)
 
 - name: Configure NFS exports
-  template:
+  ansible.builtin.template:
     src: nfs/exports.j2
     dest: /etc/exports
     mode: '0644'
@@ -65,11 +67,11 @@
   notify: reload nfs-exports
 
 - name: Create NFS export directories
-  file:
+  ansible.builtin.file:
     path: "{{ item.path }}"
     state: directory
     owner: pi
-    group: pi
+    ansible.builtin.group: pi
     mode: '0755'
   loop: "{{ nfs.exports | default([]) }}"
   when:
@@ -77,28 +79,28 @@
     - nfs.exports is defined
 
 - name: Enable NFS server
-  systemd:
+  ansible.builtin.systemd:
     name: nfs-kernel-server
-    enabled: yes
+    enabled: true
     state: started
   when: services_enabled.nfs | default(false)
 
 # Disable services if not in profile
 - name: Disable Samba if not enabled
-  systemd:
+  ansible.builtin.systemd:
     name: "{{ item }}"
-    enabled: no
+    enabled: false
     state: stopped
   loop:
     - smbd
     - nmbd
   when: not (services_enabled.samba | default(false))
-  ignore_errors: yes
+  failed_when: false
 
 - name: Disable NFS if not enabled
-  systemd:
+  ansible.builtin.systemd:
     name: nfs-kernel-server
-    enabled: no
+    enabled: false
     state: stopped
   when: not (services_enabled.nfs | default(false))
-  ignore_errors: yes
+  failed_when: false

@@ -71,7 +71,7 @@
     path: "{{ item.path }}"
     mode: "{{ item.mode }}"
     owner: root
-    group: root
+    ansible.builtin.group: root
   loop:
     - { path: '/etc/passwd', mode: '0644' }
     - { path: '/etc/shadow', mode: '0640' }

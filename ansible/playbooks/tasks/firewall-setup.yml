@@ -3,29 +3,29 @@
 # Configures nftables for routing, NAT, and security
 
 - name: Install nftables
-  apt:
+  ansible.builtin.apt:
     name: nftables
     state: present
   when: services_enabled.firewall | default(true)
 
 - name: Remove iptables (replaced by nftables)
-  apt:
+  ansible.builtin.apt:
     name:
       - iptables
     state: absent
-    purge: yes
+    purge: true
   when: services_enabled.firewall | default(true)
-  ignore_errors: yes
+  failed_when: false
 
 - name: Create nftables configuration directory
-  file:
+  ansible.builtin.file:
     path: /etc/nftables.d
     state: directory
     mode: '0755'
   when: services_enabled.firewall | default(true)
 
 - name: Configure main nftables rules
-  template:
+  ansible.builtin.template:
     src: nftables/nftables.conf.j2
     dest: /etc/nftables.conf
     mode: '0644'
@@ -33,7 +33,7 @@
   notify: reload nftables
 
 - name: Configure NAT rules
-  template:
+  ansible.builtin.template:
     src: nftables/nat.nft.j2
     dest: /etc/nftables.d/nat.nft
     mode: '0644'
@@ -41,7 +41,7 @@
   notify: reload nftables
 
 - name: Configure input filter rules
-  template:
+  ansible.builtin.template:
     src: nftables/filter-input.nft.j2
     dest: /etc/nftables.d/filter-input.nft
     mode: '0644'
@@ -49,7 +49,7 @@
   notify: reload nftables
 
 - name: Configure forward filter rules
-  template:
+  ansible.builtin.template:
     src: nftables/filter-forward.nft.j2
     dest: /etc/nftables.d/filter-forward.nft
     mode: '0644'
@@ -57,30 +57,30 @@
   notify: reload nftables
 
 - name: Enable IP forwarding (IPv4)
-  sysctl:
+  ansible.posix.sysctl:
     name: net.ipv4.ip_forward
     value: '1'
-    sysctl_set: yes
+    sysctl_set: true
     state: present
-    reload: yes
+    reload: true
   when: services_enabled.firewall | default(true)
 
 - name: Enable IP forwarding (IPv6)
-  sysctl:
+  ansible.posix.sysctl:
     name: net.ipv6.conf.all.forwarding
     value: '1'
-    sysctl_set: yes
+    sysctl_set: true
     state: present
-    reload: yes
+    reload: true
   when: services_enabled.firewall | default(true)
 
 - name: Configure security sysctl parameters
-  sysctl:
+  ansible.posix.sysctl:
     name: "{{ item.name }}"
     value: "{{ item.value }}"
-    sysctl_set: yes
+    sysctl_set: true
     state: present
-    reload: yes
+    reload: true
   loop:
     - { name: 'net.ipv4.conf.all.send_redirects', value: '0' }
     - { name: 'net.ipv4.conf.all.accept_redirects', value: '0' }
@@ -91,21 +91,21 @@
   when: services_enabled.firewall | default(true)
 
 - name: Enable nftables service
-  systemd:
+  ansible.builtin.systemd:
     name: nftables
-    enabled: yes
+    enabled: true
     state: started
   when: services_enabled.firewall | default(true)
 
 # Fail2ban configuration
 - name: Install fail2ban
-  apt:
+  ansible.builtin.apt:
     name: fail2ban
     state: present
   when: services_enabled.fail2ban | default(true)
 
 - name: Configure fail2ban jail
-  template:
+  ansible.builtin.template:
     src: fail2ban/jail.local.j2
     dest: /etc/fail2ban/jail.local
     mode: '0644'
@@ -113,8 +113,8 @@
   notify: restart fail2ban
 
 - name: Enable fail2ban service
-  systemd:
+  ansible.builtin.systemd:
     name: fail2ban
-    enabled: yes
+    enabled: true
     state: started
   when: services_enabled.fail2ban | default(true)
