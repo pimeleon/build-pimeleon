@@ -3,17 +3,16 @@
 # Optimized with best practices from n8n-deploy
 
 stages:
+  - .pre
+  - scan
   - lint
   - build
   - test
-  - scan
   - publish
   - release
   - docs
 
 variables:
-  DOCKER_DRIVER: overlay2
-  DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
   BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:${CI_COMMIT_REF_SLUG}
   TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:${CI_COMMIT_REF_SLUG}
@@ -24,7 +23,6 @@ variables:
 default:
   tags:
     - linux
-    - docker
   retry:
     max: 2
     when:
@@ -60,18 +58,49 @@ workflow:
 
 warm-cache:
   stage: .pre
-  image: docker:24-dind
-  services:
-    - docker:24-dind
+  tags:
+    - docker
   rules:
-    - when: on_success
+    # Only run if container registry is configured
+    - if: '$CI_REGISTRY && $CI_REGISTRY_IMAGE'
+      when: on_success
+    - when: never
   before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
   script:
     - echo "Warming Docker cache..."
     - docker pull ${CI_REGISTRY_IMAGE}/builder:latest || true
     - docker pull ${CI_REGISTRY_IMAGE}/tester:latest || true
     - echo "Cache warmed successfully"
+
+# ============================================
+# SECURITY SCAN STAGE
+# ============================================
+
+security:trivy:
+  stage: scan
+  image: aquasec/trivy:latest
+  rules:
+    - when: on_success
+  script:
+    - trivy fs --exit-code 0 --no-progress --format template --template "@contrib/gitlab.tpl" -o gl-container-scanning-report.json .
+  artifacts:
+    reports:
+      container_scanning: gl-container-scanning-report.json
+
+security:gitleaks:
+  stage: scan
+  image: python:3.11-slim
+  rules:
+    - when: on_success
+  before_script:
+    - apt-get -q update && apt-get -qy install wget git
+    - wget -qO- https://github.com/gitleaks/gitleaks/releases/download/v8.29.1/gitleaks_8.29.1_linux_x64.tar.gz | tar xz -C /usr/local/bin
+  script:
+    - echo "Running secret detection with gitleaks..."
+    - gitleaks git . --verbose --redact --config .gitleaks.toml
+    - echo "Secret detection completed"
+  allow_failure: true
 
 # ============================================
 # LINT STAGE
@@ -120,15 +149,15 @@ lint:shell:
 
 build:containers:
   stage: build
-  image: docker:24-dind
-  services:
-    - docker:24-dind
+  tags:
+    - docker
+    - heavy
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
       when: never
     - when: on_success
   before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
   script:
     - docker build --cache-from ${CI_REGISTRY_IMAGE}/builder:latest -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest ./containers/builder
     - docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest ./containers/tester
@@ -139,16 +168,16 @@ build:containers:
 
 build:pimeleon:
   stage: build
-  image: docker:24-dind
-  services:
-    - docker:24-dind
+  tags:
+    - docker
+    - heavy
   needs: ["build:containers"]
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
       when: never
     - when: on_success
   before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
   script:
     - |
       docker run --rm \
@@ -176,16 +205,15 @@ build:pimeleon:
 
 test:smoke:
   stage: test
-  image: docker:24-dind
-  services:
-    - docker:24-dind
-  needs: ["build:pimeleon", "build:containers"]
+  tags:
+    - docker
+  needs: ["build:pimeleon"]
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
       when: never
     - when: on_success
   before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
   script:
     - |
       docker run --rm \
@@ -204,16 +232,15 @@ test:smoke:
 
 test:integration:
   stage: test
-  image: docker:24-dind
-  services:
-    - docker:24-dind
-  needs: ["build:pimeleon", "build:containers"]
+  tags:
+    - docker
+  needs: ["build:pimeleon"]
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
       when: never
     - when: on_success
   before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
   script:
     - |
       docker run --rm \
@@ -226,49 +253,17 @@ test:integration:
   allow_failure: true
 
 # ============================================
-# SECURITY SCAN STAGE
-# ============================================
-
-security:trivy:
-  stage: scan
-  image: aquasec/trivy:latest
-  rules:
-    - when: on_success
-  script:
-    - trivy fs --exit-code 0 --no-progress --format template --template "@contrib/gitlab.tpl" -o gl-container-scanning-report.json .
-  artifacts:
-    reports:
-      container_scanning: gl-container-scanning-report.json
-
-security:gitleaks:
-  stage: scan
-  image: python:3.11-slim
-  rules:
-    - when: on_success
-  before_script:
-    - apt-get -q update && apt-get -qy install wget git
-    - wget -qO- https://github.com/gitleaks/gitleaks/releases/download/v8.29.1/gitleaks_8.29.1_linux_x64.tar.gz | tar xz -C /usr/local/bin
-  script:
-    - echo "Running secret detection with gitleaks..."
-    - gitleaks git . --verbose --redact --config .gitleaks.toml
-    - echo "Secret detection completed"
-  allow_failure: true
-
-# ============================================
 # PUBLISH STAGE
 # ============================================
 
 publish:image:
   stage: publish
-  image: docker:24-dind
-  services:
-    - docker:24-dind
+  tags:
+    - docker
   needs: ["build:pimeleon", "test:smoke"]
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
     - if: '$CI_COMMIT_TAG'
-  before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - cd output
     - |
@@ -302,7 +297,7 @@ release:rc:
   image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
   cache: {}
   needs:
-    - job: test:smoke
+    - job: build:pimeleon
       artifacts: false
   rules:
     - if: '$CI_COMMIT_TAG'
@@ -342,7 +337,7 @@ release:production:
   image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
   cache: {}
   needs:
-    - job: test:smoke
+    - job: build:pimeleon
       artifacts: false
   rules:
     - if: '$CI_COMMIT_TAG'
