@@ -34,8 +34,8 @@ default:
 # Workflow rules - smart pipeline triggering
 workflow:
   rules:
-    # Run on master/develop (protected branches)
-    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop"'
+    # Run on develop (common codebase)
+    - if: '$CI_COMMIT_BRANCH == "develop"'
       when: always
     # Run on platform release branches
     - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
@@ -189,8 +189,8 @@ build:pimeleon:
       variables:
         PIMELEON_RPI_MODEL: "4B"
         RASPBIAN_VERSION: "bookworm"
-    # Default for develop/master (use RPi 3B+ as reference)
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "master"'
+    # Default for develop (use RPi 3B+ as reference build)
+    - if: '$CI_COMMIT_BRANCH == "develop"'
       variables:
         PIMELEON_RPI_MODEL: "3B+"
         RASPBIAN_VERSION: "bookworm"
@@ -282,7 +282,8 @@ publish:image:
     - docker
   needs: ["build:pimeleon", "test:smoke"]
   rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'
+    # Publish on platform release branches
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
     - if: '$CI_COMMIT_TAG'
   script:
     - cd output
@@ -300,7 +301,9 @@ publish:pages:
   image: python:3.11-slim
   needs: ["test:smoke"]
   rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'
+    # Publish docs from develop or release branches
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
   script:
     - pip install mkdocs mkdocs-material
     - mkdocs build -d public
@@ -331,7 +334,7 @@ release:rc:
     GIT_SSL_NO_VERIFY: "1"
     GITLAB_URL: "https://192.168.76.5:8443/api/v4"
     GSG_TOKEN: $GITLAB_TOKEN
-    GSG_RELEASE_BRANCHES: master
+    GSG_RELEASE_BRANCHES: develop
     GSG_PRE_TMPL: 'rc,{{ seq }}'
   script:
     - echo "Calculating next RC version..."
@@ -340,44 +343,6 @@ release:rc:
     - |
       if [ -n "$NEXT_VERSION" ]; then
         echo "Creating RC tag v${NEXT_VERSION}..."
-        if ! release --skip-ssl-verify tag 2>&1 | tee /tmp/release.log; then
-          if grep -q "no changes found" /tmp/release.log; then
-            echo "No releasable changes - skipping tag"
-          else
-            cat /tmp/release.log
-            exit 1
-          fi
-        fi
-      else
-        echo "No version bump needed"
-      fi
-
-release:production:
-  stage: release
-  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
-  cache: {}
-  needs:
-    - job: build:pimeleon
-      artifacts: false
-  rules:
-    - if: '$CI_COMMIT_TAG'
-      when: never
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "master"'
-      when: on_success
-    - when: never
-  variables:
-    GIT_SSL_NO_VERIFY: "1"
-    GITLAB_URL: "https://192.168.76.5:8443/api/v4"
-    GSG_TOKEN: $GITLAB_TOKEN
-  script:
-    - echo "Calculating next production version..."
-    - NEXT_VERSION=$(release --skip-ssl-verify next-version --allow-current)
-    - echo "Next version - ${NEXT_VERSION}"
-    - |
-      if [ -n "$NEXT_VERSION" ]; then
-        echo "Creating release tag v${NEXT_VERSION}..."
         if ! release --skip-ssl-verify tag 2>&1 | tee /tmp/release.log; then
           if grep -q "no changes found" /tmp/release.log; then
             echo "No releasable changes - skipping tag"
@@ -494,12 +459,14 @@ trigger-docs-production:
   stage: docs
   trigger:
     project: pimeleon/docs-web
-    branch: master
+    branch: main
   variables:
     TRIGGERED_BY: pimeleon-build
     BUILD_VERSION: $CI_COMMIT_TAG
     SOURCE_BRANCH: $CI_COMMIT_BRANCH
     SOURCE_COMMIT: $CI_COMMIT_SHA
   rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+(-(rpi3|rpi4).*)?$/
+    # Trigger on platform release branches
+    - if: $CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/
+    # Trigger on platform-specific release tags
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-(rpi3|rpi4)-/
