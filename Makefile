@@ -1,31 +1,52 @@
-.PHONY: help build test clean lint dev shell docs
+.PHONY: help build build-local build-docker test clean lint dev shell docs check-deps
 
 # Default target
 help:
 	@echo "Pimeleon Build System"
 	@echo "====================="
 	@echo ""
-	@echo "Available targets:"
-	@echo "  make build       - Build Pimeleon image"
-	@echo "  make test        - Run all tests"
-	@echo "  make test-smoke  - Run smoke tests only"
-	@echo "  make clean       - Clean build artifacts"
-	@echo "  make lint        - Run linters"
-	@echo "  make dev         - Start development environment"
-	@echo "  make shell       - Open shell in builder container"
-	@echo "  make docs        - Build documentation"
+	@echo "Build targets:"
+	@echo "  make build         - Build image (Docker, default)"
+	@echo "  make build-local   - Build image locally (faster, requires deps)"
+	@echo "  make build-docker  - Build image in Docker container"
+	@echo "  make build-prod    - Production build (Docker)"
+	@echo "  make check-deps    - Check local build dependencies"
+	@echo ""
+	@echo "Test targets:"
+	@echo "  make test          - Run all tests"
+	@echo "  make test-smoke    - Run smoke tests only"
+	@echo ""
+	@echo "Development:"
+	@echo "  make dev           - Start development environment"
+	@echo "  make shell         - Open shell in builder container"
+	@echo "  make lint          - Run linters"
+	@echo "  make clean         - Clean build artifacts"
 	@echo ""
 
 # Build targets
-build:
-	@echo "Building Pimeleon image..."
-	docker-compose build builder
-	docker-compose run --rm builder
+build: build-docker
+
+build-docker:
+	@echo "Building Pimeleon image (Docker)..."
+	docker compose build builder
+	docker compose run --rm builder
+
+build-local: check-deps
+	@echo "Building Pimeleon image (local)..."
+	sudo ./scripts/build-local.sh
+
+build-prod:
+	@echo "Building production Pimeleon image..."
+	PIMELEON_PROFILE=production docker compose run --rm builder
 
 build-nocache:
 	@echo "Building Pimeleon image (no cache)..."
-	docker-compose build --no-cache builder
-	docker-compose run --rm builder
+	docker compose build --no-cache builder
+	docker compose run --rm builder
+
+check-deps:
+	@echo "Checking local build dependencies..."
+	@./scripts/check-local-deps.sh
 
 # Test targets
 test: build

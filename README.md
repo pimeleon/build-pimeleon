@@ -29,6 +29,26 @@ docker compose run --rm builder
 
 The resulting image will be in `output/pimeleon-YYYYMMDD-HHMMSS.img`
 
+### Local Build (Without Docker)
+
+For faster iteration during development, you can build directly on your host:
+
+```bash
+# Check dependencies
+make check-deps
+
+# Install missing dependencies (if needed)
+./scripts/check-local-deps.sh --install
+
+# Run local build
+make build-local
+
+# Or with custom options
+sudo ./scripts/build-local.sh --profile production --model 4B
+```
+
+**Required packages**: debootstrap, qemu-user-static, binfmt-support, kpartx, parted, ansible, dosfstools, e2fsprogs, rsync, xz-utils
+
 ## 🏗️ System Architecture
 
 ### Build Process
@@ -45,7 +65,7 @@ The system uses a **2-stage** build process (currently implemented):
 ### Key Features
 - ✅ **ARM Emulation**: Build ARM images on x86 hardware with QEMU user-mode
 - ✅ **Pi Boot Firmware**: Includes complete Raspberry Pi firmware (bootcode.bin, start.elf, kernels)
-- ✅ **Smart Build Caching**: Hardware-specific caches (`pimeleon-rpi3-buster-base-v1.tar.gz`)
+- ✅ **Smart Build Caching**: Hardware-specific caches (`pimeleon-rpi3-bullseye-base-v1.tar.gz`)
 - ✅ **APT Cache Integration**: TrueNAS apt-cacher-ng support (192.168.76.5:3142) with 95% hit rate
 - ✅ **Pi Foundation Repository**: Official Pi packages (raspberrypi-kernel, libraspberrypi-bin)
 - ✅ **systemd-networkd**: Production-matched networking configuration
@@ -54,7 +74,29 @@ The system uses a **2-stage** build process (currently implemented):
 
 ## 📋 Available Commands
 
-### Basic Operations
+### Makefile Targets
+
+```bash
+# Build operations
+make build              # Build image (Docker, default)
+make build-local        # Build image locally (faster, requires deps)
+make build-docker       # Build image in Docker container
+make build-prod         # Production build (Docker)
+make build-nocache      # Build without Docker cache
+make check-deps         # Check local build dependencies
+
+# Testing
+make test               # Run all tests
+make test-smoke         # Run smoke tests only
+
+# Development
+make dev                # Start development environment
+make shell              # Open shell in builder container
+make lint               # Run linters
+make clean              # Clean build artifacts
+```
+
+### Docker Commands
 ```bash
 # Build all containers
 docker compose build
@@ -118,6 +160,8 @@ pimeleon-build/
 ├── configs/                        # Pi configuration files
 ├── ansible/                        # Configuration management
 ├── scripts/                        # Utility scripts
+│   ├── build-local.sh              # Local build without Docker
+│   ├── check-local-deps.sh         # Dependency checker for local builds
 │   ├── clean-docker.sh             # Selective cache cleanup
 │   └── benchmark-build.sh          # Build performance analysis
 ├── benchmarks/                     # Build performance data
@@ -128,11 +172,45 @@ pimeleon-build/
 
 ### Environment Variables
 
-- `RPI_MODEL=3B+` - Target Raspberry Pi model
-- `IMAGE_SIZE=4G` - Output image size  
-- `RASPBIAN_VERSION=buster` - Base OS version
-- `APT_CACHE_SERVER=192.168.76.5` - APT cache server (auto-configured)
-- `QUIET=true` - Suppress verbose output
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PIMELEON_RPI_MODEL` | `3B+` | Target Pi model (`3B+`, `4B`) |
+| `PIMELEON_IMAGE_SIZE` | `4G` | Output image size |
+| `PIMELEON_PROFILE` | `development` | Build profile (`development`, `production`) |
+| `RASPBIAN_VERSION` | `bullseye` | Debian version (`bullseye`, `bookworm`, `trixie`) |
+| `APT_CACHE_SERVER` | - | APT cache server IP |
+| `ENABLE_STAGE3` | `false` | Enable optimization stage |
+| `ENABLE_STAGE4` | `false` | Enable packaging stage |
+
+### Build Profiles
+
+| Profile | Description |
+|---------|-------------|
+| `development` | Full services + debug tools (htop, tcpdump, strace, gdb, etc.), permissive SSH |
+| `production` | Full services, hardened SSH (port 24442, key-only), no debug tools |
+
+### Build Examples
+
+```bash
+# Default: Pi 3B+ development build
+docker compose run --rm builder
+
+# Production build (hardened)
+make build-prod
+# Or: PIMELEON_PROFILE=production docker compose run --rm builder
+
+# Pi 4 with Bookworm
+PIMELEON_RPI_MODEL=4B RASPBIAN_VERSION=bookworm docker compose run --rm builder
+
+# Pi 3B+ with APT cache
+PIMELEON_RPI_MODEL=3B+ APT_CACHE_SERVER=192.168.76.5 docker compose run --rm builder
+
+# Local build (without Docker)
+make build-local
+
+# Local production build
+sudo PIMELEON_PROFILE=production ./scripts/build-local.sh
+```
 
 ### Build Outputs
 
@@ -140,7 +218,7 @@ pimeleon-build/
 - **Logs**: `output/build-YYYYMMDD-HHMMSS.log` (detailed build logs)
 - **Credentials**: `output/pi-initial-password.txt` (generated password for pi user)
 - **Benchmarks**: `benchmarks/build-benchmark-YYYYMMDD-HHMMSS.json` (performance metrics)
-- **Cache**: `cache/pimeleon-rpi3-buster-base-v1.tar.gz` (reusable base system)
+- **Cache**: `cache/pimeleon-rpi3-bullseye-base-v1.tar.gz` (reusable base system)
 
 ## 🚨 Common Issues & Solutions
 
@@ -187,7 +265,7 @@ df -h
 **Slow builds:**
 
 - **APT Cache**: Builds use TrueNAS apt-cacher-ng automatically (95% hit rate)
-- **Smart Caching**: Base system cached as `pimeleon-rpi3-buster-base-v1.tar.gz` 
+- **Smart Caching**: Base system cached as `pimeleon-rpi3-bullseye-base-v1.tar.gz` 
 - **Hardware-specific**: Separate caches for different Pi models and OS versions
 - Use SSD storage for better I/O performance
 - Run `./scripts/benchmark-build.sh` to analyze build performance
@@ -317,7 +395,7 @@ qemu-system-arm -M raspi3 -kernel output/pimeleon-*.img
 #### Subsequent Builds (Cached Base System)  
 - **With APT Cache**: ~5-8 minutes (base system reuse + cached packages)
 - **Cache Hit Rate**: 95%+ on TrueNAS APT cache (192.168.76.5:3142)
-- **Base System Caching**: 85% time reduction when `pimeleon-rpi3-buster-base-v1.tar.gz` exists
+- **Base System Caching**: 85% time reduction when `pimeleon-rpi3-bullseye-base-v1.tar.gz` exists
 
 #### Build Analysis Tools
 - **Benchmarking**: `./scripts/benchmark-build.sh` - Comprehensive performance analysis
