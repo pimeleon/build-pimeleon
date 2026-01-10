@@ -99,7 +99,7 @@ pimeleon-build/
 │       └── quickstart-orangepi.md
 │
 ├── cache/                             # Per-platform caches
-│   ├── raspberrypi-3b-plus-buster-armhf-base-v1.tar.gz
+│   ├── raspberrypi-3b-plus-bullseye-armhf-base-v1.tar.gz
 │   └── orangepi-5-plus-bookworm-arm64-base-v1.tar.gz
 │
 └── output/                            # Per-platform outputs
@@ -190,7 +190,7 @@ fi
 
 **Before**:
 ```bash
-CACHE_KEY="pimeleon-rpi3-buster-base-v1.tar.gz"
+CACHE_KEY="pimeleon-rpi3-bullseye-base-v1.tar.gz"
 ```
 
 **After**:

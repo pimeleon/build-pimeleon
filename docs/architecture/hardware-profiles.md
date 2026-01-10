@@ -71,7 +71,7 @@ bootloader:
 # Operating system configuration
 os:
   distribution: raspbian       # raspbian, debian, ubuntu, armbian
-  version: buster              # Codename: buster, bullseye, bookworm, jammy
+  version: bullseye            # Codename: bullseye, bookworm, trixie
   mirror: http://archive.raspbian.org/raspbian/
   architecture: armhf          # Must match hardware.architecture
 

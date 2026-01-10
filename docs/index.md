@@ -97,7 +97,7 @@ graph LR
     A[Docker BuildKit] --> B[Debian 12 Builder]
     B --> C[QEMU ARM Emulation]
     C --> D[Debootstrap]
-    D --> E[Raspbian Buster]
+    D --> E[Raspbian Bullseye]
     E --> F[Ansible Provisioning]
     F --> G[Bootable Image]
 
@@ -126,7 +126,7 @@ docker compose run --rm builder
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Stage 1: Base System | ✅ Complete | Raspbian Buster bootstrap |
+| Stage 1: Base System | ✅ Complete | Raspbian Bullseye bootstrap |
 | Stage 2: Customization | ✅ Complete | Ansible provisioning |
 | Stage 3: Optimization | 🔄 Implemented | Disabled for rapid iteration |
 | Stage 4: Packaging | 🔄 Implemented | Disabled for rapid iteration |
