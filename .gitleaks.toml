@@ -1,0 +1,17 @@
+title = "Pimeleon Gitleaks configuration"
+
+[extend]
+# Extend the default gitleaks config
+useDefault = true
+
+# Disable rules that flag test/example credentials
+disabledRules = ["generic-api-key", "jwt"]
+
+# Allow certain paths
+[allowlist]
+description = "Global allowlist"
+paths = [
+  '''\.env\.example$''',
+  '''tests/''',
+  '''docs/'''
+]

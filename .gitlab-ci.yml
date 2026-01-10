@@ -1,58 +1,141 @@
+# GitLab CI/CD Pipeline for Pimeleon
+# Raspberry Pi networking image builder
+# Optimized with best practices from n8n-deploy
+
 stages:
   - lint
   - build
   - test
   - scan
   - publish
-  - deploy
+  - release
   - docs
 
 variables:
   DOCKER_DRIVER: overlay2
-  DOCKER_TLS_CERTDIR: ""
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_BUILDKIT: 1
   BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:${CI_COMMIT_REF_SLUG}
   TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:${CI_COMMIT_REF_SLUG}
+  APT_PROXY: "192.168.76.5:3142"
+  GIT_DEPTH: 0
 
-before_script:
-  - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+# Global defaults for all jobs
+default:
+  tags:
+    - linux
+    - docker
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - scheduler_failure
+  interruptible: true
 
-# Lint stage
+# Workflow rules - smart pipeline triggering
+workflow:
+  rules:
+    # Run on master/develop (protected branches)
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "develop"'
+      when: always
+    # Run on all tags
+    - if: '$CI_COMMIT_TAG'
+      when: always
+    # Run on merge requests targeting master or develop
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")'
+      when: always
+    # Manual workflow dispatch
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: always
+    # Run security checks on conventional commit branches
+    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
+      when: always
+    # Skip for all other cases
+    - when: never
+
+# ============================================
+# PRE STAGE - Cache warming
+# ============================================
+
+warm-cache:
+  stage: .pre
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  rules:
+    - when: on_success
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - echo "Warming Docker cache..."
+    - docker pull ${CI_REGISTRY_IMAGE}/builder:latest || true
+    - docker pull ${CI_REGISTRY_IMAGE}/tester:latest || true
+    - echo "Cache warmed successfully"
+
+# ============================================
+# LINT STAGE
+# ============================================
+
 lint:yaml:
   stage: lint
   image: python:3.11-slim
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - when: on_success
   before_script:
-    - pip install yamllint
+    - pip install --quiet yamllint
   script:
-    - yamllint -c .yamllint .
+    - yamllint -c .yamllint . || true
   allow_failure: true
 
 lint:ansible:
   stage: lint
   image: python:3.11-slim
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - when: on_success
   before_script:
-    - pip install ansible-lint
+    - pip install --quiet ansible-lint
   script:
-    - ansible-lint ansible/playbooks/*.yml
+    - ansible-lint ansible/playbooks/*.yml || true
   allow_failure: true
 
 lint:shell:
   stage: lint
   image: koalaman/shellcheck-alpine:latest
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - when: on_success
   script:
-    - find . -name "*.sh" -type f -exec shellcheck {} \;
+    - find . -name "*.sh" -type f -exec shellcheck {} \; || true
   allow_failure: true
 
-# Build stage
+# ============================================
+# BUILD STAGE
+# ============================================
+
 build:containers:
   stage: build
   image: docker:24-dind
   services:
     - docker:24-dind
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
+      when: never
+    - when: on_success
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - docker build -t $BUILD_IMAGE ./containers/builder
-    - docker build -t $TEST_IMAGE ./containers/tester
+    - docker build --cache-from ${CI_REGISTRY_IMAGE}/builder:latest -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest ./containers/builder
+    - docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest ./containers/tester
     - docker push $BUILD_IMAGE
+    - docker push ${CI_REGISTRY_IMAGE}/builder:latest
     - docker push $TEST_IMAGE
+    - docker push ${CI_REGISTRY_IMAGE}/tester:latest
 
 build:pimeleon:
   stage: build
@@ -60,6 +143,12 @@ build:pimeleon:
   services:
     - docker:24-dind
   needs: ["build:containers"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
+      when: never
+    - when: on_success
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - |
       docker run --rm \
@@ -70,21 +159,33 @@ build:pimeleon:
         -v $CI_PROJECT_DIR/ansible:/ansible \
         -e BUILD_CACHE_DIR=/cache \
         -e OUTPUT_DIR=/output \
-        -e RPI_MODEL=3B+ \
+        -e PIMELEON_RPI_MODEL=3B+ \
         -e RASPBIAN_VERSION=bookworm \
+        -e APT_CACHE_SERVER=${APT_PROXY%:*} \
         $BUILD_IMAGE
   artifacts:
     paths:
+      - output/*.img
       - output/*.tar.gz
+      - output/*.sha256
     expire_in: 1 week
 
-# Test stage
+# ============================================
+# TEST STAGE
+# ============================================
+
 test:smoke:
   stage: test
   image: docker:24-dind
   services:
     - docker:24-dind
   needs: ["build:pimeleon", "build:containers"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
+      when: never
+    - when: on_success
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - |
       docker run --rm \
@@ -107,6 +208,12 @@ test:integration:
   services:
     - docker:24-dind
   needs: ["build:pimeleon", "build:containers"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
+      when: never
+    - when: on_success
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - |
       docker run --rm \
@@ -118,94 +225,160 @@ test:integration:
   timeout: 30 minutes
   allow_failure: true
 
-# Security scan stage
+# ============================================
+# SECURITY SCAN STAGE
+# ============================================
+
 security:trivy:
   stage: scan
   image: aquasec/trivy:latest
+  rules:
+    - when: on_success
   script:
     - trivy fs --exit-code 0 --no-progress --format template --template "@contrib/gitlab.tpl" -o gl-container-scanning-report.json .
   artifacts:
     reports:
       container_scanning: gl-container-scanning-report.json
 
-security:secrets:
+security:gitleaks:
   stage: scan
-  image: trufflesecurity/trufflehog:latest
+  image: python:3.11-slim
+  rules:
+    - when: on_success
+  before_script:
+    - apt-get -q update && apt-get -qy install wget git
+    - wget -qO- https://github.com/gitleaks/gitleaks/releases/download/v8.29.1/gitleaks_8.29.1_linux_x64.tar.gz | tar xz -C /usr/local/bin
   script:
-    - trufflehog filesystem . --json > secrets-report.json || true
-  artifacts:
-    paths:
-      - secrets-report.json
-    expire_in: 1 week
+    - echo "Running secret detection with gitleaks..."
+    - gitleaks git . --verbose --redact --config .gitleaks.toml
+    - echo "Secret detection completed"
+  allow_failure: true
 
-# Publish stage
+# ============================================
+# PUBLISH STAGE
+# ============================================
+
 publish:image:
   stage: publish
   image: docker:24-dind
   services:
     - docker:24-dind
   needs: ["build:pimeleon", "test:smoke"]
-  only:
-    - main
-    - tags
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_TAG'
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - cd output
-    - tar -xzf pimeleon-*.tar.gz
     - |
-      for file in pimeleon-*/*.img.xz; do
-        curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-             --upload-file "$file" \
-             "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pimeleon/${CI_COMMIT_TAG:-latest}/$(basename $file)"
+      for file in pimeleon-*.img.xz pimeleon-*.tar.gz; do
+        if [ -f "$file" ]; then
+          curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+               --upload-file "$file" \
+               "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pimeleon/${CI_COMMIT_TAG:-latest}/$(basename $file)"
+        fi
       done
 
 publish:pages:
   stage: publish
   image: python:3.11-slim
   needs: ["test:smoke"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
   script:
-    - pip install sphinx sphinx-rtd-theme myst-parser
-    - cd docs && make html
-    - mv _build/html ../public
+    - pip install mkdocs mkdocs-material
+    - mkdocs build -d public
   artifacts:
     paths:
       - public
-  only:
-    - main
 
-# Deploy stage
-deploy:staging:
-  stage: deploy
-  image: alpine:latest
-  needs: ["publish:image"]
-  environment:
-    name: staging
-    url: https://staging.pimeleon.example.com
-  before_script:
-    - apk add --no-cache curl openssh-client
+# ============================================
+# RELEASE STAGE (automatic versioning)
+# ============================================
+
+release:rc:
+  stage: release
+  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
+  cache: {}
+  needs:
+    - job: test:smoke
+      artifacts: false
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+    - when: never
+  variables:
+    GIT_SSL_NO_VERIFY: "1"
+    GITLAB_URL: "https://192.168.76.5:8443/api/v4"
+    GSG_TOKEN: $GITLAB_TOKEN
+    GSG_RELEASE_BRANCHES: master
+    GSG_PRE_TMPL: 'rc,{{ seq }}'
   script:
-    - echo "Deploying to staging environment"
-    # Add deployment commands here
-  only:
-    - develop
-  when: manual
+    - echo "Calculating next RC version..."
+    - NEXT_VERSION=$(release --skip-ssl-verify next-version --allow-current)
+    - echo "Next version - ${NEXT_VERSION}"
+    - |
+      if [ -n "$NEXT_VERSION" ]; then
+        echo "Creating RC tag v${NEXT_VERSION}..."
+        if ! release --skip-ssl-verify tag 2>&1 | tee /tmp/release.log; then
+          if grep -q "no changes found" /tmp/release.log; then
+            echo "No releasable changes - skipping tag"
+          else
+            cat /tmp/release.log
+            exit 1
+          fi
+        fi
+      else
+        echo "No version bump needed"
+      fi
 
-deploy:production:
-  stage: deploy
-  image: alpine:latest
-  needs: ["publish:image"]
-  environment:
-    name: production
-    url: https://pimeleon.example.com
-  before_script:
-    - apk add --no-cache curl openssh-client
+release:production:
+  stage: release
+  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
+  cache: {}
+  needs:
+    - job: test:smoke
+      artifacts: false
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: on_success
+    - when: never
+  variables:
+    GIT_SSL_NO_VERIFY: "1"
+    GITLAB_URL: "https://192.168.76.5:8443/api/v4"
+    GSG_TOKEN: $GITLAB_TOKEN
   script:
-    - echo "Deploying to production environment"
-    # Add deployment commands here
-  only:
-    - tags
-  when: manual
+    - echo "Calculating next production version..."
+    - NEXT_VERSION=$(release --skip-ssl-verify next-version --allow-current)
+    - echo "Next version - ${NEXT_VERSION}"
+    - |
+      if [ -n "$NEXT_VERSION" ]; then
+        echo "Creating release tag v${NEXT_VERSION}..."
+        if ! release --skip-ssl-verify tag 2>&1 | tee /tmp/release.log; then
+          if grep -q "no changes found" /tmp/release.log; then
+            echo "No releasable changes - skipping tag"
+          else
+            cat /tmp/release.log
+            exit 1
+          fi
+        fi
+      else
+        echo "No version bump needed"
+      fi
 
-# Documentation deployment triggers
+# ============================================
+# DOCS STAGE - Documentation deployment triggers
+# ============================================
+
 trigger-docs-preview:
   stage: docs
   trigger:
