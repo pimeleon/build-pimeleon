@@ -138,42 +138,42 @@ fi
 # Handle output directory cleanup
 if [[ "$CLEAN_OUTPUT" == "true" ]] && [[ -d "./output" ]]; then
     print_info "Cleaning output directory..."
-    
+
     # Count files before cleanup
     IMG_COUNT=$(find ./output -name "*.img" -type f | wc -l 2>/dev/null || echo "0")
     LOG_COUNT=$(find ./output -name "build-*.log" -type f | wc -l 2>/dev/null || echo "0")
-    
+
     if [[ $IMG_COUNT -gt 0 ]] || [[ $LOG_COUNT -gt 0 ]]; then
         echo "Found $IMG_COUNT image files and $LOG_COUNT log files"
-        
+
         # Keep only the most recent image and its log
         LATEST_IMG=$(find ./output -name "*.img" -type f -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
         if [[ -n "$LATEST_IMG" ]]; then
             LATEST_BASENAME=$(basename "$LATEST_IMG" .img)
             LATEST_LOG="./output/build-${LATEST_BASENAME#pimeleon-}.log"
-            
+
             print_warning "Preserving latest image: $(basename "$LATEST_IMG")"
             if [[ -f "$LATEST_LOG" ]]; then
                 print_warning "Preserving latest log: $(basename "$LATEST_LOG")"
             fi
-            
+
             # Remove old images (keep latest)
             find ./output -name "*.img" -type f ! -path "$LATEST_IMG" -delete 2>/dev/null || true
-            
+
             # Remove old logs (keep latest and password file)
             find ./output -name "build-*.log" -type f ! -path "$LATEST_LOG" -delete 2>/dev/null || true
         else
             # No images found, remove all logs
             find ./output -name "build-*.log" -type f -delete 2>/dev/null || true
         fi
-        
+
         # Count files after cleanup
         REMAINING_IMG=$(find ./output -name "*.img" -type f | wc -l 2>/dev/null || echo "0")
         REMAINING_LOG=$(find ./output -name "build-*.log" -type f | wc -l 2>/dev/null || echo "0")
-        
+
         REMOVED_IMG=$((IMG_COUNT - REMAINING_IMG))
         REMOVED_LOG=$((LOG_COUNT - REMAINING_LOG))
-        
+
         print_success "Removed $REMOVED_IMG old images and $REMOVED_LOG old logs"
         echo "Kept: $REMAINING_IMG image(s), $REMAINING_LOG log(s), and pi-initial-password.txt"
     else

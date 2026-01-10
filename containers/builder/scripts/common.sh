@@ -52,18 +52,18 @@ check_prerequisites() {
         "mkfs.ext4"
         "ansible-playbook"
     )
-    
+
     for cmd in "${required_commands[@]}"; do
         if ! command -v "$cmd" &> /dev/null; then
             die "Required command not found: $cmd"
         fi
     done
-    
+
     # Check for qemu-user-static
     if [[ ! -f /usr/bin/qemu-arm-static ]]; then
         die "qemu-arm-static not found. Please install qemu-user-static package."
     fi
-    
+
     # Check binfmt support
     if [[ ! -d /proc/sys/fs/binfmt_misc ]]; then
         die "binfmt_misc not mounted. Please enable binfmt support."
@@ -74,26 +74,26 @@ check_prerequisites() {
 mount_image() {
     local image_path=$1
     local mount_point=$2
-    
+
     log_info "Mounting image: $image_path"
-    
+
     # Create loop device
     local loop_device=$(sudo losetup -f --show "$image_path")
-    
+
     # Scan for partitions
     sudo kpartx -av "$loop_device"
     sleep 2
-    
+
     # Get partition devices
     local boot_part="/dev/mapper/$(basename $loop_device)p1"
     local root_part="/dev/mapper/$(basename $loop_device)p2"
-    
+
     # Mount partitions
     sudo mkdir -p "$mount_point"
     sudo mount "$root_part" "$mount_point"
     sudo mkdir -p "$mount_point/boot"
     sudo mount "$boot_part" "$mount_point/boot"
-    
+
     echo "$loop_device"
 }
 
@@ -101,16 +101,16 @@ mount_image() {
 unmount_image() {
     local mount_point=$1
     local loop_device=$2
-    
+
     log_info "Unmounting image"
-    
+
     # Unmount partitions
     sudo umount "$mount_point/boot" || true
     sudo umount "$mount_point" || true
-    
+
     # Remove partition mappings
     sudo kpartx -d "$loop_device" || true
-    
+
     # Detach loop device
     sudo losetup -d "$loop_device" || true
 }
@@ -118,18 +118,18 @@ unmount_image() {
 # Setup chroot environment
 setup_chroot() {
     local chroot_dir=$1
-    
+
     log_info "Setting up chroot environment"
-    
+
     # Copy qemu static binary
     sudo cp /usr/bin/qemu-arm-static "$chroot_dir/usr/bin/"
-    
+
     # Mount special filesystems
     sudo mount -t proc proc "$chroot_dir/proc"
     sudo mount -t sysfs sys "$chroot_dir/sys"
     sudo mount -t devtmpfs dev "$chroot_dir/dev"
     sudo mount -t devpts devpts "$chroot_dir/dev/pts"
-    
+
     # Copy resolv.conf
     sudo cp /etc/resolv.conf "$chroot_dir/etc/resolv.conf"
 }
@@ -137,15 +137,15 @@ setup_chroot() {
 # Cleanup chroot environment
 cleanup_chroot() {
     local chroot_dir=$1
-    
+
     log_info "Cleaning up chroot environment"
-    
+
     # Unmount special filesystems
     sudo umount "$chroot_dir/dev/pts" || true
     sudo umount "$chroot_dir/dev" || true
     sudo umount "$chroot_dir/sys" || true
     sudo umount "$chroot_dir/proc" || true
-    
+
     # Remove qemu static binary
     sudo rm -f "$chroot_dir/usr/bin/qemu-arm-static"
 }
@@ -162,14 +162,14 @@ chroot_run() {
 generate_metadata() {
     local image_path=$1
     local metadata_file="${image_path}.metadata.json"
-    
+
     log_info "Generating metadata: $metadata_file"
-    
+
     # Calculate checksums
     local md5sum=$(md5sum "$image_path" | cut -d' ' -f1)
     local sha256sum=$(sha256sum "$image_path" | cut -d' ' -f1)
     local size=$(stat -c%s "$image_path")
-    
+
     # Create metadata JSON
     cat > "$metadata_file" <<EOF
 {
@@ -206,7 +206,7 @@ cache_get() {
     local cache_key=$1
     local destination=$2
     local cache_path=$(get_cache_path "$cache_key")
-    
+
     if cache_exists "$cache_key"; then
         log_info "Using cached file: $cache_key"
         sudo cp "$cache_path" "$destination"
@@ -221,7 +221,7 @@ cache_put() {
     local source=$1
     local cache_key=$2
     local cache_path=$(get_cache_path "$cache_key")
-    
+
     log_info "Caching file: $cache_key"
     sudo mkdir -p "$(dirname $cache_path)"
     sudo cp "$source" "$cache_path"

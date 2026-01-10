@@ -44,15 +44,15 @@ log_fail() {
 cleanup_vm() {
     local vm_name=$1
     log_info "Cleaning up VM: $vm_name"
-    
+
     # Stop VM if running
     if virsh domstate "$vm_name" 2>/dev/null | grep -q "running"; then
         virsh destroy "$vm_name" || true
     fi
-    
+
     # Remove VM
     virsh undefine "$vm_name" --remove-all-storage || true
-    
+
     # Clean up images
     rm -f "/tmp/${vm_name}.qcow2" || true
 }
@@ -61,9 +61,9 @@ wait_for_vm() {
     local vm_name=$1
     local timeout=${2:-300}
     local elapsed=0
-    
+
     log_info "Waiting for VM to be ready..."
-    
+
     while [[ $elapsed -lt $timeout ]]; do
         if virsh domstate "$vm_name" 2>/dev/null | grep -q "running"; then
             # Check if we can get IP
@@ -76,7 +76,7 @@ wait_for_vm() {
         sleep 5
         elapsed=$((elapsed + 5))
     done
-    
+
     log_error "VM failed to become ready within ${timeout}s"
     return 1
 }
@@ -86,7 +86,7 @@ test_ping() {
     local target=$1
     local count=${2:-3}
     local timeout=${3:-5}
-    
+
     if ping -c "$count" -W "$timeout" "$target" > /dev/null 2>&1; then
         return 0
     else
@@ -98,7 +98,7 @@ test_port() {
     local host=$1
     local port=$2
     local timeout=${3:-5}
-    
+
     if timeout "$timeout" bash -c "echo >/dev/tcp/$host/$port" 2>/dev/null; then
         return 0
     else
@@ -112,7 +112,7 @@ ssh_command() {
     local command=$2
     local user=${3:-pi}
     local timeout=${4:-30}
-    
+
     timeout "$timeout" ssh \
         -o StrictHostKeyChecking=no \
         -o UserKnownHostsFile=/dev/null \
@@ -125,7 +125,7 @@ scp_file() {
     local source=$1
     local dest=$2
     local timeout=${3:-60}
-    
+
     timeout "$timeout" scp \
         -o StrictHostKeyChecking=no \
         -o UserKnownHostsFile=/dev/null \
@@ -138,7 +138,7 @@ scp_file() {
 measure_bandwidth() {
     local server=$1
     local duration=${2:-10}
-    
+
     iperf3 -c "$server" -t "$duration" -J 2>/dev/null | \
         jq -r '.end.sum_received.bits_per_second' 2>/dev/null || echo "0"
 }
@@ -146,7 +146,7 @@ measure_bandwidth() {
 measure_latency() {
     local target=$1
     local count=${2:-10}
-    
+
     ping -c "$count" -q "$target" 2>/dev/null | \
         grep "rtt min/avg/max" | \
         cut -d'/' -f5 || echo "999"
@@ -156,9 +156,9 @@ measure_latency() {
 create_test_client() {
     local client_name=$1
     local network=$2
-    
+
     log_info "Creating test client: $client_name on network: $network"
-    
+
     # Use Alpine Linux for lightweight clients
     virt-install \
         --name "$client_name" \
@@ -179,7 +179,7 @@ generate_junit_xml() {
     local test_suite=$1
     local results_dir=$2
     local output_file="${results_dir}/junit.xml"
-    
+
     cat > "$output_file" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
@@ -193,7 +193,7 @@ EOF
 # Cleanup on exit
 cleanup_on_exit() {
     log_info "Cleaning up test environment..."
-    
+
     # Stop all test VMs
     for vm in $(virsh list --name | grep -E "(test-|pimeleon-)"); do
         cleanup_vm "$vm"

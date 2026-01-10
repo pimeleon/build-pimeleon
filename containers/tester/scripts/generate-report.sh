@@ -91,7 +91,7 @@ cat > "$REPORT_FILE" <<'EOF'
     <div class="container">
         <h1>Pimeleon Test Report</h1>
         <p class="timestamp">Generated: $(date)</p>
-        
+
         <div class="summary">
             <div class="summary-card passed">
                 <h3>Passed</h3>
@@ -106,7 +106,7 @@ cat > "$REPORT_FILE" <<'EOF'
                 <div style="font-size: 2em;">$(grep -c "WARN" "${RESULTS_DIR}"/*.txt 2>/dev/null || echo "0")</div>
             </div>
         </div>
-        
+
         <h2>Test Results</h2>
         <div class="test-results">
 EOF
@@ -124,7 +124,7 @@ done
 # Close HTML
 cat >> "$REPORT_FILE" <<'EOF'
         </div>
-        
+
         <h2>System Information</h2>
         <pre>
 Host OS: $(uname -a)

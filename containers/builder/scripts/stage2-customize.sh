@@ -220,17 +220,17 @@ fi
 # Copy custom configs if available
 if [[ -d "${CONFIG_DIR}" ]]; then
     log_info "Copying custom configurations"
-    
+
     # Network configs
     if [[ -d "${CONFIG_DIR}/network" ]] && [[ -n "$(ls -A ${CONFIG_DIR}/network/* 2>/dev/null)" ]]; then
         sudo cp -r "${CONFIG_DIR}/network/"* "${MOUNT_POINT}/etc/network/" || true
     fi
-    
+
     # Security configs
     if [[ -d "${CONFIG_DIR}/security" ]] && [[ -n "$(ls -A ${CONFIG_DIR}/security/* 2>/dev/null)" ]]; then
         sudo cp -r "${CONFIG_DIR}/security/"* "${MOUNT_POINT}/etc/" || true
     fi
-    
+
     # Service configs
     if [[ -d "${CONFIG_DIR}/services" ]] && [[ -n "$(ls -A ${CONFIG_DIR}/services/* 2>/dev/null)" ]]; then
         sudo cp -r "${CONFIG_DIR}/services/"* "${MOUNT_POINT}/etc/" || true
