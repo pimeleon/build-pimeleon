@@ -1,6 +1,9 @@
 #!/bin/bash
 # Common functions for Pimeleon build scripts
 
+# Project name for cache keys and output naming
+PIMELEON_PROJECT_NAME="${PIMELEON_PROJECT_NAME:-pimeleon}"
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -151,8 +154,8 @@ cleanup_chroot() {
 chroot_run() {
     local chroot_dir=$1
     shift
-    
-    sudo chroot "$chroot_dir" "$@"
+
+    sudo DEBIAN_FRONTEND=noninteractive chroot "$chroot_dir" "$@"
 }
 
 # Generate image metadata

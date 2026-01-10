@@ -2,6 +2,9 @@
 # Pimeleon Build Container
 FROM debian:12-slim AS base
 
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Build arguments for APT cache configuration
 ARG APT_CACHE_SERVER
 ARG APT_CACHE_PORT="3142"
@@ -90,7 +93,6 @@ ENV OUTPUT_DIR=/output
 ENV CACHE_DIR=/cache
 ENV CONFIG_DIR=/configs
 ENV ANSIBLE_DIR=/ansible
-ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
 # Switch to build user by default
