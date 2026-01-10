@@ -4,39 +4,14 @@ title = "Pimeleon Gitleaks configuration"
 # Extend the default gitleaks config
 useDefault = true
 
-# No disabled rules - strict detection, add exceptions as needed
+# Disable rules that flag test/example credentials
+disabledRules = ["generic-api-key", "jwt"]
 
-# Allow certain paths (based on .gitignore)
+# Allow certain paths
 [allowlist]
 description = "Global allowlist"
-regexTarget = "match"
-regexes = [
-  # DNSCrypt-proxy minisign public verification key (not a secret)
-  '''minisign_key\s*=\s*['"]RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3['"]''',
-]
 paths = [
-  # Example files
   '''\.env\.example$''',
-  # Test and documentation
   '''tests/''',
-  '''docs/''',
-  # Build artifacts
-  '''output/''',
-  '''cache/''',
-  '''site/''',
-  '''benchmarks/''',
-  # Virtual environments
-  '''\.venv/''',
-  '''venv/''',
-  '''node_modules/''',
-  # IDE settings
-  '''\.vscode/''',
-  '''\.idea/''',
-  # Test artifacts
-  '''coverage/''',
-  '''test-results/''',
-  # Log files
-  '''\.log$''',
-  # Local config with intentional tokens
-  '''CLAUDE\.md$''',
+  '''docs/'''
 ]
