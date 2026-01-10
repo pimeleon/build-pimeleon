@@ -62,7 +62,6 @@ workflow:
 warm-cache:
   stage: .pre
   tags:
-    - docker
     - heavy
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
