@@ -1,3 +1,5 @@
+name: pimeleon-build
+
 services:
   builder:
     build:
@@ -24,7 +26,7 @@ services:
       - DEBIAN_FRONTEND=noninteractive
       - PIMELEON_RPI_MODEL=${PIMELEON_RPI_MODEL:-3B+}
       - PIMELEON_IMAGE_SIZE=${PIMELEON_IMAGE_SIZE:-4G}
-      - RASPBIAN_VERSION=${RASPBIAN_VERSION:-buster}
+      - RASPBIAN_VERSION=${RASPBIAN_VERSION:-bullseye}
       - RASPBIAN_MIRROR=${RASPBIAN_MIRROR:-http://archive.raspbian.org/raspbian/}
       - APT_CACHE_SERVER=${APT_CACHE_SERVER:-}
       - APT_CACHE_PORT=${APT_CACHE_PORT:-3142}

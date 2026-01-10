@@ -37,11 +37,12 @@ fi
 log_info "Updating package lists"
 chroot_run "${MOUNT_POINT}" apt-get update
 
-# Install essential packages only (systemd-resolved is part of systemd package)
+# Install essential packages (systemd-resolved is separate package in Bookworm+)
 log_info "Installing essential packages"
 chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     systemd \
     systemd-sysv \
+    systemd-resolved \
     udev \
     dbus \
     sudo \
@@ -62,19 +63,20 @@ chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     raspberrypi-kernel \
     libraspberrypi-bin
 
-# Copy Pi boot firmware to boot partition
-log_info "Copying Pi boot firmware to boot partition"
-if [[ -d "${MOUNT_POINT}/boot" ]]; then
-    # Pi boot files are installed to /boot by raspberrypi-kernel package
-    # Copy essential boot files to FAT32 boot partition
-    sudo cp "${MOUNT_POINT}/boot/bootcode.bin" "${BOOT_MOUNT}/" || log_warn "bootcode.bin not found"
-    sudo cp "${MOUNT_POINT}/boot/start*.elf" "${BOOT_MOUNT}/" || log_warn "start.elf files not found"  
-    sudo cp "${MOUNT_POINT}/boot/fixup*.dat" "${BOOT_MOUNT}/" || log_warn "fixup.dat files not found"
-    sudo cp "${MOUNT_POINT}/boot/kernel*.img" "${BOOT_MOUNT}/" || log_warn "kernel images not found"
-    sudo cp "${MOUNT_POINT}/boot/bcm2710-rpi-3-b-plus.dtb" "${BOOT_MOUNT}/" || log_warn "Pi 3B+ device tree not found"
-    sudo cp -r "${MOUNT_POINT}/boot/overlays" "${BOOT_MOUNT}/" 2>/dev/null || log_warn "Boot overlays not found"
+# Verify Pi boot firmware was installed to boot partition
+# Note: raspberrypi-kernel installs files directly to /boot (mounted FAT32 partition)
+log_info "Verifying Pi boot firmware installation"
+FIRMWARE_OK=true
+[[ -f "${BOOT_MOUNT}/bootcode.bin" ]] || { log_warn "bootcode.bin not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/start.elf" ]] || { log_warn "start.elf not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/fixup.dat" ]] || { log_warn "fixup.dat not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/kernel7.img" ]] || { log_warn "kernel7.img not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/bcm2710-rpi-3-b-plus.dtb" ]] || { log_warn "Pi 3B+ device tree not found"; FIRMWARE_OK=false; }
+[[ -d "${BOOT_MOUNT}/overlays" ]] || { log_warn "Boot overlays not found"; FIRMWARE_OK=false; }
+if [[ "$FIRMWARE_OK" == "true" ]]; then
+    log_info "All Pi boot firmware files verified"
 else
-    log_warn "Pi firmware not found in expected location"
+    log_warn "Some firmware files missing - image may not boot"
 fi
 
 # Install basic networking tools
@@ -170,17 +172,48 @@ chroot_run "${MOUNT_POINT}" systemctl enable systemd-resolved
 if [[ -d "${ANSIBLE_DIR}/playbooks" ]] && [[ -n "$(ls -A ${ANSIBLE_DIR}/playbooks/*.yml 2>/dev/null)" ]]; then
     log_info "Applying Ansible playbooks"
     export ANSIBLE_HOST_KEY_CHECKING=False
-    
-    # Create temporary inventory
+
+    # Determine platform group from environment (3B+ -> raspberrypi_3bplus, 4B -> raspberrypi_4b)
+    PLATFORM_GROUP="raspberrypi_$(echo ${PIMELEON_RPI_MODEL:-3B+} | tr '[:upper:]' '[:lower:]' | tr -d '+')"
+    log_info "Platform group: ${PLATFORM_GROUP}"
+
+    # Create temporary inventory with platform group membership
     cat > "${WORK_DIR}/inventory" <<EOF
-[pimeleon]
-${MOUNT_POINT} ansible_connection=chroot
+[all]
+pimeleon ansible_connection=chroot ansible_host=${MOUNT_POINT}
+
+[raspberrypi]
+pimeleon
+
+[${PLATFORM_GROUP}]
+pimeleon
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
 EOF
-    
-    # Run playbooks
+
+    # Copy group_vars to work directory for ansible to find
+    if [[ -d "${ANSIBLE_DIR}/inventory/group_vars" ]]; then
+        mkdir -p "${WORK_DIR}/group_vars"
+        cp -r "${ANSIBLE_DIR}/inventory/group_vars/"* "${WORK_DIR}/group_vars/"
+    fi
+
+    # Copy profile vars to work directory
+    if [[ -f "${ANSIBLE_DIR}/inventory/group_vars/all/profiles/${PIMELEON_PROFILE:-development}.yml" ]]; then
+        cp "${ANSIBLE_DIR}/inventory/group_vars/all/profiles/${PIMELEON_PROFILE:-development}.yml" "${WORK_DIR}/group_vars/all/profile.yml"
+        log_info "Using profile: ${PIMELEON_PROFILE:-development}"
+    fi
+
+    # Run playbooks with platform, version, and profile extra-vars
     for playbook in ${ANSIBLE_DIR}/playbooks/*.yml; do
         log_info "Running playbook: $(basename $playbook)"
-        ansible-playbook -i "${WORK_DIR}/inventory" "$playbook" || log_warn "Playbook failed: $playbook"
+        ansible-playbook \
+            -i "${WORK_DIR}/inventory" \
+            --extra-vars "platform_model=${PIMELEON_RPI_MODEL:-3B+}" \
+            --extra-vars "debian_version=${RASPBIAN_VERSION:-bullseye}" \
+            --extra-vars "pimeleon_profile=${PIMELEON_PROFILE:-development}" \
+            --extra-vars "pimeleon_initial_password=${PIMELEON_INITIAL_PASSWORD:-netblox}" \
+            "$playbook" || die "Playbook failed: $playbook"
     done
 fi
 
