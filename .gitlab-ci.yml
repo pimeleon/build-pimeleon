@@ -314,46 +314,9 @@ publish:pages:
 # ============================================
 # RELEASE STAGE (automatic versioning)
 # ============================================
-
-release:rc:
-  stage: release
-  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
-  cache: {}
-  needs:
-    - job: build:pimeleon
-      artifacts: false
-  rules:
-    - if: '$CI_COMMIT_TAG'
-      when: never
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      when: on_success
-    - when: never
-  variables:
-    GIT_SSL_NO_VERIFY: "1"
-    GITLAB_URL: "https://192.168.76.5:8443/api/v4"
-    GSG_TOKEN: $GITLAB_TOKEN
-    GSG_RELEASE_BRANCHES: develop
-    GSG_PRE_TMPL: 'rc,{{ seq }}'
-  script:
-    - echo "Calculating next RC version..."
-    - NEXT_VERSION=$(release --skip-ssl-verify next-version --allow-current)
-    - echo "Next version - ${NEXT_VERSION}"
-    - |
-      if [ -n "$NEXT_VERSION" ]; then
-        echo "Creating RC tag v${NEXT_VERSION}..."
-        if ! release --skip-ssl-verify tag 2>&1 | tee /tmp/release.log; then
-          if grep -q "no changes found" /tmp/release.log; then
-            echo "No releasable changes - skipping tag"
-          else
-            cat /tmp/release.log
-            exit 1
-          fi
-        fi
-      else
-        echo "No version bump needed"
-      fi
+# Tags created only on platform release branches
+# - Merge from develop: full semver (feat=minor, fix=patch, breaking=major)
+# - Direct hotfix: patch-only mode
 
 # Platform-specific release: RPi 3B+ Bookworm
 release:rpi3-bookworm:
@@ -376,10 +339,36 @@ release:rpi3-bookworm:
     GITLAB_URL: "https://192.168.76.5:8443/api/v4"
     GSG_TOKEN: $GITLAB_TOKEN
     GSG_RELEASE_BRANCHES: "release/rpi3-bookworm"
-    GSG_PRE_TMPL: 'rpi3-bookworm'
   script:
     - echo "Calculating next version for RPi 3B+ Bookworm..."
-    - NEXT_VERSION=$(release --skip-ssl-verify next-version --allow-current)
+    - |
+      # Detect if this is a merge from develop
+      IS_MERGE_FROM_DEVELOP=false
+      if git log -1 --format=%s | grep -qE "^Merge branch 'develop'"; then
+        IS_MERGE_FROM_DEVELOP=true
+        echo "Detected merge from develop - full semver rules apply"
+      else
+        echo "Direct commit (hotfix) - patch-only mode"
+      fi
+    - |
+      # Calculate next version based on merge type
+      if [ "$IS_MERGE_FROM_DEVELOP" = "true" ]; then
+        # Full semver: feat=minor, fix=patch, breaking=major
+        NEXT_VERSION=$(release --skip-ssl-verify next-version --allow-current)
+      else
+        # Hotfix mode: force patch increment only
+        CURRENT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        if [ -z "$CURRENT_TAG" ]; then
+          NEXT_VERSION="0.0.1-rpi3-bookworm"
+        else
+          # Extract version parts and increment patch
+          BASE=$(echo "$CURRENT_TAG" | sed 's/^v//' | sed 's/-rpi3-bookworm$//')
+          MAJOR=$(echo "$BASE" | cut -d. -f1)
+          MINOR=$(echo "$BASE" | cut -d. -f2)
+          PATCH=$(echo "$BASE" | cut -d. -f3)
+          NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-rpi3-bookworm"
+        fi
+      fi
     - echo "Next version - ${NEXT_VERSION}"
     - |
       if [ -n "$NEXT_VERSION" ]; then
@@ -417,10 +406,36 @@ release:rpi4-bookworm:
     GITLAB_URL: "https://192.168.76.5:8443/api/v4"
     GSG_TOKEN: $GITLAB_TOKEN
     GSG_RELEASE_BRANCHES: "release/rpi4-bookworm"
-    GSG_PRE_TMPL: 'rpi4-bookworm'
   script:
     - echo "Calculating next version for RPi 4B Bookworm..."
-    - NEXT_VERSION=$(release --skip-ssl-verify next-version --allow-current)
+    - |
+      # Detect if this is a merge from develop
+      IS_MERGE_FROM_DEVELOP=false
+      if git log -1 --format=%s | grep -qE "^Merge branch 'develop'"; then
+        IS_MERGE_FROM_DEVELOP=true
+        echo "Detected merge from develop - full semver rules apply"
+      else
+        echo "Direct commit (hotfix) - patch-only mode"
+      fi
+    - |
+      # Calculate next version based on merge type
+      if [ "$IS_MERGE_FROM_DEVELOP" = "true" ]; then
+        # Full semver: feat=minor, fix=patch, breaking=major
+        NEXT_VERSION=$(release --skip-ssl-verify next-version --allow-current)
+      else
+        # Hotfix mode: force patch increment only
+        CURRENT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        if [ -z "$CURRENT_TAG" ]; then
+          NEXT_VERSION="0.0.1-rpi4-bookworm"
+        else
+          # Extract version parts and increment patch
+          BASE=$(echo "$CURRENT_TAG" | sed 's/^v//' | sed 's/-rpi4-bookworm$//')
+          MAJOR=$(echo "$BASE" | cut -d. -f1)
+          MINOR=$(echo "$BASE" | cut -d. -f2)
+          PATCH=$(echo "$BASE" | cut -d. -f3)
+          NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-rpi4-bookworm"
+        fi
+      fi
     - echo "Next version - ${NEXT_VERSION}"
     - |
       if [ -n "$NEXT_VERSION" ]; then
