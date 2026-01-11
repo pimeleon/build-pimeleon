@@ -13,6 +13,23 @@ VM_NAME="pimeleon-smoke"
 TIMEOUT=300  # 5 minutes
 RESULTS_FILE="${TEST_RESULTS_PATH}/smoke-test-results.txt"
 
+# Check if VM tests are possible (libvirt/KVM available)
+VM_TESTS_AVAILABLE=false
+check_vm_capability() {
+    # Check if libvirtd is running and we can list VMs
+    if virsh list &>/dev/null; then
+        # Check if we have KVM or can use QEMU
+        if [[ -e /dev/kvm ]] || virsh capabilities 2>/dev/null | grep -q "qemu"; then
+            VM_TESTS_AVAILABLE=true
+            log_info "VM testing capability: available"
+        else
+            log_warn "VM testing capability: not available (no KVM/QEMU)"
+        fi
+    else
+        log_warn "VM testing capability: not available (libvirtd not running)"
+    fi
+}
+
 # Initialize results
 echo "Smoke Test Results - $(date)" > "$RESULTS_FILE"
 echo "================================" >> "$RESULTS_FILE"
@@ -143,26 +160,43 @@ test_ssh_access() {
 run_smoke_tests() {
     local passed=0
     local failed=0
+    local skipped=0
 
-    # Run tests
+    # Check VM capability first
+    check_vm_capability
+
+    # Run image integrity test (always required)
     if test_image_integrity; then ((passed++)); else ((failed++)); fi
-    if test_vm_creation; then ((passed++)); else ((failed++)); fi
-    if test_vm_boot; then ((passed++)); else ((failed++)); fi
-    if test_network_connectivity; then ((passed++)); else ((failed++)); fi
-    if test_ssh_access; then ((passed++)); else ((failed++)); fi
+
+    # Run VM tests only if capability is available
+    if [[ "$VM_TESTS_AVAILABLE" == "true" ]]; then
+        if test_vm_creation; then ((passed++)); else ((failed++)); fi
+        if test_vm_boot; then ((passed++)); else ((failed++)); fi
+        if test_network_connectivity; then ((passed++)); else ((failed++)); fi
+        if test_ssh_access; then ((passed++)); else ((failed++)); fi
+        # Cleanup VM
+        cleanup_vm "$VM_NAME"
+    else
+        log_info "Skipping VM tests (no virtualization support)"
+        echo "[SKIP] VM creation (no virtualization support)" >> "$RESULTS_FILE"
+        echo "[SKIP] VM boot (no virtualization support)" >> "$RESULTS_FILE"
+        echo "[SKIP] Network connectivity (no virtualization support)" >> "$RESULTS_FILE"
+        echo "[SKIP] SSH access (no virtualization support)" >> "$RESULTS_FILE"
+        skipped=4
+    fi
 
     # Summary
-    echo "" >> "$RESULTS_FILE"
-    echo "Summary:" >> "$RESULTS_FILE"
-    echo "Passed: $passed" >> "$RESULTS_FILE"
-    echo "Failed: $failed" >> "$RESULTS_FILE"
+    {
+        echo ""
+        echo "Summary:"
+        echo "Passed: $passed"
+        echo "Failed: $failed"
+        echo "Skipped: $skipped"
+    } >> "$RESULTS_FILE"
 
-    # Cleanup
-    cleanup_vm "$VM_NAME"
-
-    # Return status
+    # Return status - pass if no failures (skipped tests are OK)
     if [[ $failed -eq 0 ]]; then
-        log_info "All smoke tests passed!"
+        log_info "Smoke tests completed: $passed passed, $skipped skipped"
         return 0
     else
         log_error "$failed smoke tests failed"
