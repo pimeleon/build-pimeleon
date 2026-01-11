@@ -55,7 +55,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # Create build user with restricted sudo access
 RUN useradd -m -s /bin/bash -u 1000 builder && \
     usermod -a -G disk builder && \
-    echo "builder ALL=(ALL) NOPASSWD:SETENV: /usr/bin/mount, /usr/bin/umount, /sbin/losetup, /sbin/kpartx, /usr/sbin/debootstrap, /usr/sbin/chroot, /bin/dd, /sbin/mkfs.*, /sbin/parted, /bin/cp, /bin/rm, /bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/tee, /bin/cat, /bin/tar, /bin/touch, /bin/sed, /bin/ls, /usr/bin/sed, /usr/bin/env, /bin/rmdir, /usr/bin/truncate, /usr/bin/find" >> /etc/sudoers.d/builder && \
+    echo "builder ALL=(ALL) NOPASSWD:SETENV: /usr/bin/mount, /usr/bin/umount, /sbin/losetup, /sbin/kpartx, /usr/sbin/debootstrap, /usr/sbin/chroot, /bin/dd, /sbin/mkfs.*, /sbin/parted, /bin/cp, /bin/rm, /bin/mkdir, /bin/chown, /bin/chmod, /usr/bin/tee, /bin/cat, /bin/tar, /bin/touch, /bin/sed, /bin/ls, /usr/bin/sed, /usr/bin/env, /bin/rmdir, /usr/bin/truncate, /usr/bin/find, /opt/venv/bin/ansible-playbook" >> /etc/sudoers.d/builder && \
     chmod 0440 /etc/sudoers.d/builder
 
 # Set up Python environment
