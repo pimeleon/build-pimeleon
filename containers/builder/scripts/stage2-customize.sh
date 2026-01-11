@@ -226,7 +226,7 @@ EOF
     # Run playbooks with platform, version, and profile extra-vars
     for playbook in ${ANSIBLE_DIR}/playbooks/*.yml; do
         log_info "Running playbook: $(basename $playbook)"
-        ansible-playbook \
+        sudo ansible-playbook \
             -i "${WORK_DIR}/inventory" \
             --extra-vars "platform_model=${PIMELEON_RPI_MODEL:-3B+}" \
             --extra-vars "debian_version=${RASPBIAN_VERSION:-bullseye}" \
