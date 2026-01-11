@@ -192,12 +192,65 @@ EOF
 
 # Cleanup on exit
 cleanup_on_exit() {
+    local exit_code=$?
     log_info "Cleaning up test environment..."
 
     # Stop all test VMs
-    for vm in $(virsh list --name | grep -E "(test-|pimeleon-)"); do
+    for vm in $(virsh list --name 2>/dev/null | grep -E "(test-|pimeleon-)" || true); do
         cleanup_vm "$vm"
     done
+
+    # Generate junit.xml even if tests failed (for CI artifact collection)
+    if [[ -n "${TEST_RESULTS_PATH:-}" && -d "${TEST_RESULTS_PATH}" ]]; then
+        generate_junit_report "${TEST_RESULTS_PATH}"
+        # Also copy to parent results directory for CI
+        local parent_dir=$(dirname "${TEST_RESULTS_PATH}")
+        if [[ -d "$parent_dir" && "$parent_dir" != "${TEST_RESULTS_PATH}" ]]; then
+            cp "${TEST_RESULTS_PATH}/junit.xml" "${parent_dir}/junit.xml" 2>/dev/null || true
+        fi
+    fi
+
+    exit $exit_code
+}
+
+# Generate JUnit XML report from test results
+generate_junit_report() {
+    local results_dir=$1
+    local junit_file="${results_dir}/junit.xml"
+    local passed=$(grep -c "\[PASS\]" "${results_dir}"/*.txt 2>/dev/null || echo "0")
+    local failed=$(grep -c "\[FAIL\]" "${results_dir}"/*.txt 2>/dev/null || echo "0")
+    local total=$((passed + failed))
+    local timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+    cat > "$junit_file" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Pimeleon Tests" tests="${total}" failures="${failed}" time="0" timestamp="${timestamp}">
+  <testsuite name="pimeleon" tests="${total}" failures="${failed}" errors="0" skipped="0" time="0">
+EOF
+
+    # Parse test results and add test cases
+    for result_file in "${results_dir}"/*.txt; do
+        if [[ -f "$result_file" ]]; then
+            local suite_name=$(basename "$result_file" .txt)
+            while IFS= read -r line; do
+                if [[ "$line" == *"[PASS]"* ]]; then
+                    local test_name="${line#*\[PASS\] }"
+                    test_name="${test_name% passed}"
+                    echo "    <testcase name=\"${test_name}\" classname=\"${suite_name}\" time=\"0\"/>" >> "$junit_file"
+                elif [[ "$line" == *"[FAIL]"* ]]; then
+                    local test_name="${line#*\[FAIL\] }"
+                    echo "    <testcase name=\"${test_name}\" classname=\"${suite_name}\" time=\"0\">" >> "$junit_file"
+                    echo "      <failure message=\"Test failed\">${line}</failure>" >> "$junit_file"
+                    echo "    </testcase>" >> "$junit_file"
+                fi
+            done < "$result_file"
+        fi
+    done
+
+    echo "  </testsuite>" >> "$junit_file"
+    echo "</testsuites>" >> "$junit_file"
+
+    log_info "JUnit report generated: $junit_file"
 }
 
 # Set trap for cleanup
