@@ -118,7 +118,9 @@ warm-cache:
 
 security:trivy:
   stage: scan
-  image: aquasec/trivy:latest
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
   rules:
     - when: on_success
   script:
