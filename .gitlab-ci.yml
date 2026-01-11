@@ -490,7 +490,7 @@ release:rpi4-bookworm:
 trigger-docs-preview:
   stage: docs
   trigger:
-    project: pimeleon/docs-web
+    project: pirouter/pimeleon-site
     branch: preview
   variables:
     TRIGGERED_BY: pimeleon-build
@@ -504,7 +504,7 @@ trigger-docs-preview:
 trigger-docs-production:
   stage: docs
   trigger:
-    project: pimeleon/docs-web
+    project: pirouter/pimeleon-site
     branch: main
   variables:
     TRIGGERED_BY: pimeleon-build
