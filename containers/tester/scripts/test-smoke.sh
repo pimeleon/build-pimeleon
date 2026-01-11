@@ -166,14 +166,15 @@ run_smoke_tests() {
     check_vm_capability
 
     # Run image integrity test (always required)
-    if test_image_integrity; then ((passed++)); else ((failed++)); fi
+    # Note: Use ((++var)) or ((var+=1)) to avoid exit code 1 when var=0 with set -e
+    if test_image_integrity; then ((++passed)); else ((++failed)); fi
 
     # Run VM tests only if capability is available
     if [[ "$VM_TESTS_AVAILABLE" == "true" ]]; then
-        if test_vm_creation; then ((passed++)); else ((failed++)); fi
-        if test_vm_boot; then ((passed++)); else ((failed++)); fi
-        if test_network_connectivity; then ((passed++)); else ((failed++)); fi
-        if test_ssh_access; then ((passed++)); else ((failed++)); fi
+        if test_vm_creation; then ((++passed)); else ((++failed)); fi
+        if test_vm_boot; then ((++passed)); else ((++failed)); fi
+        if test_network_connectivity; then ((++passed)); else ((++failed)); fi
+        if test_ssh_access; then ((++passed)); else ((++failed)); fi
         # Cleanup VM
         cleanup_vm "$VM_NAME"
     else
