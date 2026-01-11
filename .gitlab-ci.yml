@@ -228,6 +228,7 @@ build:pimeleon:
     - |
       docker run --rm \
         --privileged \
+        -v /dev:/dev:rw \
         -v $CI_PROJECT_DIR/output:/output \
         -v $CI_PROJECT_DIR/cache:/cache \
         -v $CI_PROJECT_DIR/configs:/configs \
