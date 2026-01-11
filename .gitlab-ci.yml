@@ -242,8 +242,10 @@ build:pimeleon:
   artifacts:
     paths:
       - output/*.img
-      - output/*.tar.gz
-      - output/*.sha256
+      - output/*.img.xz
+      - output/*.img.metadata.json
+      - output/*.log
+      - output/pi-initial-password.txt
     expire_in: 1 week
 
 # ============================================
@@ -259,19 +261,21 @@ test:smoke:
       when: never
     - when: on_success
   script:
+    - mkdir -p test-results
     - |
       docker run --rm \
         --privileged \
         -v $CI_PROJECT_DIR/output:/images:ro \
         -v $CI_PROJECT_DIR/tests:/tests \
+        -v $CI_PROJECT_DIR/test-results:/results \
         -e TEST_SUITE=smoke \
         $TEST_IMAGE
   artifacts:
     when: always
     paths:
-      - tests/results/
+      - test-results/
     reports:
-      junit: tests/results/junit.xml
+      junit: test-results/junit.xml
     expire_in: 1 week
 
 test:integration:
@@ -283,11 +287,13 @@ test:integration:
       when: never
     - when: on_success
   script:
+    - mkdir -p test-results
     - |
       docker run --rm \
         --privileged \
         -v $CI_PROJECT_DIR/output:/images:ro \
         -v $CI_PROJECT_DIR/tests:/tests \
+        -v $CI_PROJECT_DIR/test-results:/results \
         -e TEST_SUITE=integration \
         $TEST_IMAGE
   timeout: 30 minutes
