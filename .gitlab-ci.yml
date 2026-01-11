@@ -335,7 +335,7 @@ publish:pages:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
   script:
-    - pip install mkdocs mkdocs-material
+    - pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin
     - mkdocs build -d public
   artifacts:
     paths:
