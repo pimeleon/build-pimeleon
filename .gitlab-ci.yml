@@ -335,6 +335,7 @@ publish:pages:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
   script:
+    - apt-get -qy update && apt-get -q install -y --no-install-recommends git
     - pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin
     - mkdocs build -d public
   artifacts:
