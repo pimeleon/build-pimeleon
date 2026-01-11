@@ -203,10 +203,18 @@ cleanup_on_exit() {
     # Generate junit.xml even if tests failed (for CI artifact collection)
     if [[ -n "${TEST_RESULTS_PATH:-}" && -d "${TEST_RESULTS_PATH}" ]]; then
         generate_junit_report "${TEST_RESULTS_PATH}"
-        # Also copy to parent results directory for CI
-        local parent_dir=$(dirname "${TEST_RESULTS_PATH}")
+        # Also copy to parent results directory for CI artifact collection
+        local parent_dir
+        parent_dir=$(dirname "${TEST_RESULTS_PATH}")
+        log_info "TEST_RESULTS_PATH: ${TEST_RESULTS_PATH}"
+        log_info "Parent dir: ${parent_dir}"
         if [[ -d "$parent_dir" && "$parent_dir" != "${TEST_RESULTS_PATH}" ]]; then
-            cp "${TEST_RESULTS_PATH}/junit.xml" "${parent_dir}/junit.xml" 2>/dev/null || true
+            if [[ -f "${TEST_RESULTS_PATH}/junit.xml" ]]; then
+                cp "${TEST_RESULTS_PATH}/junit.xml" "${parent_dir}/junit.xml"
+                log_info "JUnit report copied to: ${parent_dir}/junit.xml"
+            else
+                log_warn "JUnit report not found at: ${TEST_RESULTS_PATH}/junit.xml"
+            fi
         fi
     fi
 
