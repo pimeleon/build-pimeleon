@@ -124,10 +124,11 @@ security:trivy:
   rules:
     - when: on_success
   script:
-    - trivy fs --exit-code 0 --no-progress --format template --template "@contrib/gitlab.tpl" -o gl-container-scanning-report.json .
+    - trivy fs --exit-code 0 --no-progress --scanners vuln --format json -o trivy-report.json .
   artifacts:
-    reports:
-      container_scanning: gl-container-scanning-report.json
+    paths:
+      - trivy-report.json
+    expire_in: 1 week
 
 security:gitleaks:
   stage: scan
