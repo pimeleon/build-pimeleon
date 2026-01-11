@@ -5,6 +5,56 @@ set -euo pipefail
 
 RESULTS_DIR=$1
 REPORT_FILE="${RESULTS_DIR}/report.html"
+JUNIT_FILE="${RESULTS_DIR}/junit.xml"
+
+# Generate JUnit XML report for CI/CD integration
+generate_junit_xml() {
+    local passed=$(grep -c "PASS" "${RESULTS_DIR}"/*.txt 2>/dev/null || echo "0")
+    local failed=$(grep -c "FAIL" "${RESULTS_DIR}"/*.txt 2>/dev/null || echo "0")
+    local total=$((passed + failed))
+    local timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+    cat > "$JUNIT_FILE" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Pimeleon Tests" tests="${total}" failures="${failed}" time="0" timestamp="${timestamp}">
+  <testsuite name="pimeleon" tests="${total}" failures="${failed}" errors="0" skipped="0" time="0">
+EOF
+
+    # Parse test results and add test cases
+    for result_file in "${RESULTS_DIR}"/*.txt; do
+        if [[ -f "$result_file" ]]; then
+            local suite_name=$(basename "$result_file" .txt)
+            while IFS= read -r line; do
+                if [[ "$line" == *"[PASS]"* ]]; then
+                    local test_name=$(echo "$line" | sed 's/.*\[PASS\] *//' | sed 's/ passed$//')
+                    echo "    <testcase name=\"${test_name}\" classname=\"${suite_name}\" time=\"0\"/>" >> "$JUNIT_FILE"
+                elif [[ "$line" == *"[FAIL]"* ]]; then
+                    local test_name=$(echo "$line" | sed 's/.*\[FAIL\] *//')
+                    echo "    <testcase name=\"${test_name}\" classname=\"${suite_name}\" time=\"0\">" >> "$JUNIT_FILE"
+                    echo "      <failure message=\"Test failed\">${line}</failure>" >> "$JUNIT_FILE"
+                    echo "    </testcase>" >> "$JUNIT_FILE"
+                fi
+            done < "$result_file"
+        fi
+    done
+
+    cat >> "$JUNIT_FILE" <<EOF
+  </testsuite>
+</testsuites>
+EOF
+
+    echo "JUnit report generated: $JUNIT_FILE"
+
+    # Also copy to parent results directory for CI accessibility
+    local parent_results=$(dirname "$RESULTS_DIR")
+    if [[ -d "$parent_results" && "$parent_results" != "$RESULTS_DIR" ]]; then
+        cp "$JUNIT_FILE" "${parent_results}/junit.xml"
+        echo "JUnit report also copied to: ${parent_results}/junit.xml"
+    fi
+}
+
+# Generate JUnit XML first
+generate_junit_xml
 
 # Generate HTML report
 cat > "$REPORT_FILE" <<'EOF'
