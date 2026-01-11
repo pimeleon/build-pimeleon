@@ -83,7 +83,7 @@ COPY scripts/ /scripts/
 RUN chmod +x /scripts/*.sh
 
 # Cache Debian Buster base for debootstrap (matching production Pi 3B+)
-ADD --checksum=sha256:0680cca0de3a9b9e5ae12de8cfde3229749a757ddcee1d0ec3d22ef28f602611 \
+ADD --checksum=sha256:8b9ddf0a5c3371b337e68fbfd7034ccf1b0bd3494d4c998a9da14ae8cf4b8c28 \
     http://deb.debian.org/debian/dists/buster/Release \
     /cache/debian-buster-release
 
