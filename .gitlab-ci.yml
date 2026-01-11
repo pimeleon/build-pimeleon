@@ -129,25 +129,22 @@ security:trivy:
 
 security:gitleaks:
   stage: scan
-  image: zricethezav/gitleaks:v8.21.2
+  image: python:3.11-slim
+  tags:
+    - linux
   rules:
     - if: '$CI_COMMIT_TAG'
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - when: on_success
-  cache:
-    key: gitleaks-baseline
-    paths:
-      - .gitleaks-baseline.json
-    policy: pull-push
+  before_script:
+    - apt-get -q update && apt-get -qy install git wget
+    - wget -qO- https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar xz -C /usr/local/bin
   script:
-    - |
-      if [ ! -f .gitleaks-baseline.json ]; then
-        echo "Creating baseline from full git history..."
-        gitleaks git . --log-opts="--all" --report-path .gitleaks-baseline.json --config .gitleaks.toml
-      fi
-    - gitleaks git . --verbose --redact --baseline-path .gitleaks-baseline.json --config .gitleaks.toml
+    - echo "Running secret detection with gitleaks..."
+    - gitleaks git . --verbose --redact --config .gitleaks.toml
+    - echo "Secret detection completed"
 
 # ============================================
 # LINT STAGE
