@@ -13,21 +13,37 @@ VM_NAME="pimeleon-smoke"
 TIMEOUT=300  # 5 minutes
 RESULTS_FILE="${TEST_RESULTS_PATH}/smoke-test-results.txt"
 
-# Check if VM tests are possible (libvirt/KVM available)
+# Check if VM tests are possible (libvirt/KVM available AND networks active)
 VM_TESTS_AVAILABLE=false
 check_vm_capability() {
     # Check if libvirtd is running and we can list VMs
-    if virsh list &>/dev/null; then
-        # Check if we have KVM or can use QEMU
-        if [[ -e /dev/kvm ]] || virsh capabilities 2>/dev/null | grep -q "qemu"; then
-            VM_TESTS_AVAILABLE=true
-            log_info "VM testing capability: available"
-        else
-            log_warn "VM testing capability: not available (no KVM/QEMU)"
-        fi
-    else
+    if ! virsh list &>/dev/null; then
         log_warn "VM testing capability: not available (libvirtd not running)"
+        return
     fi
+
+    # Check if we have KVM or can use QEMU
+    if [[ ! -e /dev/kvm ]] && ! virsh capabilities 2>/dev/null | grep -q "qemu"; then
+        log_warn "VM testing capability: not available (no KVM/QEMU)"
+        return
+    fi
+
+    # Check if required networks are active
+    local networks_ok=true
+    for net in wan lan mgmt; do
+        if ! virsh net-info "$net" 2>/dev/null | grep -q "Active:.*yes"; then
+            log_warn "Required network '$net' is not active"
+            networks_ok=false
+        fi
+    done
+
+    if [[ "$networks_ok" != "true" ]]; then
+        log_warn "VM testing capability: not available (networks not active)"
+        return
+    fi
+
+    VM_TESTS_AVAILABLE=true
+    log_info "VM testing capability: available (libvirt + networks active)"
 }
 
 # Initialize results
@@ -212,6 +228,19 @@ main() {
 
     # Generate summary
     echo "SMOKE_TEST_STATUS=$([[ $status -eq 0 ]] && echo 'PASSED' || echo 'FAILED')" > "${TEST_RESULTS_PATH}/summary.txt"
+
+    # Generate JUnit report before exiting (cleanup_on_exit also generates, but let's ensure it exists)
+    generate_junit_report "${TEST_RESULTS_PATH}"
+
+    # Copy junit.xml to parent directory for CI artifact collection
+    local parent_dir
+    parent_dir=$(dirname "${TEST_RESULTS_PATH}")
+    if [[ -f "${TEST_RESULTS_PATH}/junit.xml" && -d "$parent_dir" ]]; then
+        cp "${TEST_RESULTS_PATH}/junit.xml" "${parent_dir}/junit.xml"
+        log_info "JUnit copied to: ${parent_dir}/junit.xml"
+    else
+        log_warn "Could not copy JUnit: src=${TEST_RESULTS_PATH}/junit.xml parent=${parent_dir}"
+    fi
 
     return $status
 }
