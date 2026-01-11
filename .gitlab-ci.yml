@@ -239,6 +239,9 @@ build:pimeleon:
         -e RASPBIAN_VERSION=${RASPBIAN_VERSION:-bookworm} \
         -e APT_CACHE_SERVER=${APT_PROXY%:*} \
         $BUILD_IMAGE
+    - echo "Build output:"
+    - ls -la output/ || true
+    - sudo chown -R "$(id -u):$(id -g)" output/ || true
   artifacts:
     paths:
       - output/*.img
