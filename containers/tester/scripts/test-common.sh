@@ -217,10 +217,15 @@ cleanup_on_exit() {
 generate_junit_report() {
     local results_dir=$1
     local junit_file="${results_dir}/junit.xml"
-    local passed=$(grep -c "\[PASS\]" "${results_dir}"/*.txt 2>/dev/null || echo "0")
-    local failed=$(grep -c "\[FAIL\]" "${results_dir}"/*.txt 2>/dev/null || echo "0")
-    local total=$((passed + failed))
-    local timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    # Count total PASS/FAIL across all files (grep -c outputs per-file, so use grep -h | wc -l)
+    local passed
+    local failed
+    local total
+    local timestamp
+    passed=$(grep -h "\[PASS\]" "${results_dir}"/*.txt 2>/dev/null | wc -l || echo "0")
+    failed=$(grep -h "\[FAIL\]" "${results_dir}"/*.txt 2>/dev/null | wc -l || echo "0")
+    total=$((passed + failed))
+    timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
     cat > "$junit_file" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
