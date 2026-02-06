@@ -8,11 +8,20 @@ repos:
       - id: end-of-file-fixer
         exclude: '\.md$'
       - id: check-yaml
-        args: [--allow-multiple-documents]
+        args: [--allow-multiple-documents, --unsafe]
       - id: check-added-large-files
         args: ['--maxkb=1000']
       - id: check-merge-conflict
       - id: detect-private-key
+
+  # Shell script syntax validation (catches unclosed quotes, etc.)
+  - repo: local
+    hooks:
+      - id: bash-syntax
+        name: Bash syntax check
+        entry: bash -n
+        language: system
+        types: [shell]
 
   # Shell script linting (warnings only, don't block commits)
   - repo: https://github.com/koalaman/shellcheck-precommit
@@ -28,9 +37,9 @@ repos:
         name: Ansible Lint
         entry: ansible-lint
         language: system
-        files: ansible/.*\.ya?ml$
+        files: shared/ansible/.*\.ya?ml$
         pass_filenames: false
-        args: ['--offline', 'ansible/playbooks/']
+        args: ['--offline', 'shared/ansible/playbooks/']
 
   # YAML linting
   - repo: https://github.com/adrienverge/yamllint
@@ -44,7 +53,7 @@ repos:
     rev: v0.38.0
     hooks:
       - id: markdownlint
-        args: ['--fix']
+        args: ['--config', '.markdownlint.json', '--fix']
 
   # Secret detection (pre-push only - scans working directory)
   - repo: https://github.com/gitleaks/gitleaks

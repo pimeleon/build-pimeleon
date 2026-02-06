@@ -1,0 +1,179 @@
+---
+# DNS Setup Task
+# Configures BIND9 and dnscrypt-proxy for recursive DNS with DDNS support
+# Note: bind9, bind9utils, dnsutils, dnscrypt-proxy installed in stage2-customize.sh
+
+- name: Set dns_domain default
+  ansible.builtin.set_fact:
+    dns_domain: "{{ dns_domain | default('pimeleon.local') }}"
+
+- name: Create BIND9 configuration directory
+  ansible.builtin.file:
+    path: /etc/bind
+    state: directory
+    mode: '0755'
+  when: services_enabled.dns_server | default(true)
+
+- name: Create DNS zone directory
+  ansible.builtin.file:
+    path: /var/lib/bind
+    state: directory
+    owner: bind
+    group: bind
+    mode: '0755'
+  when: services_enabled.dns_server | default(true)
+
+# Generate RNDC key for DDNS
+- name: Check if RNDC key exists
+  ansible.builtin.stat:
+    path: /etc/bind/rndc.key
+  register: rndc_key_stat
+  when: services_enabled.dns_server | default(true)
+
+- name: Generate RNDC key
+  ansible.builtin.command:
+    cmd: rndc-confgen -a -A hmac-sha256
+    creates: /etc/bind/rndc.key
+  when:
+    - services_enabled.dns_server | default(true)
+    - not rndc_key_stat.stat.exists | default(true)
+
+- name: Set RNDC key permissions
+  ansible.builtin.file:
+    path: /etc/bind/rndc.key
+    owner: bind
+    group: bind
+    mode: '0640'
+  when: services_enabled.dns_server | default(true)
+
+- name: Configure BIND9 options
+  ansible.builtin.template:
+    src: bind/named.conf.options.j2
+    dest: /etc/bind/named.conf.options
+    mode: '0644'
+  when: services_enabled.dns_server | default(true)
+  notify: Restart bind9
+
+- name: Configure BIND9 local zones
+  ansible.builtin.template:
+    src: bind/named.conf.local.j2
+    dest: /etc/bind/named.conf.local
+    mode: '0644'
+  when: services_enabled.dns_server | default(true)
+  notify: Restart bind9
+
+# Create initial zone files
+- name: Create forward zone file
+  ansible.builtin.copy:
+    content: |
+      $TTL 86400
+      @   IN  SOA ns1.{{ dns_domain }}. admin.{{ dns_domain }}. (
+                  1       ; Serial
+                  604800  ; Refresh
+                  86400   ; Retry
+                  2419200 ; Expire
+                  86400 ) ; Negative Cache TTL
+      ;
+      @       IN  NS  ns1.{{ dns_domain | default('pimeleon.local') }}.
+      ns1     IN  A   {{ default_ip }}
+      router  IN  A   {{ default_ip }}
+    dest: /var/lib/bind/{{ dns_domain | default('pimeleon.local') }}.zone
+    owner: bind
+    group: bind
+    mode: '0644'
+    force: false
+  when: services_enabled.dns_server | default(true)
+
+- name: Create LAN reverse zone file
+  ansible.builtin.copy:
+    content: |
+      $TTL 86400
+      @   IN  SOA ns1.{{ dns_domain }}. admin.{{ dns_domain }}. (
+                  1       ; Serial
+                  604800  ; Refresh
+                  86400   ; Retry
+                  2419200 ; Expire
+                  86400 ) ; Negative Cache TTL
+      ;
+      @       IN  NS  ns1.{{ dns_domain | default('pimeleon.local') }}.
+      1       IN  PTR router.{{ dns_domain | default('pimeleon.local') }}.
+    dest: /var/lib/bind/76.168.192.rev
+    owner: bind
+    group: bind
+    mode: '0644'
+    force: false
+  when: services_enabled.dns_server | default(true)
+
+- name: Create WiFi reverse zone file
+  ansible.builtin.copy:
+    content: |
+      $TTL 86400
+      @   IN  SOA ns1.{{ dns_domain }}. admin.{{ dns_domain }}. (
+                  1       ; Serial
+                  604800  ; Refresh
+                  86400   ; Retry
+                  2419200 ; Expire
+                  86400 ) ; Negative Cache TTL
+      ;
+      @       IN  NS  ns1.{{ dns_domain | default('pimeleon.local') }}.
+      1       IN  PTR router.{{ dns_domain | default('pimeleon.local') }}.
+    dest: /var/lib/bind/77.168.192.rev
+    owner: bind
+    group: bind
+    mode: '0644'
+    force: false
+  when: services_enabled.dns_server | default(true)
+
+# dnscrypt-proxy configuration
+- name: Create dnscrypt-proxy directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /etc/dnscrypt-proxy
+    - /var/log/dnscrypt-proxy
+    - /var/cache/dnscrypt-proxy
+  when: services_enabled.dnscrypt_proxy | default(true)
+
+- name: Configure dnscrypt-proxy
+  ansible.builtin.template:
+    src: dnscrypt-proxy/dnscrypt-proxy.toml.j2
+    dest: /etc/dnscrypt-proxy/dnscrypt-proxy.toml
+    mode: '0644'
+  when: services_enabled.dnscrypt_proxy | default(true)
+  notify: Restart dnscrypt-proxy
+
+# Enable services
+- name: Check bind9 package status
+  ansible.builtin.command: dpkg -s bind9
+  register: bind9_package_status
+  failed_when: false
+  changed_when: false
+  when: services_enabled.dns_server | default(true)
+
+- name: Display bind9 package status
+  ansible.builtin.debug:
+    var: bind9_package_status.stdout
+  when:
+    - services_enabled.dns_server | default(true)
+    - bind9_package_status.rc == 0  # Only show if package is installed
+
+- name: Display bind9 package stderr if not installed
+  ansible.builtin.debug:
+    var: bind9_package_status.stderr
+  when:
+    - services_enabled.dns_server | default(true)
+    - bind9_package_status.rc != 0  # Only show if package is NOT installed
+
+- name: List bind9 systemd service files
+  ansible.builtin.command: find /lib/systemd/system /etc/systemd/system -name "bind9.service"
+  register: bind9_service_files
+  failed_when: false
+  changed_when: false
+  when: services_enabled.dns_server | default(true)
+
+- name: Display bind9 systemd service files
+  ansible.builtin.debug:
+    var: bind9_service_files.stdout_lines
+  when: services_enabled.dns_server | default(true)

@@ -1,0 +1,22 @@
+# Trivy configuration
+# https://aquasecurity.github.io/trivy/latest/docs/configuration/
+
+# Skip directories that don't need scanning
+scan:
+  skip-dirs:
+    - .venv
+    - venv
+    - node_modules
+    - cache
+    - output
+
+# Disable specific package types to avoid pip warning
+pkg-types:
+  - os
+  - library
+
+# Disable pip analyzer (no Python packages in this repo)
+disabled-analyzers:
+  - pip
+  - pipenv
+  - poetry

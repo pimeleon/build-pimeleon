@@ -1,10 +1,12 @@
 # Ansible Multi-Platform Optimization Plan
 
-This document outlines the plan to optimize Ansible configuration for supporting multiple Raspberry Pi platforms with different configuration values and service subsets.
+This document outlines the plan to optimize Ansible configuration for supporting multiple
+Raspberry Pi platforms with different configuration values and service subsets.
 
 ## Current Issues
 
 ### 1. Undefined Variables
+
 The `network-setup.yml` task file references variables that are **never defined**:
 
 | Variable | Used In | Current State |
@@ -16,12 +18,15 @@ The `network-setup.yml` task file references variables that are **never defined*
 | `dhcp_range_end` | network-setup.yml | Undefined (will fail) |
 
 ### 2. No Platform-Specific Configs
+
 All configuration values are hardcoded in task files with no distinction between platforms.
 
 ### 3. No Variable Passing
+
 Platform variables (`PIMELEON_RPI_MODEL`) are not passed from build scripts to Ansible.
 
 ### 4. Missing Directory Structure
+
 No `group_vars/` or `host_vars/` directories exist for organizing platform-specific variables.
 
 ---
@@ -93,26 +98,26 @@ wifi_interface: "wlan0"
 mgmt_interface: "eth0:0"
 
 # LAN network settings
-lan_ip: "192.168.76.1"
+lan_ip: "192.168.42.1"
 lan_netmask: "255.255.255.0"
-lan_network: "192.168.76.0/24"
+lan_network: "192.168.42.0/24"
 
 # WiFi AP network settings
-wifi_ap_ip: "192.168.77.1"
+wifi_ap_ip: "192.168.42.1"
 wifi_ap_netmask: "255.255.255.0"
-wifi_ap_network: "192.168.77.0/24"
+wifi_ap_network: "192.168.42.0/24"
 
 # Management network
 mgmt_ip: "172.16.0.1"
 mgmt_netmask: "255.255.255.0"
 
 # DHCP configuration
-dhcp_range_start: "192.168.76.100"
-dhcp_range_end: "192.168.76.200"
+dhcp_range_start: "192.168.42.100"
+dhcp_range_end: "192.168.42.200"
 dhcp_lease_time: "12h"
 
-wifi_dhcp_range_start: "192.168.77.100"
-wifi_dhcp_range_end: "192.168.77.200"
+wifi_dhcp_range_start: "192.168.42.100"
+wifi_dhcp_range_end: "192.168.42.200"
 
 # WiFi AP configuration
 wifi_ssid: "pimeleon"
@@ -285,7 +290,7 @@ config_txt:
   max_usb_current: 1
 
 # hostapd WiFi capabilities (Pi 3B+)
-hostapd_ht_capab: "[HT40+][HT40-][SHORT-GI-20][SHORT-GI-40][TX-STBC][RX-STBC1]"
+hostapd_ht_capab: ""
 hostapd_max_sta: 10
 ```
 
@@ -385,7 +390,7 @@ config_txt:
   arm_freq: 1000
 
 # Minimal hostapd config
-hostapd_ht_capab: "[SHORT-GI-20]"
+hostapd_ht_capab: ""
 hostapd_max_sta: 5  # Limited by resources
 ```
 

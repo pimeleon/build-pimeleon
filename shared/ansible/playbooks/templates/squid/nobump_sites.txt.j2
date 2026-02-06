@@ -1,0 +1,33 @@
+# Sites that should not have SSL bumped
+# Managed by Ansible - do not edit manually
+
+# Banking and payment sites that should not be bumped
+.paypal.com
+.amazon.com
+.stripe.com
+.square.com
+.visa.com
+.mastercard.com
+
+# Sites with certificate pinning that cause issues
+.google.com
+.youtube.com
+.googleapis.com
+.gstatic.com
+.facebook.com
+.fbcdn.net
+.twitter.com
+.instagram.com
+.apple.com
+.microsoft.com
+.live.com
+.outlook.com
+
+# Certificate authorities and security sites
+.letsencrypt.org
+.digicert.com
+.verisign.com
+.symantec.com
+
+# Local domain (no need to bump internal traffic)
+.{{ domain_name | default('pimeleon.lan') }}

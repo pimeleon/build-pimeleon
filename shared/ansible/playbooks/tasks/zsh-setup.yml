@@ -1,0 +1,90 @@
+---
+# Zsh Setup for pim user
+# Configures zsh with oh-my-zsh, daily auto-update, and ASCII banner
+
+- name: Install zsh and dependencies
+  ansible.builtin.apt:
+    name:
+      - zsh
+      - git
+      - curl
+    state: present
+
+- name: Download oh-my-zsh
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
+    dest: /tmp/install-ohmyzsh.sh
+    mode: '0755'
+
+- name: Install oh-my-zsh for pim user
+  ansible.builtin.shell: |
+    export HOME=/home/pim
+    export ZSH=/home/pim/.oh-my-zsh
+    sh /tmp/install-ohmyzsh.sh --unattended --keep-zshrc
+  args:
+    creates: /home/pim/.oh-my-zsh/oh-my-zsh.sh
+    executable: /bin/bash
+  become: true
+  become_user: pim
+
+- name: Copy Pimeleon ASCII banner
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../configs/shell/motd-banner"
+    dest: /etc/pimeleon-banner
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Deploy MOTD profile script for all shells
+  ansible.builtin.copy:
+    dest: /etc/profile.d/pimeleon-motd.sh
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      # Pimeleon MOTD - displays on login for all shells
+      # Only show for interactive login shells, not subshells
+      if [[ -f /etc/pimeleon-banner ]] && [[ $- == *i* ]] && [[ -z "$PIMELEON_MOTD_SHOWN" ]]; then
+          export PIMELEON_MOTD_SHOWN=1
+          cat /etc/pimeleon-banner
+          echo ""
+          echo "  Welcome to Pimeleon - Your Privacy Gateway"
+          echo "  Hostname: $(hostname) | IP: $(hostname -I 2>/dev/null | awk '{print $1}')"
+          # Show hint based on setup state
+          if [[ ! -f /var/lib/pimeleon/.setup-complete ]]; then
+              echo "  Run 'sudo pim-setup' for first-time setup wizard"
+          elif [[ ! -f /var/lib/pimeleon/.pim-config.ran ]]; then
+              echo "  Run 'sudo pim-config' for configuration menu"
+          fi
+          echo ""
+      fi
+
+- name: Disable default Debian MOTD (we use our own)
+  ansible.builtin.file:
+    path: /etc/motd
+    state: absent
+
+- name: Deploy zshrc configuration
+  ansible.builtin.template:
+    src: zshrc.j2
+    dest: /home/pim/.zshrc
+    owner: pim
+    group: pim
+    mode: '0644'
+
+- name: Set zsh as default shell for pim user
+  ansible.builtin.user:
+    name: pim
+    shell: /bin/zsh
+
+- name: Create zsh auto-update cron job
+  ansible.builtin.cron:
+    name: "Update oh-my-zsh daily"
+    user: pim
+    hour: "3"
+    minute: "30"
+    job: "cd /home/pim/.oh-my-zsh && git pull --quiet origin master"
+
+- name: Clean up oh-my-zsh installer
+  ansible.builtin.file:
+    path: /tmp/install-ohmyzsh.sh
+    state: absent

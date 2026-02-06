@@ -1,0 +1,106 @@
+---
+# dnscrypt-proxy installation from pre-downloaded binary
+# Binary downloaded by stage2-customize.sh (outside chroot)
+# Source: https://github.com/DNSCrypt/dnscrypt-proxy/releases
+
+- name: Check if dnscrypt-proxy download exists
+  ansible.builtin.stat:
+    path: /tmp/pimeleon-downloads/dnscrypt-proxy.tar.gz
+  register: dnscrypt_download
+  when: services_enabled.dnscrypt_proxy | default(false)
+
+- name: Skip dnscrypt-proxy setup if download not available
+  ansible.builtin.debug:
+    msg: >-
+      dnscrypt-proxy binary not found at /tmp/pimeleon-downloads/dnscrypt-proxy.tar.gz
+      - skipping setup
+  when:
+    - services_enabled.dnscrypt_proxy | default(false)
+    - not (dnscrypt_download.stat.exists | default(false))
+
+# All tasks below only run if download exists
+- name: Create dnscrypt-proxy directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /etc/dnscrypt-proxy, mode: '0755' }
+    - { path: /var/cache/dnscrypt-proxy, mode: '0755' }
+    - { path: /var/log/dnscrypt-proxy, mode: '0755' }
+  when:
+    - services_enabled.dnscrypt_proxy | default(false)
+    - dnscrypt_download.stat.exists | default(false)
+
+- name: Create dnscrypt-proxy user
+  ansible.builtin.user:
+    name: _dnscrypt-proxy
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/cache/dnscrypt-proxy
+    create_home: false
+    comment: "DNSCrypt proxy daemon"
+  when:
+    - services_enabled.dnscrypt_proxy | default(false)
+    - dnscrypt_download.stat.exists | default(false)
+
+- name: Extract dnscrypt-proxy binary
+  ansible.builtin.unarchive:
+    src: /tmp/pimeleon-downloads/dnscrypt-proxy.tar.gz
+    dest: /tmp/pimeleon-downloads
+    remote_src: true
+  when:
+    - services_enabled.dnscrypt_proxy | default(false)
+    - dnscrypt_download.stat.exists | default(false)
+
+- name: Install dnscrypt-proxy binary
+  ansible.builtin.copy:
+    src: "/tmp/pimeleon-downloads/linux-{{ 'arm64' if rpi_arch == 'arm64' else 'arm' }}/dnscrypt-proxy"
+    dest: /usr/local/bin/dnscrypt-proxy
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0755'
+  when:
+    - services_enabled.dnscrypt_proxy | default(false)
+    - dnscrypt_download.stat.exists | default(false)
+  notify: Restart dnscrypt-proxy
+
+- name: Configure dnscrypt-proxy
+  ansible.builtin.template:
+    src: dnscrypt-proxy/dnscrypt-proxy.toml.j2
+    dest: /etc/dnscrypt-proxy/dnscrypt-proxy.toml
+    owner: root
+    group: root
+    mode: '0644'
+  when:
+    - services_enabled.dnscrypt_proxy | default(false)
+    - dnscrypt_download.stat.exists | default(false)
+  notify: Restart dnscrypt-proxy
+
+- name: Create dnscrypt-proxy systemd service
+  ansible.builtin.template:
+    src: dnscrypt-proxy/dnscrypt-proxy.service.j2
+    dest: /etc/systemd/system/dnscrypt-proxy.service
+    mode: '0644'
+  when:
+    - services_enabled.dnscrypt_proxy | default(false)
+    - dnscrypt_download.stat.exists | default(false)
+  notify:
+    - Reload systemd
+    - Restart dnscrypt-proxy
+
+- name: Create dnscrypt-proxy socket activation
+  ansible.builtin.template:
+    src: dnscrypt-proxy/dnscrypt-proxy.socket.j2
+    dest: /etc/systemd/system/dnscrypt-proxy.socket
+    mode: '0644'
+  when:
+    - services_enabled.dnscrypt_proxy | default(false)
+    - dnscrypt_download.stat.exists | default(false)
+  notify:
+    - Reload systemd
+
+# Note: dnscrypt-proxy service enablement happens in stage3-optimize.sh (outside chroot)

@@ -1,0 +1,25 @@
+---
+# Privoxy setup tasks for Pimeleon
+# Transparent HTTP proxy for ad blocking and privacy
+# Note: privoxy installed in stage2-customize.sh
+
+- name: Create privoxy log directory
+  ansible.builtin.file:
+    path: /var/log/privoxy
+    state: directory
+    owner: privoxy
+    group: adm
+    mode: '0750'
+  when: services_enabled.proxy_services | default(true)
+
+- name: Configure privoxy
+  ansible.builtin.template:
+    src: privoxy/config.j2
+    dest: /etc/privoxy/config
+    owner: root
+    group: root
+    mode: '0644'
+  when: services_enabled.proxy_services | default(true)
+  notify: Restart privoxy
+
+# Note: privoxy service enablement happens in stage3-optimize.sh (outside chroot)

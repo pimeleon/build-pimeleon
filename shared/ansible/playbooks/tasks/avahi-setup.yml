@@ -1,0 +1,64 @@
+---
+# Avahi mDNS/DNS-SD setup
+# Provides .local hostname resolution and service discovery
+
+- name: Install Avahi packages
+  ansible.builtin.apt:
+    name:
+      - avahi-daemon
+      - avahi-utils
+      - libnss-mdns
+    state: present
+    update_cache: false
+  when: services_enabled.avahi | default(false)
+
+- name: Create Avahi configuration directory
+  ansible.builtin.file:
+    path: /etc/avahi/services
+    state: directory
+    mode: '0755'
+  when: services_enabled.avahi | default(false)
+
+- name: Configure Avahi daemon
+  ansible.builtin.template:
+    src: avahi/avahi-daemon.conf.j2
+    dest: /etc/avahi/avahi-daemon.conf
+    mode: '0644'
+  when: services_enabled.avahi | default(false)
+  notify: Restart avahi-daemon
+
+- name: Configure SSH service advertisement
+  ansible.builtin.copy:
+    dest: /etc/avahi/services/ssh.service
+    mode: '0644'
+    content: |
+      <?xml version="1.0" standalone='no'?>
+      <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+      <service-group>
+        <name replace-wildcards="yes">%h SSH</name>
+        <service>
+          <type>_ssh._tcp</type>
+          <port>22</port>
+        </service>
+      </service-group>
+  when: services_enabled.avahi | default(false)
+  notify: Restart avahi-daemon
+
+- name: Configure SFTP service advertisement
+  ansible.builtin.copy:
+    dest: /etc/avahi/services/sftp.service
+    mode: '0644'
+    content: |
+      <?xml version="1.0" standalone='no'?>
+      <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+      <service-group>
+        <name replace-wildcards="yes">%h SFTP</name>
+        <service>
+          <type>_sftp-ssh._tcp</type>
+          <port>22</port>
+        </service>
+      </service-group>
+  when: services_enabled.avahi | default(false)
+  notify: Restart avahi-daemon
+
+# Note: avahi-daemon service enablement happens in stage3-optimize.sh (outside chroot)

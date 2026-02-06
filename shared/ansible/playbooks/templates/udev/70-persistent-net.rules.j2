@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+# Enforce Raspberry Pi standard interface naming
+# Backup for net.ifnames=0 kernel parameter
+
+# Built-in Ethernet (BCM/LAN78xx) -> eth0
+SUBSYSTEM=="net", ACTION=="add", DRIVERS=="smsc95xx", NAME="eth0"
+SUBSYSTEM=="net", ACTION=="add", DRIVERS=="lan78xx", NAME="eth0"
+
+# Built-in WiFi (Broadcom) -> wlan0
+SUBSYSTEM=="net", ACTION=="add", DRIVERS=="brcmfmac", NAME="wlan0"

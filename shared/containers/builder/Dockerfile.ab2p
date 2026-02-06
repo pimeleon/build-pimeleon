@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1.6
+# Standalone adblock2privoxy builder
+# Build once: docker build -f Dockerfile.ab2p -t pimeleon-adblock2privoxy .
+# Only rebuild when adblock2privoxy version changes
+
+FROM haskell:9.4-slim
+
+# Build adblock2privoxy with limited parallelism to avoid linker segfaults
+# -j1 limits parallel compilation, avoiding memory pressure
+RUN cabal update && \
+    cabal install adblock2privoxy -j1 --installdir=/usr/local/bin --install-method=copy && \
+    # Find and copy templates from either cabal store location
+    mkdir -p /opt/adblock2privoxy && \
+    (find /root/.cabal/store -name "templates" -type d -path "*/adblock2privoxy-*" \
+        -exec cp -r {} /opt/adblock2privoxy/ \; 2>/dev/null || true) && \
+    (find /root/.local/state/cabal/store -name "templates" -type d -path "*/adblock2privoxy-*" \
+        -exec cp -r {} /opt/adblock2privoxy/ \; 2>/dev/null || true) && \
+    # Verify templates were found
+    ls -la /opt/adblock2privoxy/templates/
+
+# Output locations for COPY --from:
+# /usr/local/bin/adblock2privoxy - binary
+# /opt/adblock2privoxy/templates - templates

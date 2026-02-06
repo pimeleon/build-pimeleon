@@ -58,9 +58,9 @@ raspberrypi_3bplus/main.yml  # Platform-specific
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `wan_interface` | `eth0` | WAN interface name |
-| `lan_ip` | `192.168.76.1` | LAN IP address |
-| `dhcp_range_start` | `192.168.76.100` | DHCP pool start |
-| `dhcp_range_end` | `192.168.76.200` | DHCP pool end |
+| `lan_ip` | `192.168.42.1` | LAN IP address |
+| `dhcp_range_start` | `192.168.42.100` | DHCP pool start |
+| `dhcp_range_end` | `192.168.42.200` | DHCP pool end |
 | `wifi_ssid` | `pimeleon` | WiFi AP SSID |
 | `wifi_channel` | `6` | WiFi channel |
 
@@ -117,6 +117,7 @@ Entry point that imports all task files:
 During image build (`stage2-customize.sh`):
 
 1. **Inventory Generation**
+
    ```ini
    [all]
    pimeleon ansible_connection=chroot ansible_host=/tmp/build/mount
@@ -131,6 +132,7 @@ During image build (`stage2-customize.sh`):
 2. **Group Vars Copied** to work directory
 
 3. **Extra Vars Passed**
+
    ```bash
    --extra-vars "platform_model=3B+"
    --extra-vars "debian_version=bullseye"

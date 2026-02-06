@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+# dnscrypt-proxy socket activation
+
+[Unit]
+Description=DNSCrypt-proxy socket
+Documentation=https://github.com/DNSCrypt/dnscrypt-proxy/wiki
+
+[Socket]
+ListenStream={{ dnscrypt_proxy.listen_address | default('127.0.0.1') }}:{{ dnscrypt_proxy.port | default(5353) }}
+ListenDatagram={{ dnscrypt_proxy.listen_address | default('127.0.0.1') }}:{{ dnscrypt_proxy.port | default(5353) }}
+
+[Install]
+WantedBy=sockets.target

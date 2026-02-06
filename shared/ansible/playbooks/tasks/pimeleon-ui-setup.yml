@@ -1,0 +1,181 @@
+---
+# Pimeleon UI/API setup
+# Files pre-copied by stage2-customize.sh to /opt/pimeleon/
+# - /opt/pimeleon/api/    - FastAPI server (Python/uvicorn)
+# - /opt/pimeleon/proxy/  - Nitro proxy server (Node.js)
+# - /opt/pimeleon/ui/     - Quasar SPA (static files)
+
+- name: Check if Pimeleon UI files exist
+  ansible.builtin.stat:
+    path: /opt/pimeleon/ui/index.html
+  register: pimeleon_ui_files
+
+- name: Check if Pimeleon UI directory exists
+  ansible.builtin.stat:
+    path: /opt/pimeleon/ui
+  register: pimeleon_ui_dir
+  when: not (pimeleon_ui_files.stat.exists | default(false))
+
+- name: List Pimeleon UI directory contents (debug)
+  ansible.builtin.command: ls -la /opt/pimeleon/ui/
+  register: ui_listing
+  when:
+    - not (pimeleon_ui_files.stat.exists | default(false))
+    - pimeleon_ui_dir.stat.exists | default(false)
+  changed_when: false
+
+- name: Show UI directory contents if index.html missing
+  ansible.builtin.debug:
+    msg: "UI directory exists but index.html missing. Contents: {{ ui_listing.stdout_lines | default([]) }}"
+  when:
+    - ui_listing is defined
+    - ui_listing.stdout_lines is defined
+
+- name: Fail build if Pimeleon UI files are not available
+  ansible.builtin.fail:
+    msg: "Pimeleon UI files not found at /opt/pimeleon/ui/index.html"
+  when: not (pimeleon_ui_files.stat.exists | default(false))
+
+# Set ownership for Pimeleon directories (pim group + separate users)
+- name: Set Pimeleon API directory ownership
+  ansible.builtin.file:
+    path: /opt/pimeleon/api
+    state: directory
+    owner: pim-api
+    group: pim
+    mode: '0750'
+    recurse: true
+
+- name: Set Pimeleon Proxy directory ownership
+  ansible.builtin.file:
+    path: /opt/pimeleon/proxy
+    state: directory
+    owner: pim-proxy
+    group: pim
+    mode: '0750'
+    recurse: true
+
+- name: Set Pimeleon UI directory ownership
+  ansible.builtin.file:
+    path: /opt/pimeleon/ui
+    state: directory
+    owner: pim-proxy
+    group: pim
+    mode: '0755'
+    recurse: true
+
+# Create data directory (shared, group writable)
+- name: Create Pimeleon data directory
+  ansible.builtin.file:
+    path: /opt/pimeleon/data
+    state: directory
+    owner: pim-api
+    group: pim
+    mode: '0770'
+
+# Create log directory (shared, group writable)
+- name: Create Pimeleon log directory
+  ansible.builtin.file:
+    path: /var/log/pimeleon
+    state: directory
+    owner: root
+    group: pim
+    mode: '0775'
+
+# Create plugins directory (API managed)
+- name: Create Pimeleon plugins directory
+  ansible.builtin.file:
+    path: /opt/pimeleon/plugins
+    state: directory
+    owner: pim-api
+    group: pim
+    mode: '0770'
+
+# Install FastAPI Python dependencies in virtual environment
+# PEP 668 requires venv for pip installs in Debian Bookworm+
+- name: Create Python virtual environment for Pimeleon API
+  ansible.builtin.command:
+    cmd: python3 -m venv /opt/pimeleon/api/venv
+    creates: /opt/pimeleon/api/venv/bin/python
+  when: pimeleon_ui_files.stat.exists | default(false)
+
+- name: Set venv ownership
+  ansible.builtin.file:
+    path: /opt/pimeleon/api/venv
+    state: directory
+    owner: pim-api
+    group: pim
+    mode: '0750'
+    recurse: true
+  when: pimeleon_ui_files.stat.exists | default(false)
+
+- name: Install FastAPI requirements in venv
+  ansible.builtin.pip:
+    requirements: /opt/pimeleon/api/requirements.txt
+    virtualenv: /opt/pimeleon/api/venv
+    state: present
+  when: pimeleon_ui_files.stat.exists | default(false)
+
+# Create FastAPI .env file
+- name: Create Pimeleon FastAPI environment file
+  ansible.builtin.copy:
+    dest: /opt/pimeleon/api/.env
+    owner: pim-api
+    group: pim
+    mode: '0640'
+    content: |
+      # Pimeleon FastAPI Configuration
+      # API binds to localhost only - Nitro proxy handles external access
+      HOST=127.0.0.1
+      PORT=8000
+      DEBUG=false
+
+      # Database
+      DATABASE_PATH=/opt/pimeleon/data/pimeleon.db
+
+      # Authentication
+      JWT_SECRET={{ lookup('pipe', 'openssl rand -hex 32') }}
+      JWT_EXPIRES_IN=24h
+      ADMIN_USERNAME=admin
+      ADMIN_PASSWORD={{ lookup('pipe', 'openssl rand -base64 16 | tr -d /+= | head -c 16') }}
+
+      # Paths
+      PLUGIN_DIR=/opt/pimeleon/plugins
+  when: pimeleon_ui_files.stat.exists | default(false)
+
+# Create Nitro proxy .env file
+- name: Create Pimeleon Proxy environment file
+  ansible.builtin.copy:
+    dest: /opt/pimeleon/proxy/.env
+    owner: pim-proxy
+    group: pim
+    mode: '0640'
+    content: |
+      # Pimeleon Nitro Proxy Configuration
+      # Binds to localhost only - nginx handles external access
+      NODE_ENV=production
+      HOST=127.0.0.1
+      PORT=3000
+
+      # Backend API
+      API_BASE_URL=http://127.0.0.1:8000
+
+      # Static files
+      STATIC_DIR=/opt/pimeleon/ui
+  when: pimeleon_ui_files.stat.exists | default(false)
+
+# Create FastAPI systemd service
+- name: Create Pimeleon FastAPI systemd service
+  ansible.builtin.template:
+    src: pimeleon/pimeleon-api.service.j2
+    dest: /etc/systemd/system/pimeleon-api.service
+    mode: '0644'
+
+# Create Nitro proxy systemd service
+- name: Create Pimeleon Proxy systemd service
+  ansible.builtin.template:
+    src: pimeleon/pimeleon-proxy.service.j2
+    dest: /etc/systemd/system/pimeleon-proxy.service
+    mode: '0644'
+
+# NOTE: Service enablement happens in stage3-optimize.sh (outside Ansible chroot context)

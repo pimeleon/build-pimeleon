@@ -1,0 +1,85 @@
+---
+# DHCP Setup Task
+# Configures isc-dhcp-server for LAN and WiFi networks
+# Note: isc-dhcp-server installed in stage2-customize.sh
+
+- name: Create DHCP configuration directory
+  ansible.builtin.file:
+    path: /etc/dhcp
+    state: directory
+    mode: '0755'
+  when: services_enabled.dhcp_server | default(true)
+
+- name: Configure DHCP server defaults
+  ansible.builtin.template:
+    src: dhcp/isc-dhcp-server.j2
+    dest: /etc/default/isc-dhcp-server
+    mode: '0644'
+  when: services_enabled.dhcp_server | default(true)
+  notify: Restart isc-dhcp-server
+
+- name: Configure DHCP server
+  ansible.builtin.template:
+    src: dhcp/dhcpd.conf.j2
+    dest: /etc/dhcp/dhcpd.conf
+    mode: '0644'
+  when: services_enabled.dhcp_server | default(true)
+  notify: Restart isc-dhcp-server
+
+- name: Create DHCP lease directory
+  ansible.builtin.file:
+    path: /var/lib/dhcp
+    state: directory
+    mode: '0755'
+  when: services_enabled.dhcp_server | default(true)
+
+- name: Touch DHCP lease file
+  ansible.builtin.file:
+    path: /var/lib/dhcp/dhcpd.leases
+    state: touch
+    mode: '0644'
+  when: services_enabled.dhcp_server | default(true)
+
+- name: Enable DHCP server service
+  ansible.builtin.systemd:
+    name: isc-dhcp-server
+    enabled: true
+  when: services_enabled.dhcp_server | default(true)
+
+# Systemd override to ensure DHCP starts after hostapd creates wlan0
+- name: Create isc-dhcp-server systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/isc-dhcp-server.service.d
+    state: directory
+    mode: '0755'
+  when:
+    - services_enabled.dhcp_server | default(true)
+    - wifi_interface is defined
+
+- name: Configure isc-dhcp-server to start after hostapd
+  ansible.builtin.template:
+    src: dhcp/isc-dhcp-server.service.override.j2
+    dest: /etc/systemd/system/isc-dhcp-server.service.d/override.conf
+    mode: '0644'
+  when:
+    - services_enabled.dhcp_server | default(true)
+  notify:
+    - Reload systemd
+    - Restart isc-dhcp-server
+
+# DDNS configuration for BIND9 integration
+# Copy RNDC key to DHCP directory for DDNS integration
+- name: Copy RNDC key for DHCP-DNS integration
+  ansible.builtin.copy:
+    src: /etc/bind/rndc.key
+    dest: /etc/dhcp/rndc.key
+    remote_src: true
+    mode: '0640'
+    owner: root
+    group: root
+  when:
+    - services_enabled.dhcp_server | default(true)
+    - services_enabled.dns_server | default(true)
+  notify:
+    - Restart isc-dhcp-server
+    - Restart bind9

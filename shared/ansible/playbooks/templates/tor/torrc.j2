@@ -1,0 +1,43 @@
+# {{ ansible_managed }}
+# Tor configuration for Pimeleon router
+
+## Basic settings
+DataDirectory /var/lib/tor
+Log notice file /var/log/tor/notices.log
+
+## SOCKS proxy for applications
+SocksPort {{ tor.socks_port | default(9050) }} IsolateDestAddr IsolateDestPort
+SocksPolicy accept 192.168.0.0/16
+SocksPolicy accept 172.16.0.0/12
+SocksPolicy accept 10.0.0.0/8
+SocksPolicy reject *
+
+{% if tor.transparent_port is defined and tor.transparent_port %}
+## Transparent proxy (for iptables/nftables redirection)
+TransPort {{ tor.transparent_port }} IsolateClientAddr IsolateClientProtocol
+{% endif %}
+
+{% if tor.dns_port is defined and tor.dns_port %}
+## DNS resolution through Tor
+DNSPort {{ tor.dns_port }}
+AutomapHostsOnResolve 1
+AutomapHostsSuffixes .onion,.exit
+{% endif %}
+
+{% if tor.control_port is defined and tor.control_port %}
+## Control port (for Nyx, arm, or other controllers)
+ControlPort {{ tor.control_port }}
+CookieAuthentication 1
+{% endif %}
+
+## Security settings
+SafeSocks 1
+TestSocks 1
+WarnUnsafeSocks 1
+
+## Performance tuning
+AvoidDiskWrites 1
+DisableDebuggerAttachment 1
+
+## Exit policy (relay disabled by default - this is a client)
+ExitPolicy reject *:*

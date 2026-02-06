@@ -1,0 +1,33 @@
+# Network Optimization Service for Pimeleon
+# Implements CAKE QoS, txqueuelen tuning, and WiFi power management
+
+[Unit]
+Description=Network Optimization (CAKE QoS, txqueuelen, WiFi power)
+After=network.target hostapd.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Set high txqueuelen for better throughput
+ExecStartPre=/sbin/ifconfig {{ wan_interface | default('eth0') }} txqueuelen {{ txqueuelen | default(10000) }}
+ExecStartPre=-/sbin/ifconfig {{ wifi_interface | default('wlan0') }} txqueuelen {{ txqueuelen | default(10000) }}
+
+# Disable WiFi power save for better latency
+ExecStartPre=-/sbin/iw {{ wifi_interface | default('wlan0') }} set power_save off
+
+# Apply CAKE QoS to interfaces
+# - {{ wan_interface | default('eth0') }} (WAN): {{ wan_bandwidth | default('200mbit') }}
+# - {{ wifi_interface | default('wlan0') }} (WiFi): {{ wifi_bandwidth | default('40mbit') }}
+# Options: diffserv3 triple-isolate for fair bandwidth sharing
+ExecStart=/bin/bash -c "sleep 5 && \
+  /sbin/tc qdisc replace dev {{ wan_interface | default('eth0') }} root cake bandwidth {{ wan_bandwidth | default('200mbit') }} diffserv3 triple-isolate nonat nowash no-ack-filter split-gso rtt 100ms && \
+  /sbin/tc qdisc replace dev {{ wifi_interface | default('wlan0') }} root cake bandwidth {{ wifi_bandwidth | default('40mbit') }} diffserv3 triple-isolate nonat nowash no-ack-filter split-gso rtt 100ms"
+
+ExecReload=/bin/bash -c "\
+  /sbin/tc qdisc replace dev {{ wan_interface | default('eth0') }} root cake bandwidth {{ wan_bandwidth | default('200mbit') }} diffserv3 triple-isolate nonat nowash no-ack-filter split-gso rtt 100ms && \
+  /sbin/tc qdisc replace dev {{ wifi_interface | default('wlan0') }} root cake bandwidth {{ wifi_bandwidth | default('40mbit') }} diffserv3 triple-isolate nonat nowash no-ack-filter split-gso rtt 100ms"
+
+[Install]
+WantedBy=multi-user.target

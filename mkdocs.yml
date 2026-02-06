@@ -1,6 +1,9 @@
+---
 site_name: Pimeleon Documentation
-site_url: https://docs.pimeleon.com
-site_description: Comprehensive documentation for the Pimeleon build system - a Docker-based ARM cross-compilation environment for creating custom Raspberry Pi router images
+site_url: https://docs.pimeleon.org
+site_description: >-
+  Comprehensive documentation for the Pimeleon build system - a Docker-based
+  ARM cross-compilation environment for creating custom Raspberry Pi router images
 site_author: Pimeleon
 repo_url: https://github.com/yourusername/pimeleon
 repo_name: pimeleon
@@ -139,40 +142,40 @@ nav:
   - Home: index.md
 
   - Getting Started:
-    - getting-started/index.md
-    - Prerequisites: getting-started/prerequisites.md
-    - First Build: getting-started/first-build.md
+      - getting-started/index.md
+      - Prerequisites: getting-started/prerequisites.md
+      - First Build: getting-started/first-build.md
 
   - User Guides:
-    - Building Images: guides/building-images.md
-    - Customization: guides/customization.md
-    - Performance Optimization: guides/performance.md
-    - Troubleshooting: guides/troubleshooting.md
+      - Building Images: guides/building-images.md
+      - Customization: guides/customization.md
+      - Performance Optimization: guides/performance.md
+      - Troubleshooting: guides/troubleshooting.md
 
   - Architecture:
-    - Overview: architecture/overview.md
-    - Containers: architecture/containers.md
-    - Build Pipeline: architecture/build-pipeline.md
-    - Network Design: architecture/networking.md
-    - Multi-Platform Strategy: architecture/multi-platform-strategy.md
-    - Hardware Profiles: architecture/hardware-profiles.md
-    - Migration Roadmap: architecture/migration-roadmap.md
+      - Overview: architecture/overview.md
+      - Containers: architecture/containers.md
+      - Build Pipeline: architecture/build-pipeline.md
+      - Network Design: architecture/networking.md
+      - Multi-Platform Strategy: architecture/multi-platform-strategy.md
+      - Hardware Profiles: architecture/hardware-profiles.md
+      - Migration Roadmap: architecture/migration-roadmap.md
 
   - Platforms:
-    - Overview: platforms/README.md
-    - Raspberry Pi 3B+: platforms/raspberrypi/3b-plus.md
-    - Raspberry Pi 4B: platforms/raspberrypi/4b.md
+      - Overview: platforms/README.md
+      - Raspberry Pi 3B+: platforms/raspberrypi/3b-plus.md
+      - Raspberry Pi 4B: platforms/raspberrypi/4b.md
 
   - Reference:
-    - CLI Commands: reference/cli-commands.md
-    - Environment Variables: reference/environment-variables.md
-    - Configuration Files: reference/configuration-files.md
-    - Ansible Playbooks: reference/ansible-playbooks.md
+      - CLI Commands: reference/cli-commands.md
+      - Environment Variables: reference/environment-variables.md
+      - Configuration Files: reference/configuration-files.md
+      - Ansible Playbooks: reference/ansible-playbooks.md
 
   - Contributing:
-    - Development Setup: contributing/development.md
-    - Testing: contributing/testing.md
-    - Adding Platforms: contributing/adding-platforms.md
+      - Development Setup: contributing/development.md
+      - Testing: contributing/testing.md
+      - Adding Platforms: contributing/adding-platforms.md
 
 # Copyright
 copyright: Copyright &copy; 2024 Pimeleon - All rights reserved

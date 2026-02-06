@@ -1,0 +1,30 @@
+# {{ ansible_managed }}
+# Pimeleon First Boot Setup Wizard
+# Runs on first boot if user is on console (tty1)
+# If not run, default config applies: AP on wlan0 + DHCP client on eth0
+
+[Unit]
+Description=Pimeleon First Boot Setup Wizard
+After=multi-user.target getty@tty1.service firstboot.service
+Wants=getty@tty1.service
+Requires=firstboot.service
+ConditionPathExists=!/var/lib/pimeleon/.setup-complete
+# Only run if tty1 is available (HDMI connected)
+ConditionPathExists=/dev/tty1
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/pim-setup
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+RemainAfterExit=yes
+# Allow boot to continue if setup times out or fails
+TimeoutStartSec=300
+SuccessExitStatus=0 1
+
+[Install]
+WantedBy=multi-user.target

@@ -67,6 +67,7 @@ docker compose build
     This takes 5-10 minutes on first run, using layer caching on subsequent builds.
 
 **Expected output:**
+
 ```
 [+] Building 324.5s (45/45) FINISHED
  => [builder internal] load build definition
@@ -100,7 +101,7 @@ Now create your first Pimeleon image:
 
     ```bash
     export DOCKER_BUILDKIT=1
-    export APT_CACHE_SERVER=192.168.76.5
+    export APT_CACHE_SERVER=192.168.42.5
     export RASPBIAN_MIRROR=http://archive.raspbian.org/raspbian/
 
     docker compose run --rm builder
@@ -115,7 +116,7 @@ Now create your first Pimeleon image:
     export PIMELEON_RPI_MODEL=3B+
     export PIMELEON_IMAGE_SIZE=8G
     export PIMELEON_INITIAL_PASSWORD=mysecurepassword
-    export APT_CACHE_SERVER=192.168.76.5
+    export APT_CACHE_SERVER=192.168.42.5
     export RASPBIAN_MIRROR=http://archive.raspbian.org/raspbian/
 
     docker compose run --rm builder
@@ -198,7 +199,8 @@ pimeleon : ok=42   changed=38   unreachable=0    failed=0
 ```
 
 !!! info "Why disabled?"
-    Stages 3 and 4 are implemented but disabled in `build.sh` to speed up development. They can be enabled by uncommenting lines 55-61 in `containers/builder/scripts/build.sh`.
+    Stages 3 and 4 are implemented but disabled in `build.sh` to speed up development.
+    They can be enabled by uncommenting lines 55-61 in `containers/builder/scripts/build.sh`.
 
 #### Build Complete
 
@@ -293,8 +295,8 @@ graph LR
 | Interface | Configuration |
 |-----------|--------------|
 | **bond0** (WAN) | DHCP, bonded eth0+eth1 |
-| **eth1** (LAN) | Static 192.168.76.1/24 |
-| **wlan0** (WiFi AP) | Static 192.168.77.1/24, SSID: pimeleon |
+| **eth1** (LAN) | Static 192.168.42.1/24 |
+| **wlan0** (WiFi AP) | Static 192.168.42.1/24, SSID: pimeleon |
 
 #### Security Features
 
@@ -335,10 +337,10 @@ SSH into your new router:
 
 ```bash
 # Via LAN
-ssh pi@192.168.76.1
+ssh pi@192.168.42.1
 
 # Via WiFi
-ssh pi@192.168.77.1
+ssh pi@192.168.42.1
 ```
 
 Use the password from `output/pi-initial-password.txt` or your SSH key.
@@ -406,7 +408,7 @@ sudo systemctl restart docker
 
 ```bash
 # Check if cache server is running
-curl http://192.168.76.5:3142
+curl http://192.168.42.5:3142
 
 # If not working, build without cache:
 unset APT_CACHE_SERVER
@@ -428,25 +430,25 @@ Now you can:
 
 <div class="grid cards" markdown>
 
--   **Customize the build**
+- **Customize the build**
 
     Learn how to modify network config, add packages, customize services
 
     [:octicons-arrow-right-24: Customization Guide](../guides/customization.md)
 
--   **Optimize builds**
+- **Optimize builds**
 
     Set up caching, enable all stages, reduce build times
 
     [:octicons-arrow-right-24: Performance Guide](../guides/performance.md)
 
--   **Understand the architecture**
+- **Understand the architecture**
 
     Deep dive into containers, build pipeline, networking
 
     [:octicons-arrow-right-24: Architecture](../architecture/overview.md)
 
--   **Extend functionality**
+- **Extend functionality**
 
     Add custom services, integrate with other systems
 

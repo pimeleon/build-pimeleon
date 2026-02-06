@@ -1,0 +1,23 @@
+[Unit]
+Description=ngrok tunnel service
+After=network.target
+Documentation=https://ngrok.com/docs
+
+[Service]
+Type=simple
+User=pim-ngrok
+Group=pim
+WorkingDirectory=/var/lib/ngrok
+ExecStart=/usr/local/bin/ngrok http 3000 --config /var/lib/ngrok/ngrok.yml
+Restart=on-failure
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/ngrok
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,224 @@
+---
+# Security hardening tasks for Pimeleon
+- name: Configure SSH security
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+    - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication yes' }
+    - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+    - { regexp: '^#?PermitEmptyPasswords', line: 'PermitEmptyPasswords no' }
+    - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
+    - { regexp: '^#?ClientAliveInterval', line: 'ClientAliveInterval 300' }
+    - { regexp: '^#?ClientAliveCountMax', line: 'ClientAliveCountMax 2' }
+    - { regexp: '^#?Protocol', line: 'Protocol 2' }
+    - { regexp: '^#?AllowUsers', line: 'AllowUsers pim' }
+  notify: Restart SSH
+
+- name: Configure fail2ban
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      [DEFAULT]
+      bantime = 3600
+      findtime = 600
+      maxretry = 3
+
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 3
+
+      [nftables-common]
+      enabled = true
+      port = all
+      protocol = all
+      filter = nftables-common
+      logpath = /var/log/syslog
+      maxretry = 5
+    mode: '0644'
+
+- name: Install security packages (all platforms)
+  ansible.builtin.apt:
+    name:
+      - fail2ban
+      - unattended-upgrades
+      - apt-listchanges
+    state: present
+
+# rkhunter excluded on RPi3 due to CPU-intensive scans
+- name: Install rkhunter (RPi4+ only)
+  ansible.builtin.apt:
+    name:
+      - rkhunter
+    state: present
+  when: platform_model is defined and platform_model != "3B+"
+
+- name: Configure rkhunter (RPi4+ only)
+  ansible.builtin.copy:
+    dest: /etc/rkhunter.conf.local
+    mode: '0640'
+    content: |
+      # Pimeleon rkhunter configuration
+      # Local overrides for embedded router environment
+
+      # Update mirrors
+      UPDATE_MIRRORS=1
+      MIRRORS_MODE=0
+      WEB_CMD=wget
+
+      # Mail settings (disabled - use logs instead)
+      MAIL-ON-WARNING=""
+
+      # Logging
+      USE_SYSLOG=authpriv.warning
+      LOGFILE=/var/log/rkhunter.log
+
+      # Allow script replacements during updates
+      SCRIPTWHITELIST=/usr/bin/egrep
+      SCRIPTWHITELIST=/usr/bin/fgrep
+      SCRIPTWHITELIST=/usr/bin/which
+      SCRIPTWHITELIST=/usr/bin/ldd
+
+      # Allow /dev/.udev for systemd
+      ALLOWDEVDIR=/dev/.udev
+      ALLOWDEVDIR=/dev/shm
+
+      # Whitelist expected hidden directories
+      ALLOWHIDDENDIR=/etc/.java
+      ALLOWHIDDENDIR=/dev/.lxc
+
+      # Disable checks not suitable for embedded/router
+      DISABLE_TESTS=suspscan hidden_ports hidden_procs deleted_files packet_cap_apps apps
+
+      # SSH root login is disabled via sshd_config
+      ALLOW_SSH_ROOT_USER=no
+
+      # Whitelist expected network-facing processes
+      PORT_WHITELIST="/usr/sbin/dnsmasq"
+      PORT_WHITELIST="/usr/sbin/sshd"
+      PORT_WHITELIST="/usr/sbin/hostapd"
+      PORT_WHITELIST="/usr/sbin/dhcpd"
+  when: platform_model is defined and platform_model != "3B+"
+
+- name: Configure rkhunter defaults (RPi4+ only)
+  ansible.builtin.lineinfile:
+    path: /etc/default/rkhunter
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^CRON_DAILY_RUN=', line: 'CRON_DAILY_RUN="false"' }
+    - { regexp: '^CRON_DB_UPDATE=', line: 'CRON_DB_UPDATE="true"' }
+    - { regexp: '^APT_AUTOGEN=', line: 'APT_AUTOGEN="true"' }
+    - { regexp: '^DB_UPDATE_EMAIL=', line: 'DB_UPDATE_EMAIL="false"' }
+  when: platform_model is defined and platform_model != "3B+"
+
+- name: Create weekly rkhunter scan cron job (RPi4+ only)
+  ansible.builtin.copy:
+    dest: /etc/cron.weekly/rkhunter-scan
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      # Weekly rkhunter scan for Pimeleon
+      # Runs quietly, logs warnings to syslog
+
+      /usr/bin/rkhunter --check --skip-keypress --quiet --report-warnings-only
+  when: platform_model is defined and platform_model != "3B+"
+
+- name: Enable automatic security updates (APT::Periodic)
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::Download-Upgradeable-Packages "1";
+      APT::Periodic::AutocleanInterval "7";
+    mode: '0644'
+
+- name: Configure unattended-upgrades policy
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    content: |
+      // Security updates only - safe for router/gateway
+      Unattended-Upgrade::Allowed-Origins {
+          "${distro_id}:${distro_codename}";
+          "${distro_id}:${distro_codename}-security";
+          "${distro_id}ESM:${distro_codename}-infra-security";
+          "Raspbian:${distro_codename}";
+          "Raspberry Pi Foundation:${distro_codename}";
+      };
+
+      // Packages to never update automatically (critical services)
+      Unattended-Upgrade::Package-Blacklist {
+          // "linux-image*";
+          // "linux-headers*";
+      };
+
+      // Behavior settings
+      Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+      Unattended-Upgrade::MinimalSteps "true";
+      Unattended-Upgrade::InstallOnShutdown "false";
+
+      // Cleanup
+      Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+      Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
+      Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+      // NEVER auto-reboot a router/gateway
+      Unattended-Upgrade::Automatic-Reboot "false";
+      Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
+
+      // Logging
+      Unattended-Upgrade::SyslogEnable "true";
+      Unattended-Upgrade::SyslogFacility "daemon";
+    mode: '0644'
+
+- name: Set secure file permissions
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    mode: "{{ item.mode }}"
+    owner: root
+    group: root
+  loop:
+    - { path: '/etc/passwd', mode: '0644' }
+    - { path: '/etc/shadow', mode: '0640' }
+    - { path: '/etc/group', mode: '0644' }
+    - { path: '/etc/gshadow', mode: '0640' }
+    - { path: '/etc/ssh/sshd_config', mode: '0600' }
+
+- name: Disable unnecessary services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - bluetooth
+    - avahi-daemon
+  failed_when: false
+
+- name: Create security report script
+  ansible.builtin.copy:
+    dest: /usr/local/bin/security-check.sh
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      echo "Pimeleon Security Check - $(date)"
+      echo "================================"
+      echo
+      echo "Failed login attempts:"
+      grep "Failed password" /var/log/auth.log | tail -10
+      echo
+      echo "Active connections:"
+      ss -tunap | grep ESTABLISHED
+      echo
+      echo "Firewall statistics:"
+      nft list ruleset | grep -E "counter|drop"
+      echo
+      echo "System updates:"
+      apt list --upgradable 2>/dev/null | grep -v "Listing"

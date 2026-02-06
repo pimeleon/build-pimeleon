@@ -1,0 +1,42 @@
+---
+# Raspberry Pi 4 Model B specific configuration
+
+platform_model: "4B"
+display_name: "Raspberry Pi 4 Model B"
+
+# Hardware specs
+architecture: "arm64"
+soc: "BCM2711"
+cpu_cores: 4
+cpu_freq_default: 1500
+cpu_freq_max: 1800
+ram_mb: 4096
+
+# Device tree
+device_tree: "bcm2711-rpi-4-b.dtb"
+device_tree_overlays:
+  - "vc4-kms-v3d"
+
+# Network performance (true Gigabit)
+ethernet_available: true
+ethernet_max_speed_mbps: 1000
+wifi_max_speed_mbps: 150
+
+# USB 3.0 support
+usb3_enabled: true
+
+# config.txt parameters
+config_txt:
+  enable_uart: 1
+  dtparam_spi: "on"
+  dtparam_i2c: "on"
+  dtparam_i2s: "on"
+  gpu_mem: 256
+  arm_freq: 1800
+  over_voltage: 4
+  max_usb_current: 1
+
+# hostapd WiFi capabilities (improved)
+hostapd_ht_capab: "[HT40+][HT40-][SHORT-GI-20][SHORT-GI-40][DSSS_CCK-40]"
+hostapd_vht_enabled: true
+hostapd_max_sta: 20

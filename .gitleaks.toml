@@ -9,6 +9,11 @@ useDefault = true
 # Allow certain paths (based on .gitignore)
 [allowlist]
 description = "Global allowlist"
+regexTarget = "match"
+regexes = [
+  # DNSCrypt-proxy minisign public verification key (not a secret)
+  '''minisign_key\s*=\s*['"]RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3['"]''',
+]
 paths = [
   # Example files
   '''\.env\.example$''',

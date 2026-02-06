@@ -1,0 +1,26 @@
+[Unit]
+Description=Pimeleon FastAPI Server
+After=network.target
+
+[Service]
+Type=simple
+User=pim-api
+Group=pim
+WorkingDirectory=/opt/pimeleon/api
+Environment=PYTHONUNBUFFERED=1
+Environment=DEBIAN_FRONTEND=noninteractive
+EnvironmentFile=-/opt/pimeleon/api/.env
+ExecStart=/opt/pimeleon/api/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=90
+TimeoutStopSec=30
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/pimeleon/data /opt/pimeleon/plugins /var/log/pimeleon
+
+[Install]
+WantedBy=multi-user.target
