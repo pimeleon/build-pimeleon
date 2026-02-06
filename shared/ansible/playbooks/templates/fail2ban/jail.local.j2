@@ -10,13 +10,12 @@ findtime = {{ fail2ban_findtime | default(600) }}
 maxretry = {{ fail2ban_maxretry | default(3) }}
 
 # Ignore local networks
-ignoreip = 127.0.0.1/8 {{ wifi_ap_network }}
+ignoreip = 127.0.0.1/8 {{ default_subnet }}
 
 # Backend settings
 backend = auto
 usedns = warn
 logencoding = auto
-allowipv6 = auto
 enabled = false
 
 # Use nftables for banning

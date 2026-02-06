@@ -1,6 +1,7 @@
 # Getting Started
 
-Welcome to the Pimeleon Build System! This guide will help you build your first custom Raspberry Pi router image in just a few minutes.
+Welcome to the Pimeleon Build System! This guide will help you build your first
+custom Raspberry Pi router image in just a few minutes.
 
 ## What You'll Build
 
@@ -83,7 +84,7 @@ Run the builder to create a Pimeleon image:
 
     ```bash
     export DOCKER_BUILDKIT=1
-    export APT_PROXY=192.168.76.5:3142    # Your cache server (host:port)
+    export APT_CACHE_SERVER=192.168.42.5  # Your cache server IP
     export RASPBIAN_MIRROR=http://archive.raspbian.org/raspbian/
 
     docker compose run --rm builder
@@ -195,10 +196,10 @@ Once booted, access via SSH:
 ssh pi@172.16.0.1
 
 # Via LAN interface
-ssh pi@192.168.76.1
+ssh pi@192.168.42.1
 
 # Via WiFi AP interface
-ssh pi@192.168.77.1
+ssh pi@192.168.42.1
 ```
 
 Use the SSH key you configured during build, or the password from `output/pi-initial-password.txt`.
@@ -207,7 +208,7 @@ Use the SSH key you configured during build, or the password from `output/pi-ini
 
 <div class="grid cards" markdown>
 
--   :material-file-document-edit:{ .lg .middle } __Customize Your Build__
+- :material-file-document-edit:{ .lg .middle } **Customize Your Build**
 
     ---
 
@@ -215,7 +216,7 @@ Use the SSH key you configured during build, or the password from `output/pi-ini
 
     [:octicons-arrow-right-24: Customization Guide](../guides/customization.md)
 
--   :material-speedometer:{ .lg .middle } __Optimize Performance__
+- :material-speedometer:{ .lg .middle } **Optimize Performance**
 
     ---
 
@@ -223,7 +224,7 @@ Use the SSH key you configured during build, or the password from `output/pi-ini
 
     [:octicons-arrow-right-24: Performance Guide](../guides/performance.md)
 
--   :material-bug:{ .lg .middle } __Troubleshooting__
+- :material-bug:{ .lg .middle } **Troubleshooting**
 
     ---
 
@@ -231,7 +232,7 @@ Use the SSH key you configured during build, or the password from `output/pi-ini
 
     [:octicons-arrow-right-24: Troubleshooting](../guides/troubleshooting.md)
 
--   :material-book-open-variant:{ .lg .middle } __Deep Dive__
+- :material-book-open-variant:{ .lg .middle } **Deep Dive**
 
     ---
 
@@ -256,7 +257,7 @@ export PIMELEON_RPI_MODEL=3B+               # Pi model (3B+, 4, Zero W)
 export PIMELEON_IMAGE_SIZE=4G               # Image size (4G, 8G)
 
 # Network optimization
-export APT_CACHE_SERVER=192.168.76.5        # APT cache proxy
+export APT_CACHE_SERVER=192.168.42.5        # APT cache proxy
 export APT_CACHE_PORT=3142                  # Cache port
 export RASPBIAN_MIRROR=http://archive.raspbian.org/raspbian/
 

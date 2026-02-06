@@ -5,10 +5,8 @@
 Name={{ wifi_interface | default('wlan0') }}
 
 [Network]
-Address={{ wifi_ap_ip | default('192.168.42.1') }}/{{ wifi_ap_netmask_cidr | default('24') }}
+Address={{ default_ip }}/{{ default_netmask_cidr }}
 {% if ipv6_enabled | default(true) %}
 Address={{ wifi_ipv6 | default('fd00:1:42::1') }}/64
 IPForward=ipv6
 {% endif %}
-# Assign static IP before hostapd brings up carrier (avoids chicken-and-egg)
-ConfigureWithoutCarrier=yes

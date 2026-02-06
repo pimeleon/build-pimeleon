@@ -44,7 +44,7 @@ jobs:
         continue-on-error: true
 
       - name: Lint Ansible playbooks
-        run: ansible-lint ansible/playbooks/*.yml
+        run: ansible-lint shared/ansible/playbooks/*.yml
         continue-on-error: true
 
       - name: Lint shell scripts
@@ -88,7 +88,7 @@ jobs:
       - name: Build builder container
         uses: docker/build-push-action@v5
         with:
-          context: ./containers/builder
+          context: ./shared/containers/builder
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/builder:latest
           cache-from: type=gha
@@ -98,14 +98,16 @@ jobs:
         run: |
           docker run --rm \
             --privileged \
+            -v ${{ github.workspace }}:/workspace:ro \
             -v ${{ github.workspace }}/output:/output \
             -v ${{ github.workspace }}/cache:/cache \
             -v ${{ github.workspace }}/configs:/configs \
-            -v ${{ github.workspace }}/ansible:/ansible \
-            -e BUILD_CACHE_DIR=/cache \
+            -v ${{ github.workspace }}/shared/ansible:/ansible:ro \
+            -v ${{ github.workspace }}/shared/scripts:/scripts:ro \
+            -e WORKSPACE_DIR=/workspace \
+            -e CACHE_DIR=/cache \
             -e OUTPUT_DIR=/output \
-            -e RPI_MODEL=3B+ \
-            -e RASPBIAN_VERSION=bookworm \
+            -e TARGET_PLATFORM=rpi3-bookworm \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/builder:latest
 
       - name: Upload build artifacts
@@ -164,7 +166,7 @@ jobs:
       - name: Build test container
         uses: docker/build-push-action@v5
         with:
-          context: ./containers/tester
+          context: ./shared/containers/tester
           load: true
           tags: pimeleon-tester:latest
 

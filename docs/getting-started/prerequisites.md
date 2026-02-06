@@ -40,7 +40,8 @@ Before building Pimeleon images, ensure your system meets the following requirem
 - ❌ Old Linux kernels (< 5.0)
 
 !!! warning "WSL2 Limitations"
-    While WSL2 technically works, ARM emulation performance is poor and builds may fail randomly. Native Linux is strongly recommended.
+    While WSL2 technically works, ARM emulation performance is poor and builds may fail
+    randomly. Native Linux is strongly recommended.
 
 ### Docker
 
@@ -146,7 +147,9 @@ docker run --rm arm32v7/alpine uname -m
 ```
 
 !!! info "How It Works"
-    The `binfmt-support` package registers ARM binary formats with the kernel, and `qemu-user-static` provides the ARM emulator. When you try to run an ARM binary on x86, the kernel automatically invokes QEMU to execute it.
+    The `binfmt-support` package registers ARM binary formats with the kernel, and
+    `qemu-user-static` provides the ARM emulator. When you try to run an ARM binary on x86,
+    the kernel automatically invokes QEMU to execute it.
 
 ### Git
 
@@ -293,11 +296,13 @@ Save as `check-prereqs.sh`, make executable with `chmod +x check-prereqs.sh`, an
 ### Docker Permission Denied
 
 **Symptom:**
+
 ```
 permission denied while trying to connect to the Docker daemon socket
 ```
 
 **Solution:**
+
 ```bash
 # Add user to docker group
 sudo usermod -aG docker $USER
@@ -309,11 +314,13 @@ newgrp docker
 ### ARM Emulation Not Working
 
 **Symptom:**
+
 ```
 exec user process caused: exec format error
 ```
 
 **Solution:**
+
 ```bash
 # Reinstall QEMU and binfmt
 sudo apt install --reinstall binfmt-support qemu-user-static
@@ -325,11 +332,13 @@ sudo systemctl restart docker
 ### Insufficient Disk Space
 
 **Symptom:**
+
 ```
 no space left on device
 ```
 
 **Solution:**
+
 ```bash
 # Clean Docker system
 docker system prune -a

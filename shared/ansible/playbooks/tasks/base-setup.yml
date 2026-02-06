@@ -10,12 +10,6 @@
     mode: '0755'
   when: config_txt is defined
 
-- name: Remove deprecated elevator= kernel parameter from cmdline.txt
-  ansible.builtin.replace:
-    path: /boot/cmdline.txt
-    regexp: ' ?elevator=\S+'
-    replace: ''
-
 - name: Set system hostname
   ansible.builtin.hostname:
     name: pimeleon
@@ -39,6 +33,7 @@
       - dhcpcd5
       - dhcpcd-base
       - ifupdown
+      - network-manager
     state: absent
     purge: true
 
@@ -54,32 +49,15 @@
     dest: /etc/sysctl.d/90-pimeleon.conf
     content: |
       # Pimeleon Router sysctl configuration
-      # Ported from production 'gw' host
-
-      # Kernel logging (reduce console spam)
-      kernel.printk = 3 4 1 3
-
-      # Memory management
-      vm.min_free_kbytes = 16384
+      # Applied at boot time
 
       # IPv4 forwarding
       net.ipv4.ip_forward = 1
 
-      # Network device queue settings (high throughput)
-      net.core.netdev_max_backlog = 30000
-      net.core.netdev_budget = 600
-      net.core.dev_weight = 64
-
-      # Large socket buffers for throughput
-      net.core.rmem_default = 1048576
-      net.core.rmem_max = 4194304
-      net.core.wmem_default = 1048576
-      net.core.wmem_max = 4194304
-
-      # IPv6 forwarding disabled globally; wlan0 forwarding set by systemd-networkd
-      # (IPForward=ipv6 in 10-wlan0.network) when the interface appears
+      # IPv6 - disable global forwarding, enable per-interface for WiFi only
       net.ipv6.conf.all.forwarding = 0
       net.ipv6.conf.default.forwarding = 0
+      net.ipv6.conf.{{ wifi_interface | default('wlan0') }}.forwarding = 1
 
       # IPv6 - disable on WAN interface (eth0)
       net.ipv6.conf.{{ wan_interface | default('eth0') }}.disable_ipv6 = 1
@@ -174,13 +152,46 @@
     name: whiptail
     state: present
 
+# Deploy pim-setup first-boot wizard
+# Default config (if wizard not run): AP on wlan0 + DHCP client on eth0
+- name: Deploy pim-setup first-boot wizard
+  ansible.builtin.copy:
+    src: /configs/scripts/pim-setup
+    dest: /usr/local/bin/pim-setup
+    mode: '0755'
+    owner: root
+    group: root
+
 - name: Create pimeleon directory
   ansible.builtin.file:
     path: /var/lib/pimeleon
     state: directory
     mode: '0755'
 
+- name: Deploy pim-setup systemd service
+  ansible.builtin.template:
+    src: pimeleon/pim-setup.service.j2
+    dest: /etc/systemd/system/pim-setup.service
+    mode: '0644'
+
 # Note: Service enablement happens in stage3-optimize.sh (outside chroot)
+
+# Configure nano editor system-wide
+- name: Configure nano editor
+  ansible.builtin.copy:
+    dest: /etc/nanorc
+    mode: '0644'
+    content: |
+      # Pimeleon nano configuration
+      set tabsize 2
+      set tabstospaces
+      set linenumbers
+      set constantshow
+
+      # Include default syntax highlighting
+      include "/usr/share/nano/*.nanorc"
+
+# Note: Base packages installed in stage2-customize.sh
 # These tasks are kept for non-chroot deployments (e.g., direct Ansible runs)
 # Packages: htop, iotop, tcpdump, dnsutils, iputils-ping, traceroute, vim
 #           hostapd, nftables, bridge-utils, wireless-tools, isc-dhcp-server

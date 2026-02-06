@@ -2,76 +2,89 @@
 # Resolve the current version for a specific platform with Auto-Bump logic
 # Usage: get-next-version.sh [platform]
 #
-# POSIX sh compatible
+# POSIX sh compatible - works in Alpine/BusyBox environments
 
 set -eu
 
 get_next_version() {
     platform="${1:-}"
-    version_file="apps/${platform}/VERSION"
-    base_version=""
+    current_tag=""
 
-    # 1. Resolve base version from VERSION file
-    if [ -f "$version_file" ]; then
-        base_version=$(tr -d '[:space:]' < "$version_file")
-    else
-        # Fallback to latest tag if file missing
-        current_tag=$(git tag -l "${platform}-v*" "v*-${platform}" --sort=-v:refname 2>/dev/null | head -1 || echo "")
-        if [ -n "$current_tag" ]; then
-            base_version=$(echo "$current_tag" | sed "s/^${platform}-v//; s/^v//; s/-${platform}\$//")
-        else
-            base_version="0.1.0"
-        fi
+    # Find latest tag for this platform (or any tag if no platform)
+    if [ -n "$platform" ]; then
+        current_tag=$(git tag -l "*-${platform}" --sort=-v:refname 2>/dev/null | head -1) || current_tag=""
+    fi
+    # Legacy fallback: v{version}-{platform} or plain v{version}
+    if [ -z "$current_tag" ] && [ -n "$platform" ]; then
+        current_tag=$(git tag -l "*-${platform}" --sort=-v:refname 2>/dev/null | head -1) || current_tag=""
+    fi
+    if [ -z "$current_tag" ]; then
+        current_tag=$(git describe --tags --abbrev=0 2>/dev/null) || current_tag=""
     fi
 
-    # 2. Skip or Bump logic
-    # Minor bump: feat: or refactor: commits touching build paths (including docker-compose.yml)
-    # Patch bump: fix:/build:/perf: or untagged commits touching build paths
-    # No bump:   docs:/chore:/ci:/style:/test: commits (service commits, never trigger rebuild)
+    if [ -z "$current_tag" ]; then
+        echo "0.1.0"
+        return
+    fi
 
-    # Find the commit where the version was last set
-    last_version_commit=$(git log -1 --format=%H -- "$version_file" 2>/dev/null || git rev-list --max-parents=0 HEAD)
+    # Strip v prefix and platform suffix for parsing
+    base_version=$(echo "$current_tag" | sed 's/^v//')
+    if [ -n "$platform" ]; then
+        base_version=$(echo "$base_version" | sed "s/-${platform}\$//")
+    fi
 
     major=$(echo "$base_version" | cut -d. -f1)
     minor=$(echo "$base_version" | cut -d. -f2)
     patch=$(echo "$base_version" | cut -d. -f3)
 
-    # Count minor-bump commits: feat: or refactor: touching build paths
-    minor_commits=$(git log "$last_version_commit"..HEAD \
-        --format="%s" \
-        -- \
-        "apps/${platform}/" \
-        "shared/ansible/" \
-        "shared/configs/" \
-        "shared/scripts/" \
-        "docker-compose.yml" \
-        "requirements.txt" \
-        2>/dev/null \
-        | grep -cE "^(feat|refactor)(\([^)]*\))?!?:" || true)
+    # Handle missing version components
+    major="${major:-0}"
+    minor="${minor:-0}"
+    patch="${patch:-0}"
 
-    # Count patch-bump commits: anything not service and not minor touching build paths
-    patch_commits=$(git log "$last_version_commit"..HEAD \
-        --format="%s" \
-        -- \
-        "apps/${platform}/" \
-        "shared/ansible/" \
-        "shared/configs/" \
-        "shared/scripts/" \
-        "docker-compose.yml" \
-        "requirements.txt" \
-        2>/dev/null \
-        | grep -cvE "^(docs|chore|ci|style|test|feat|refactor)(\([^)]*\))?!?:" || true)
+    # Analyze commits since last tag
+    has_breaking=false
+    has_feat=false
+    has_fix=false
 
-    if [ "${minor_commits}" -gt 0 ]; then
-        # Feature or refactor -> MINOR bump, reset patch
-        echo "${major}.$((minor + 1)).0"
-    elif [ "${patch_commits}" -gt 0 ]; then
-        # Fix/build/perf or untagged -> PATCH bump
-        echo "${major}.${minor}.$((patch + 1))"
-    else
-        # Service commits only -> Return stable version for SKIP
-        echo "${base_version}"
-    fi
+    # Use pipe instead of process substitution for POSIX compatibility
+    git log "$current_tag"..HEAD --format=%s 2>/dev/null | while IFS= read -r msg; do
+        [ -z "$msg" ] && continue
+        if echo "$msg" | grep -qE "^[a-z]+(\(.+\))?!:"; then
+            echo "BREAKING"
+        elif echo "$msg" | grep -qE "^feat(\(.+\))?:"; then
+            echo "FEAT"
+        elif echo "$msg" | grep -qE "^(fix|perf|refactor)(\(.+\))?:"; then
+            echo "FIX"
+        fi
+    done | {
+        # Read commit types from pipe
+        while IFS= read -r commit_type; do
+            case "$commit_type" in
+                BREAKING) has_breaking=true ;;
+                FEAT) has_feat=true ;;
+                FIX) has_fix=true ;;
+            esac
+        done
+
+        # Bump version based on conventional commits
+        if [ "$has_breaking" = true ]; then
+            major=$((major + 1))
+            minor=0
+            patch=0
+        elif [ "$has_feat" = true ]; then
+            minor=$((minor + 1))
+            patch=0
+        elif [ "$has_fix" = true ]; then
+            patch=$((patch + 1))
+        else
+            # No releasable commits - use current + dev suffix
+            echo "${major}.${minor}.${patch}-dev"
+            return
+        fi
+
+        echo "${major}.${minor}.${patch}"
+    }
 }
 
 case "$0" in

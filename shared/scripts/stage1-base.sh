@@ -4,12 +4,10 @@ set -euo pipefail
 # Stage 1: Create base system
 # Creates the base Raspbian image with partitions
 
-# shellcheck disable=SC1091
-# shellcheck disable=SC1091
 source /scripts/common.sh
 
 # Setup cleanup trap for error handling
-trap 'cleanup_on_exit' EXIT ERR INT TERM
+trap cleanup_on_exit EXIT ERR INT
 
 WORK_DIR=$1
 IMAGE_PATH=$2
@@ -34,7 +32,7 @@ log_info "Creating ${SIZE_MB}MB image file"
 
 # Ensure output directory exists and has proper permissions
 mkdir -p "$(dirname "${IMAGE_PATH}")"
-sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "$(dirname "${IMAGE_PATH}")"
+sudo chown builder:docker "$(dirname "${IMAGE_PATH}")"
 
 # Create sparse image file
 if ! truncate -s "${IMAGE_SIZE}" "${IMAGE_PATH}"; then
@@ -69,8 +67,8 @@ CLEANUP_LOOP_DEVICE="${LOOP_DEVICE}"
 sudo kpartx -av "${LOOP_DEVICE}"
 sleep 2
 
-BOOT_PART="/dev/mapper/$(basename "${LOOP_DEVICE}")p1"
-ROOT_PART="/dev/mapper/$(basename "${LOOP_DEVICE}")p2"
+BOOT_PART="/dev/mapper/$(basename ${LOOP_DEVICE})p1"
+ROOT_PART="/dev/mapper/$(basename ${LOOP_DEVICE})p2"
 
 log_info "Formatting partitions"
 sudo mkfs.vfat -F 32 -n BOOT "${BOOT_PART}"
@@ -91,25 +89,12 @@ if cache_exists "${RASPBIAN_CACHE_KEY}"; then
     cache_get "${RASPBIAN_CACHE_KEY}" "${WORK_DIR}/raspbian-base.tar.gz"
     sudo tar -xzf "${WORK_DIR}/raspbian-base.tar.gz" -C "${MOUNT_POINT}"
 else
-    # Determine architecture-specific settings
-    DEBOOTSTRAP_ARCH="${RPI_ARCH:-armhf}"
-    if [[ "${DEBOOTSTRAP_ARCH}" == "arm64" ]]; then
-        # arm64 uses standard Debian repos (Raspbian is armhf-only)
-        DEBOOTSTRAP_MIRROR="http://deb.debian.org/debian"
-        log_info "Bootstrapping Debian ${RASPBIAN_VERSION} (${DEBOOTSTRAP_ARCH})"
-    else
-        # armhf uses Raspbian repos
-        DEBOOTSTRAP_MIRROR="${RASPBIAN_MIRROR}"
-        log_info "Bootstrapping Raspbian ${RASPBIAN_VERSION} (${DEBOOTSTRAP_ARCH})"
-    fi
+    log_info "Bootstrapping Raspbian ${RASPBIAN_VERSION}"
 
     # First stage debootstrap with keyring handling
-    KEYRING_OPT=""
-    if [[ "${DEBOOTSTRAP_ARCH}" != "arm64" ]]; then
-        # For Raspbian, disable GPG verification as keyring is not readily available in Debian
-        KEYRING_OPT="--no-check-gpg"
-        log_warn "Disabling GPG verification for Raspbian bootstrap"
-    fi
+    # For Raspbian, disable GPG verification as keyring is not readily available in Debian
+    KEYRING_OPT="--no-check-gpg"
+    log_warn "Disabling GPG verification for Raspbian bootstrap"
 
     # ARM binary format registration handled by host system
     # Host should have: sudo apt install binfmt-support qemu-user-static
@@ -117,47 +102,48 @@ else
 
     # Configure proxy environment for debootstrap if available
     DEBOOTSTRAP_ENV=""
-    if has_apt_proxy; then
-        log_info "Configuring APT proxy for debootstrap: ${APT_PROXY}"
-        DEBOOTSTRAP_ENV="http_proxy=http://${APT_PROXY} HTTP_PROXY=http://${APT_PROXY}"
+    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+        log_info "Configuring APT proxy for debootstrap: ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+        DEBOOTSTRAP_ENV="http_proxy=http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142} HTTP_PROXY=http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
     fi
 
     # Bootstrap base system without Pi-specific packages first
     # Include python3-minimal for Ansible compatibility
     # Exclude DHCP packages since systemd handles networking
-    sudo env "${DEBOOTSTRAP_ENV}" debootstrap --foreign --arch="${DEBOOTSTRAP_ARCH}" \
+    sudo env ${DEBOOTSTRAP_ENV} debootstrap --foreign --arch=armhf \
         --include=python3-minimal \
         --exclude=isc-dhcp-common,isc-dhcp-client \
         ${KEYRING_OPT} \
-        "${RASPBIAN_VERSION}" "${MOUNT_POINT}" "${DEBOOTSTRAP_MIRROR}"
+        "${RASPBIAN_VERSION}" "${MOUNT_POINT}" "${RASPBIAN_MIRROR}"
 
     # Setup chroot for second stage
     setup_chroot "${MOUNT_POINT}"
 
     # Configure proxy for second stage debootstrap if available
-    configure_chroot_apt_proxy "${MOUNT_POINT}"
+    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+        sudo mkdir -p "${MOUNT_POINT}/etc/apt/apt.conf.d"
+        sudo tee "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy-temp" > /dev/null <<EOF
+# Temporary APT proxy for debootstrap second stage
+Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
+Acquire::http::Timeout "120";
+Acquire::https::Timeout "120";
+Acquire::Retries "3";
+EOF
+    fi
 
     # Second stage debootstrap
     chroot_run "${MOUNT_POINT}" /debootstrap/debootstrap --second-stage
 
     # Remove temporary proxy config
-    remove_chroot_apt_proxy "${MOUNT_POINT}"
+    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+        sudo rm -f "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy-temp"
+    fi
 
-    # Configure apt sources based on architecture
-    if [[ "${DEBOOTSTRAP_ARCH}" == "arm64" ]]; then
-        # arm64: standard Debian repos + non-free-firmware for bookworm+
-        sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
-deb http://deb.debian.org/debian ${RASPBIAN_VERSION} main contrib non-free non-free-firmware
-deb http://deb.debian.org/debian-security ${RASPBIAN_VERSION}-security main contrib non-free non-free-firmware
-deb http://deb.debian.org/debian ${RASPBIAN_VERSION}-updates main contrib non-free non-free-firmware
-EOF
-    else
-        # armhf: Raspbian repos
-        sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
+    # Configure apt sources with all required components
+    sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
 deb ${RASPBIAN_MIRROR} ${RASPBIAN_VERSION} main contrib non-free rpi
 deb-src ${RASPBIAN_MIRROR} ${RASPBIAN_VERSION} main contrib non-free rpi
 EOF
-    fi
 
     # Add Raspberry Pi Foundation GPG key (modern method - no apt-key)
     sudo mkdir -p "${MOUNT_POINT}/etc/apt/keyrings"
@@ -173,10 +159,33 @@ deb [signed-by=/etc/apt/keyrings/raspberrypi-archive-keyring.gpg] http://archive
 EOF
 
     # Configure APT cache for chroot if available
-    configure_chroot_apt_proxy "${MOUNT_POINT}"
+    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+        log_info "Configuring APT cache for chroot environment"
+        sudo mkdir -p "${MOUNT_POINT}/etc/apt/apt.conf.d"
+        sudo tee "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy" > /dev/null <<EOF
+# APT Cache Configuration for Build Process
+Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
+# Longer timeouts for slow cache/upstream responses
+Acquire::http::Timeout "120";
+Acquire::https::Timeout "120";
+Acquire::Retries "3";
+EOF
+    fi
 
     # Migrate legacy APT keyring to modern format (prevents deprecation warnings)
-    migrate_apt_keyring "${MOUNT_POINT}"
+    if [ -f "${MOUNT_POINT}/etc/apt/trusted.gpg" ]; then
+        log_info "Migrating legacy APT keyring to modern format"
+        sudo mkdir -p "${MOUNT_POINT}/etc/apt/trusted.gpg.d"
+        sudo gpg --no-default-keyring \
+            --keyring "${MOUNT_POINT}/etc/apt/trusted.gpg" \
+            --export 2>/dev/null | \
+            sudo gpg --no-default-keyring \
+                --keyring "gnupg-ring:${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" \
+                --import 2>/dev/null || true
+        sudo chmod 644 "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" 2>/dev/null || true
+        sudo rm -f "${MOUNT_POINT}/etc/apt/trusted.gpg"
+        log_info "Legacy keyring migrated and removed"
+    fi
 
     # Cache the base system
     log_info "Caching base system for future builds"
@@ -191,34 +200,67 @@ fi
 log_info "Configuring basic boot files"
 sudo tee "${MOUNT_POINT}/boot/config.txt" > /dev/null <<EOF
 # Pimeleon Boot Configuration
-# Optimized for Raspberry Pi 3B+
 
 # Disable rainbow splash for clean boot
 disable_splash=1
 
-# Display settings
+# uncomment if you get no picture on HDMI for a default "safe" mode
+#hdmi_safe=1
+
+# uncomment this if your display has a black border of unused pixels visible
+# and your display can output without overscan
+#disable_overscan=1
+
+# uncomment the following to adjust overscan. Use positive numbers if console
+# goes off screen, and negative if there is too much border
+#overscan_left=16
+#overscan_right=16
+#overscan_top=16
+#overscan_bottom=16
+
+# uncomment to force a console size. By default it will be display's size minus
+# overscan.
+#framebuffer_width=1280
+#framebuffer_height=720
+
+# uncomment if hdmi display is not detected and composite is being output
 hdmi_force_hotplug=1
+
+# uncomment to force a specific HDMI mode (this will force VGA)
+#hdmi_group=1
+#hdmi_mode=4
+
+# uncomment to force a HDMI mode rather than DVI. This can make audio work in
+# DMT (computer monitor) modes
 hdmi_drive=2
+
+# uncomment to increase signal to HDMI, if you have interference, blanking, or
+# no display
 config_hdmi_boost=4
 
-# Optimized performance settings
+#uncomment to overclock the arm. 700 MHz is the default.
 arm_freq=1000
 over_voltage=2
 
-# Essential hardware interfaces
+# Uncomment some or all of these to enable the optional hardware interfaces
 dtparam=i2c_arm=on
+#dtparam=i2s=on
 dtparam=spi=on
+
+# Uncomment this to enable the lirc-rpi module
+#dtoverlay=lirc-rpi
+
+# Additional overlays and parameters are documented /boot/overlays/README
 
 # Enable KMS driver for GPU acceleration
 dtoverlay=vc4-fkms-v3d
 
-# Disable all multimedia and camera features
+# Enable audio (loads snd_bcm2835)
 dtparam=audio=off
 start_x=0
 
-# System constraints
 enable_uart=0
-gpu_mem=128
+gpu_mem=256
 max_usb_current=1
 
 # Boot timing
@@ -239,9 +281,6 @@ EOF
 # Set hostname
 echo "pimeleon" | sudo tee "${MOUNT_POINT}/etc/hostname" > /dev/null
 
-# Verify stage completion
-verify_stage 1 "${MOUNT_POINT}"
-
 # Unmount
 sudo umount "${MOUNT_POINT}/boot"
 sudo umount "${MOUNT_POINT}"
@@ -249,9 +288,7 @@ sudo kpartx -d "${LOOP_DEVICE}"
 sudo losetup -d "${LOOP_DEVICE}"
 
 # Clear cleanup tracking (successful unmount)
-# shellcheck disable=SC2034
 CLEANUP_MOUNT_POINT=""
-# shellcheck disable=SC2034
 CLEANUP_LOOP_DEVICE=""
 
 log_info "Stage 1 completed successfully"

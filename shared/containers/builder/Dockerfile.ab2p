@@ -12,9 +12,9 @@ RUN cabal update && \
     # Find and copy templates from either cabal store location
     mkdir -p /opt/adblock2privoxy && \
     (find /root/.cabal/store -name "templates" -type d -path "*/adblock2privoxy-*" \
-    -exec cp -r {} /opt/adblock2privoxy/ \; 2>/dev/null || true) && \
+        -exec cp -r {} /opt/adblock2privoxy/ \; 2>/dev/null || true) && \
     (find /root/.local/state/cabal/store -name "templates" -type d -path "*/adblock2privoxy-*" \
-    -exec cp -r {} /opt/adblock2privoxy/ \; 2>/dev/null || true) && \
+        -exec cp -r {} /opt/adblock2privoxy/ \; 2>/dev/null || true) && \
     # Verify templates were found
     ls -la /opt/adblock2privoxy/templates/
 

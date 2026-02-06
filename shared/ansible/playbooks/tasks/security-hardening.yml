@@ -15,7 +15,6 @@
     - { regexp: '^#?ClientAliveInterval', line: 'ClientAliveInterval 300' }
     - { regexp: '^#?ClientAliveCountMax', line: 'ClientAliveCountMax 2' }
     - { regexp: '^#?Protocol', line: 'Protocol 2' }
-    - { regexp: '^#?PrintMotd', line: 'PrintMotd yes' }
     - { regexp: '^#?AllowUsers', line: 'AllowUsers pim' }
   notify: Restart SSH
 
@@ -201,54 +200,7 @@
   loop:
     - bluetooth
     - avahi-daemon
-  when:
-    - ansible_connection != "chroot"  # Skip in chroot where systemctl logic is unreliable
-  register: service_status
   failed_when: false
-
-- name: Mask unnecessary services in chroot
-  ansible.builtin.file:
-    src: /dev/null
-    dest: "/etc/systemd/system/{{ item }}.service"
-    state: link
-    force: true
-  loop:
-    - bluetooth
-    - avahi-daemon
-  when:
-    - ansible_connection == "chroot"
-  tags: [security, chroot]
-
-- name: Create .ssh directory for root
-  ansible.builtin.file:
-    path: /root/.ssh
-    state: directory
-    owner: root
-    group: root
-    mode: '0700'
-
-- name: Generate ED25519 SSH key for root
-  ansible.builtin.command:
-    cmd: ssh-keygen -t ed25519 -N "" -C "root@pimeleon" -f /root/.ssh/id_ed25519
-    creates: /root/.ssh/id_ed25519
-
-- name: Create .ssh directory for pim
-  ansible.builtin.file:
-    path: /home/pim/.ssh
-    state: directory
-    owner: pim
-    group: pim
-    mode: '0700'
-
-- name: Generate ED25519 SSH key for pim
-  ansible.builtin.command:
-    cmd: ssh-keygen -t ed25519 -N "" -C "pim@pimeleon" -f /home/pim/.ssh/id_ed25519
-    creates: /home/pim/.ssh/id_ed25519
-
-- name: Fix ownership on pim SSH keys
-  ansible.builtin.command:
-    cmd: chown -R pim:pim /home/pim/.ssh
-  changed_when: false
 
 - name: Create security report script
   ansible.builtin.copy:

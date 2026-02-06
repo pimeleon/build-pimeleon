@@ -15,10 +15,6 @@
     url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
     dest: /tmp/install-ohmyzsh.sh
     mode: '0755'
-  environment:
-    http_proxy: "{{ http_proxy | default('') }}"
-    https_proxy: "{{ https_proxy | default('') }}"
-    no_proxy: "{{ no_proxy | default('') }}"
 
 - name: Install oh-my-zsh for pim user
   ansible.builtin.shell: |
@@ -53,7 +49,12 @@
           echo ""
           echo "  Welcome to Pimeleon - Your Privacy Gateway"
           echo "  Hostname: $(hostname) | IP: $(hostname -I 2>/dev/null | awk '{print $1}')"
-          echo "  Run 'pim-config' for configuration menu"
+          # Show hint based on setup state
+          if [[ ! -f /var/lib/pimeleon/.setup-complete ]]; then
+              echo "  Run 'sudo pim-setup' for first-time setup wizard"
+          elif [[ ! -f /var/lib/pimeleon/.pim-config.ran ]]; then
+              echo "  Run 'sudo pim-config' for configuration menu"
+          fi
           echo ""
       fi
 
@@ -64,7 +65,7 @@
 
 - name: Deploy zshrc configuration
   ansible.builtin.template:
-    src: system/zshrc.j2
+    src: zshrc.j2
     dest: /home/pim/.zshrc
     owner: pim
     group: pim

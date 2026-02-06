@@ -216,8 +216,8 @@ fi
 
 echo ""
 echo -e "${BLUE}🚀 Next Steps:${NC}"
-echo "1. Rebuild containers: APT_CACHE_SERVER=192.168.76.5 docker compose build --no-cache builder"
-echo "2. Run build: APT_CACHE_SERVER=192.168.76.5 docker compose --progress quiet run --rm builder"
+echo "1. Rebuild containers: APT_CACHE_SERVER=192.168.42.5 docker compose build --no-cache builder"
+echo "2. Run build: APT_CACHE_SERVER=192.168.42.5 docker compose --progress quiet run --rm builder"
 echo ""
 echo "Or use the full command with cache server detection:"
-echo 'if ping -c1 192.168.76.5 &>/dev/null; then export APT_CACHE_SERVER=192.168.76.5; fi && docker compose build --no-cache builder'
+echo 'if ping -c1 192.168.42.5 &>/dev/null; then export APT_CACHE_SERVER=192.168.42.5; fi && docker compose build --no-cache builder'

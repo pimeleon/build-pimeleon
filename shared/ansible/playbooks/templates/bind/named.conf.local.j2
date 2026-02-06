@@ -12,10 +12,10 @@ zone "{{ dns_domain | default('pimeleon.local') }}" {
     check-names ignore;
 };
 
-// Reverse zone for WiFi (wlan0 - primary, 192.168.42.x)
-zone "{{ wifi_ap_network | regex_replace('^(\\d+)\\.(\\d+)\\.(\\d+)\\..*', '\\3.\\2.\\1') }}.in-addr.arpa" {
+// Reverse zone for internal network
+zone "{{ default_subnet | regex_replace('^(\\d+)\\.(\\d+)\\.(\\d+)\\..*', '\\3.\\2.\\1') }}.in-addr.arpa" {
     type master;
-    file "/var/lib/bind/{{ wifi_ap_network | regex_replace('^(\\d+)\\.(\\d+)\\.(\\d+)\\..*', '\\3.\\2.\\1') }}.rev";
+    file "/var/lib/bind/{{ default_subnet | regex_replace('^(\\d+)\\.(\\d+)\\.(\\d+)\\..*', '\\3.\\2.\\1') }}.rev";
     allow-update { key rndc-key; };
     check-names ignore;
 };

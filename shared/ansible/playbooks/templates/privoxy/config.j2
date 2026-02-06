@@ -27,8 +27,8 @@ debug 1024
 user-manual /usr/share/doc/privoxy/user-manual
 
 # Listen on localhost and LAN interfaces
-listen-address 127.0.0.1:{{ privoxy_port | default(8118) }}
-listen-address {{ wifi_ap_ip }}:{{ privoxy_port | default(8118) }}
+listen-address {{ dns_local }}:{{ privoxy_port }}
+listen-address {{ default_ip }}:{{ privoxy_port }}
 
 toggle 1
 

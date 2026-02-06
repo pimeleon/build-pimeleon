@@ -33,18 +33,15 @@ allow unknown-clients;
 
 # DNS zones for DDNS
 zone {{ dns_domain | default('pimeleon.local') }}. {
-    primary 127.0.0.1;
+    primary {{ dns_local | default('127.0.0.1') }};
     key rndc-key;
 }
 
-{% if wifi_interface is defined %}
 zone {{ wifi_ap_network | regex_replace('^(\\d+)\\.(\\d+)\\.(\\d+)\\..*', '\\3.\\2.\\1') }}.in-addr.arpa. {
-    primary 127.0.0.1;
+    primary {{ dns_local | default('127.0.0.1') }};
     key rndc-key;
 }
-{% endif %}
 
-{% if wifi_interface is defined %}
 # WiFi subnet ({{ wifi_interface }})
 subnet {{ wifi_ap_network | regex_replace('/\\d+$', '') | regex_replace('\\.\\d+$', '.0') }} netmask {{ wifi_ap_netmask }} {
     option routers {{ wifi_ap_ip }};
@@ -52,17 +49,16 @@ subnet {{ wifi_ap_network | regex_replace('/\\d+$', '') | regex_replace('\\.\\d+
     option netbios-name-servers {{ wifi_ap_ip }};
     option subnet-mask {{ wifi_ap_netmask }};
     option ntp-servers {{ ntp_servers | default(['0.pool.ntp.org', '1.pool.ntp.org']) | join(', ') }};
-    range {{ wifi_dhcp_range_start }} {{ wifi_dhcp_range_end }};
+    range {{ wifi_dhcp_range_start | default(dhcp_range_start) }} {{ wifi_dhcp_range_end | default(dhcp_range_end) }};
     interface {{ wifi_interface }};
     # Shorter lease for WiFi clients
     default-lease-time {{ wifi_dhcp_lease | default(900) }};
 }
-{% endif %}
 
 # Static host reservations can be added below
 # group {
 #     host example {
 #         hardware ethernet AA:BB:CC:DD:EE:FF;
-#         fixed-address 192.168.77.10;
+#         fixed-address 192.168.42.10;
 #     }
 # }

@@ -187,7 +187,7 @@ Examples:
     sudo $0 --profile production
 
     # With APT cache
-    sudo $0 --with-cache 192.168.76.5
+    sudo $0 --with-cache 192.168.42.5
 
     # Pi 4B with Bookworm
     sudo $0 --model 4B --version bookworm

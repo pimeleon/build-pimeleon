@@ -48,7 +48,7 @@ hdmi_drive=2
 #sdtv_mode=2
 
 # CPU frequency
-arm_freq={{ config_txt.arm_freq | default(1000) }}
+arm_freq={{ config_txt.arm_freq | default(1200) }}
 {% if config_txt.over_voltage is defined %}
 over_voltage={{ config_txt.over_voltage }}
 {% endif %}
@@ -58,15 +58,16 @@ enable_uart={{ config_txt.enable_uart | default(1) }}
 
 # Uncomment some or all of these to enable the optional hardware interfaces
 #dtparam=i2c_arm={{ config_txt.dtparam_i2c | default('on') }}
-#dtparam=i2s={{ config_txt.dtparam_i2s | default('on') }}
-#dtparam=spi={{ config_txt.dtparam_spi | default('on') }}
+#dtparam=i2s=o{{ config_txt.dtparam_i2s | default('on') }}
+#dtparam=spi=o{{ config_txt.dtparam_spi | default('on') }}
 
-# USB power configuration
+# USB power (Pi 3B+ can supply more current)
 {% if config_txt.max_usb_current is defined %}
 max_usb_current={{ config_txt.max_usb_current }}
 {% endif %}
 
-# Additional overlays
+# Disable Bluetooth (frees up UART and saves power)
+# Uncomment this to enable the lirc-rpi module for IR receiver support
 {% for overlay in device_tree_overlays | default([]) %}
 dtoverlay={{ overlay | regex_replace('\.dtbo$', '') }}
 {% endfor %}

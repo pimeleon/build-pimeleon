@@ -32,7 +32,9 @@
 
     - name: Load profile configuration
       ansible.builtin.include_vars:
-        file: "{{ inventory_dir }}/group_vars/all/profile.yml"
+        file: >-
+          {{ playbook_dir }}/../inventory/group_vars/all/profiles/{{
+          pimeleon_profile | default('development') }}.yml
       failed_when: false
 
   tasks:
@@ -57,7 +59,7 @@
       ansible.builtin.include_tasks: tasks/wifi-setup.yml
       tags: [wifi, network, core]
 
-    - name: Run hostapd setup (APT package with WPA3 support)
+    - name: Run hostapd setup (built from source with WPA3 support)
       ansible.builtin.include_tasks: tasks/hostapd-setup.yml
       tags: [hostapd, wifi, network]
       when: services_enabled.hostapd | default(true)
@@ -116,7 +118,7 @@
 
     - name: Run squid setup
       ansible.builtin.include_tasks: tasks/squid-setup.yml
-      tags: [squid, proxy, services]
+      tags: [squid, proxy, services, caching]
       when: services_enabled.squid | default(false)
 
     - name: Run Tor setup

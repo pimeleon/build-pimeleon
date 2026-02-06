@@ -4,11 +4,13 @@
     "code_blocks": false,
     "tables": false
   },
+  "MD024": {
+    "siblings_only": true
+  },
   "MD033": {
     "allowed_elements": ["div", "span", "br", "img", "a"]
   },
   "MD036": false,
   "MD040": false,
-  "MD024": false,
   "MD046": false
 }

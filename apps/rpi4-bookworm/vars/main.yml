@@ -30,6 +30,7 @@ config_txt:
   enable_uart: 1
   dtparam_spi: "on"
   dtparam_i2c: "on"
+  dtparam_i2s: "on"
   gpu_mem: 256
   arm_freq: 1800
   over_voltage: 4

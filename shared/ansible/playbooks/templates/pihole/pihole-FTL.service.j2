@@ -4,15 +4,15 @@
 [Unit]
 Description=Pi-hole FTL DNS resolver
 Documentation=https://docs.pi-hole.net/
-After=network-online.target dnscrypt-proxy.service
-Wants=network-online.target dnscrypt-proxy.service
+After=network.target
+Wants=network.target
 
 [Service]
 Type=simple
 User=pihole
 Group=pihole
 
-ExecStart={{ pihole_ftl_path }} no-daemon
+ExecStart=/usr/local/bin/pihole-FTL no-daemon
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=30
@@ -29,8 +29,7 @@ ProtectSystem=full
 ProtectHome=yes
 PrivateTmp=yes
 NoNewPrivileges=no
-RuntimeDirectory=pihole
-ReadWritePaths=/etc/pihole /var/lib/pihole /var/log/pihole
+ReadWritePaths=/etc/pihole /var/lib/pihole /var/log/pihole /var/run/pihole
 
 [Install]
 WantedBy=multi-user.target

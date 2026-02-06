@@ -5,7 +5,7 @@
 set -e
 
 # Configuration
-CACHE_SERVER="192.168.76.5"  # TrueNAS IP (use IP for Docker containers)
+CACHE_SERVER="192.168.42.5"  # TrueNAS IP (use IP for Docker containers)
 CACHE_PORT="3142"
 PROXY_URL="http://${CACHE_SERVER}:${CACHE_PORT}"
 

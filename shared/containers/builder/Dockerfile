@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.6
 # Pimeleon Build Container
 
 # Stage 1: Use pre-built adblock2privoxy image
@@ -12,20 +13,21 @@ FROM debian:12-slim AS base
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Build argument for APT cache proxy (host:port format)
-ARG APT_PROXY
+# Build arguments for APT cache configuration
+ARG APT_CACHE_SERVER
+ARG APT_CACHE_PORT="3142"
 
-# Configure APT cache if proxy is provided
-RUN if [ -n "$APT_PROXY" ]; then \
-    echo "Acquire::http::Proxy \"http://${APT_PROXY}\";" > /etc/apt/apt.conf.d/01proxy && \
+# Configure APT cache if server is provided
+RUN if [ -n "$APT_CACHE_SERVER" ]; then \
+    echo "Acquire::http::Proxy \"http://${APT_CACHE_SERVER}:${APT_CACHE_PORT}\";" > /etc/apt/apt.conf.d/01proxy && \
     echo "Acquire::https::Proxy \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy && \
-    echo "Using APT cache at ${APT_PROXY}"; \
+    echo "Using APT cache at ${APT_CACHE_SERVER}:${APT_CACHE_PORT}"; \
     fi
 
 # Install base dependencies and build tools
 # APT caching handled by remote apt-cacher-ng via APT_PROXY
 # Clean local cache after install to reduce image size
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ansible \
     bc \
     bison \
@@ -83,8 +85,9 @@ RUN groupadd -g 999 docker && \
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install Python packages
-RUN pip install --upgrade pip && \
+# Install Python packages with cache mount
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
     pip install \
     pyyaml \
     jinja2 \
@@ -129,7 +132,7 @@ FROM base AS development
 USER root
 
 # Install development and debugging tools
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ansible-lint \
     dnsutils \
     htop \

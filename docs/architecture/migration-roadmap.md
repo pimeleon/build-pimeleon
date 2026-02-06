@@ -2,7 +2,9 @@
 
 ## Overview
 
-This document provides a detailed, phase-by-phase implementation plan for migrating `pimeleon-build` from a Raspberry Pi-specific build system to a multi-platform ARM router build system.
+This document provides a detailed, phase-by-phase implementation plan for migrating
+`pimeleon-build` from a Raspberry Pi-specific build system to a multi-platform ARM router
+build system.
 
 **Timeline**: 3-6 months (24 weeks)
 **Approach**: Incremental refactoring with zero breaking changes
@@ -50,6 +52,7 @@ gantt
 **Goal**: Create hardware abstraction infrastructure without breaking existing Pi builds.
 
 **Success Criteria**:
+
 - ✅ Platform directory structure exists
 - ✅ Pi 3B+ profile created from hardcoded values
 - ✅ Hardware loader parses YAML profiles
@@ -61,6 +64,7 @@ gantt
 #### Tasks
 
 1. **Create directory structure** (2 hours)
+
    ```bash
    mkdir -p platforms/{core,raspberrypi,orangepi,community}/{profiles,hooks,tests,docs}
    mkdir -p platforms/core/scripts
@@ -68,6 +72,7 @@ gantt
    ```
 
 2. **Move common.sh to platforms/core** (1 hour)
+
    ```bash
    mv containers/builder/scripts/common.sh platforms/core/scripts/
    ln -s ../../../platforms/core/scripts/common.sh containers/builder/scripts/common.sh
@@ -80,6 +85,7 @@ gantt
    - `platforms/community/README.md` - Community contribution guide
 
 4. **Update .gitignore** (30 minutes)
+
    ```
    # Platform-specific caches
    cache/*/
@@ -90,6 +96,7 @@ gantt
    ```
 
 **Deliverables**:
+
 - Directory structure created
 - Documentation stubs in place
 - Git history clean (using `git mv` for file moves)
@@ -115,6 +122,7 @@ gantt
    ```
 
    Create `platforms/raspberrypi/profiles/3b-plus.yaml`:
+
    ```yaml
    metadata:
      platform: raspberrypi
@@ -179,6 +187,7 @@ gantt
 4. **Create validation script** (4 hours)
 
    `scripts/validate-profile.sh`:
+
    ```bash
    #!/bin/bash
    set -euo pipefail
@@ -221,6 +230,7 @@ gantt
    ```
 
 **Deliverables**:
+
 - Pi 3B+ and 4B profiles created
 - Profile validation script
 - Documentation updated
@@ -234,6 +244,7 @@ gantt
 1. **Create hardware-loader.sh** (8 hours)
 
    `scripts/hardware-loader.sh`:
+
    ```bash
    #!/bin/bash
    # Hardware profile loader
@@ -325,6 +336,7 @@ gantt
 2. **Update environment variables** (2 hours)
 
    Add to `.env.example`:
+
    ```bash
    # Hardware Platform Configuration
    PIMELEON_PLATFORM=raspberrypi   # Platform: raspberrypi, orangepi, rockpi
@@ -337,6 +349,7 @@ gantt
 3. **Add backward compatibility layer** (4 hours)
 
    In `containers/builder/scripts/build.sh`:
+
    ```bash
    # Backward compatibility for old variable names
    if [[ -n "${PIMELEON_RPI_MODEL:-}" ]]; then
@@ -358,6 +371,7 @@ gantt
 4. **Add yq to Docker container** (1 hour)
 
    In `containers/builder/Dockerfile`:
+
    ```dockerfile
    # Install yq for YAML parsing
    RUN wget -qO /usr/local/bin/yq \
@@ -366,6 +380,7 @@ gantt
    ```
 
 **Deliverables**:
+
 - Hardware loader script functional
 - Environment variables updated
 - Backward compatibility verified
@@ -380,6 +395,7 @@ gantt
 1. **Create test suite for profiles** (6 hours)
 
    `platforms/core/tests/test_profiles.py`:
+
    ```python
    import pytest
    import yaml
@@ -438,6 +454,7 @@ gantt
    - Update CI/CD documentation
 
 **Deliverables**:
+
 - Automated profile validation tests
 - Backward compatibility verified
 - Regression tests pass
@@ -450,6 +467,7 @@ gantt
 **Goal**: Refactor build stages to use profiles instead of hardcoded values.
 
 **Success Criteria**:
+
 - ✅ All hardcoded Pi values replaced with profile variables
 - ✅ Multiple Pi models build from profiles
 - ✅ Boot configuration templating system works
@@ -462,12 +480,14 @@ gantt
 1. **Refactor cache key generation** (3 hours)
 
    **Before** (`stage1-base.sh:21-22`):
+
    ```bash
    RPI_CACHE_NAME=$(echo "${PIMELEON_RPI_MODEL}" | sed -E 's/^([0-9]+).*/rpi\1/')
    RASPBIAN_CACHE_KEY="pimeleon-${RPI_CACHE_NAME}-${RASPBIAN_VERSION}-base-${CACHE_VERSION}.tar.gz"
    ```
 
    **After**:
+
    ```bash
    # Use platform-specific cache key from profile
    CACHE_KEY=$(generate_cache_key "base" "${CACHE_VERSION}")
@@ -477,11 +497,13 @@ gantt
 2. **Refactor debootstrap calls** (3 hours)
 
    **Before**:
+
    ```bash
    debootstrap --arch=armhf bullseye "${MOUNT_POINT}" http://archive.raspbian.org/raspbian/
    ```
 
    **After**:
+
    ```bash
    debootstrap --arch="${OS_ARCHITECTURE}" "${OS_VERSION}" "${MOUNT_POINT}" "${OS_MIRROR}"
    ```
@@ -489,12 +511,14 @@ gantt
 3. **Refactor partition configuration** (4 hours)
 
    **Before**:
+
    ```bash
    # Hardcoded partition sizes
    BOOT_SIZE=256M
    ```
 
    **After**:
+
    ```bash
    # From profile
    BOOT_SIZE="${BOOT_PARTITION_SIZE}"
@@ -508,6 +532,7 @@ gantt
    - Check debootstrap success
 
 **Deliverables**:
+
 - Stage 1 fully profile-driven
 - Multiple Pi models build successfully
 - Cache keys platform-specific
@@ -521,11 +546,13 @@ gantt
 1. **Refactor device tree handling** (4 hours)
 
    **Before** (`stage2-customize.sh:74`):
+
    ```bash
    sudo cp "${MOUNT_POINT}/boot/bcm2710-rpi-3-b-plus.dtb" "${BOOT_MOUNT}/"
    ```
 
    **After**:
+
    ```bash
    # Copy device tree if specified in profile
    if [[ -n "${BOOT_DEVICE_TREE}" && "${BOOT_DEVICE_TREE}" != "null" ]]; then
@@ -541,11 +568,13 @@ gantt
 2. **Refactor package installation** (4 hours)
 
    **Before**:
+
    ```bash
    chroot_run apt-get install -y raspberrypi-kernel libraspberrypi-bin firmware-brcm80211
    ```
 
    **After**:
+
    ```bash
    # Install kernel from profile
    log_info "Installing kernel: ${PACKAGES_KERNEL}"
@@ -563,6 +592,7 @@ gantt
 3. **Refactor hardware groups creation** (3 hours)
 
    **Before**:
+
    ```bash
    for group in gpio i2c spi video audio; do
        chroot_run groupadd -f "${group}"
@@ -570,6 +600,7 @@ gantt
    ```
 
    **After**:
+
    ```bash
    # Create hardware-specific groups from profile
    if [[ ${#HARDWARE_GROUPS[@]} -gt 0 ]]; then
@@ -584,18 +615,21 @@ gantt
 4. **Refactor fstab generation** (3 hours)
 
    **Before**:
+
    ```bash
    /dev/mmcblk0p2  /       ext4    defaults,noatime  0       1
    /dev/mmcblk0p1  /boot   vfat    defaults          0       2
    ```
 
    **After**:
+
    ```bash
    /dev/${STORAGE_DEVICE}${STORAGE_ROOT_SUFFIX}  /       ${STORAGE_ROOT_FS}    defaults,noatime  0       1
    /dev/${STORAGE_DEVICE}${STORAGE_BOOT_SUFFIX}  /boot   ${STORAGE_BOOT_FS}    defaults          0       2
    ```
 
 **Deliverables**:
+
 - Stage 2 fully profile-driven
 - Hardware-specific logic conditional
 - Multiple models build successfully
@@ -609,6 +643,7 @@ gantt
 1. **Create Jinja2 template renderer** (6 hours)
 
    `scripts/render-template.py`:
+
    ```python
    #!/usr/bin/env python3
    import os
@@ -641,6 +676,7 @@ gantt
 2. **Create Pi config.txt template** (3 hours)
 
    `platforms/raspberrypi/templates/config.txt.j2`:
+
    ```jinja2
    # Raspberry Pi {{ HW_MODEL }} Boot Configuration
    # Generated by pimeleon-build
@@ -672,6 +708,7 @@ gantt
 3. **Integrate template rendering in stage1** (4 hours)
 
    **Before** (`stage1-base.sh:168-182`):
+
    ```bash
    cat > "${BOOT_MOUNT}/config.txt" << EOF
    enable_uart=1
@@ -684,6 +721,7 @@ gantt
    ```
 
    **After**:
+
    ```bash
    # Render boot configuration from template
    if [[ -n "${BOOT_CONFIG_TEMPLATE}" && "${BOOT_CONFIG_TEMPLATE}" != "null" ]]; then
@@ -699,6 +737,7 @@ gantt
 4. **Add Jinja2 to container** (1 hour)
 
    In `containers/builder/Dockerfile`:
+
    ```dockerfile
    # Install Python and Jinja2 for template rendering
    RUN apt-get update && apt-get install -y \
@@ -708,6 +747,7 @@ gantt
    ```
 
 **Deliverables**:
+
 - Template rendering system functional
 - Pi config.txt generated from template
 - Multiple models use correct config
@@ -743,6 +783,7 @@ gantt
    - Create migration FAQ
 
 **Deliverables**:
+
 - All Pi models build successfully
 - Boot tests pass
 - Performance maintained
@@ -755,6 +796,7 @@ gantt
 **Goal**: Validate abstraction with non-Pi hardware (Orange Pi 5 Plus).
 
 **Success Criteria**:
+
 - ✅ Orange Pi 5+ profile created
 - ✅ U-Boot bootloader support added
 - ✅ Orange Pi image builds successfully
@@ -773,6 +815,7 @@ gantt
 2. **Create Orange Pi 5+ profile** (6 hours)
 
    `platforms/orangepi/profiles/5-plus.yaml`:
+
    ```yaml
    metadata:
      platform: orangepi
@@ -818,6 +861,7 @@ gantt
    ```
 
 3. **Test profile validation** (2 hours)
+
    ```bash
    ./scripts/validate-profile.sh platforms/orangepi/profiles/5-plus.yaml
    ```
@@ -828,6 +872,7 @@ gantt
    - List known limitations
 
 **Deliverables**:
+
 - Orange Pi 5+ profile created
 - Profile validates successfully
 - Documentation written
@@ -865,6 +910,7 @@ gantt
 2. **Create U-Boot hook for Orange Pi** (6 hours)
 
    `platforms/orangepi/hooks/install-uboot.sh`:
+
    ```bash
    #!/bin/bash
 
@@ -888,6 +934,7 @@ gantt
 3. **Create boot script template** (4 hours)
 
    `platforms/orangepi/templates/boot.scr.j2`:
+
    ```bash
    # Orange Pi {{ HW_MODEL }} U-Boot Boot Script
 
@@ -906,12 +953,14 @@ gantt
 4. **Add mkimage to container** (2 hours)
 
    In `containers/builder/Dockerfile`:
+
    ```dockerfile
    # Install U-Boot tools for boot script compilation
    RUN apt-get install -y u-boot-tools
    ```
 
 **Deliverables**:
+
 - U-Boot support implemented
 - Orange Pi hook created
 - Boot script template ready
@@ -923,9 +972,11 @@ gantt
 #### Tasks
 
 1. **First build attempt** (4 hours)
+
    ```bash
    PIMELEON_PLATFORM=orangepi PIMELEON_MODEL=5-plus make build
    ```
+
    - Document errors
    - Identify missing dependencies
    - Fix issues iteratively
@@ -942,6 +993,7 @@ gantt
    - Reduce build time
 
 **Deliverables**:
+
 - Orange Pi 5+ builds successfully
 - Build time <20 minutes
 - Image file generated
@@ -976,6 +1028,7 @@ gantt
    - Soft announcement (no press release)
 
 **Deliverables**:
+
 - Orange Pi documented
 - QEMU tests pass
 - Platform comparison published
@@ -988,6 +1041,7 @@ gantt
 **Goal**: Enable community contributions of new platforms.
 
 **Success Criteria**:
+
 - ✅ Contribution guidelines published
 - ✅ CI/CD supports platform matrix
 - ✅ 1+ community platform submitted
@@ -1007,6 +1061,7 @@ gantt
 2. **Create platform template** (4 hours)
 
    `platforms/.template/`:
+
    ```
    profiles/
    ├── model.yaml.example
@@ -1031,6 +1086,7 @@ gantt
    - Maintainer commitment
 
 **Deliverables**:
+
 - Contribution guide complete
 - Platform template available
 - Hooks documented
@@ -1045,6 +1101,7 @@ gantt
 1. **Update GitLab CI pipeline** (8 hours)
 
    `.gitlab-ci.yml`:
+
    ```yaml
    build:multi-platform:
      stage: build
@@ -1082,6 +1139,7 @@ gantt
    - Update README with badges
 
 **Deliverables**:
+
 - CI/CD matrix functional
 - Platform tests automated
 - Build badges displayed
@@ -1117,6 +1175,7 @@ gantt
    - Video tutorial (optional)
 
 **Deliverables**:
+
 - 1+ community platform accepted
 - Platform maintainer role filled
 - Community gallery published
@@ -1129,6 +1188,7 @@ gantt
 **Goal**: Polish, optimize, and prepare for stable release.
 
 **Success Criteria**:
+
 - ✅ Performance optimized
 - ✅ Documentation complete
 - ✅ Release prepared
@@ -1163,6 +1223,7 @@ gantt
    - Build server sizing
 
 **Deliverables**:
+
 - Build times <15 min (all platforms)
 - CI/CD pipeline <30 min
 - Cache hit rates >90%
@@ -1198,6 +1259,7 @@ gantt
    - Language selector
 
 **Deliverables**:
+
 - Documentation 100% accurate
 - Video tutorials published
 - SEO improved
@@ -1234,6 +1296,7 @@ gantt
    - Press release (optional)
 
 **Deliverables**:
+
 - v2.0.0 released
 - Release notes published
 - Community announced

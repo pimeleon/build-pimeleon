@@ -4,10 +4,9 @@
 [Unit]
 Description=DNSCrypt-proxy client
 Documentation=https://github.com/DNSCrypt/dnscrypt-proxy/wiki
-After=network-online.target
-Wants=network-online.target
+After=network.target
 Before=nss-lookup.target
-StartLimitIntervalSec=0
+Wants=nss-lookup.target
 
 [Service]
 Type=simple
@@ -16,27 +15,27 @@ Group=nogroup
 
 ExecStart=/usr/local/bin/dnscrypt-proxy -config /etc/dnscrypt-proxy/dnscrypt-proxy.toml
 Restart=on-failure
-RestartSec=30
+RestartSec=10
 
 # Hardening
 NoNewPrivileges=yes
 PrivateTmp=yes
-#PrivateDevices=yes
+PrivateDevices=yes
 ProtectHome=yes
-#ProtectSystem=strict
+ProtectSystem=strict
 ReadWritePaths=/var/cache/dnscrypt-proxy /var/log/dnscrypt-proxy
-#ProtectControlGroups=yes
-#ProtectKernelModules=yes
-#ProtectKernelTunables=yes
-#LockPersonality=yes
-#RestrictRealtime=yes
-#RestrictSUIDSGID=yes
-#MemoryDenyWriteExecute=yes
-#ystemCallArchitectures=native
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
 
 # Allow binding to privileged ports
-#AmbientCapabilities=CAP_NET_BIND_SERVICE
-#CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=multi-user.target

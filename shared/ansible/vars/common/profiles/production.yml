@@ -9,7 +9,6 @@ profile_description: "Full-featured production build with all services"
 services_enabled:
   # Tier 1: Core
   networkd: true
-  wpa_supplicant: false
   hostapd: true
   dhcp_server: true
   dns_server: true
@@ -38,8 +37,6 @@ services_enabled:
   # Tier 6: Supporting
   avahi: true
   postfix: false     # Usually not needed
-  zram: true
-  swapfile: true
 
 # Minimal packages for production (no debug tools)
 dev_packages: []

@@ -4,19 +4,22 @@ FROM ubuntu:22.04
 # Prevent interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 
-ARG APT_PROXY=""
+ARG APT_CACHE_SERVER=""
+ARG APT_CACHE_PORT="3142"
 
-# Configure APT cache if proxy is provided
-RUN if [ -n "$APT_PROXY" ]; then \
-    echo "Acquire::http::Proxy \"http://${APT_PROXY}\";" > /etc/apt/apt.conf.d/01proxy && \
+# Configure APT cache if server is provided
+RUN if [ -n "$APT_CACHE_SERVER" ]; then \
+    echo "Acquire::http::Proxy \"http://${APT_CACHE_SERVER}:${APT_CACHE_PORT}\";" > /etc/apt/apt.conf.d/01proxy && \
     echo "Acquire::https::Proxy \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy && \
-    echo "Using APT cache at ${APT_PROXY}"; \
+    echo "Using APT cache at ${APT_CACHE_SERVER}:${APT_CACHE_PORT}"; \
     fi
 
-# Install base dependencies and testing tools
-RUN rm -f /etc/apt/apt.conf.d/docker-clean && \
+# Install base dependencies and testing tools with cache mount
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean && \
     echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache && \
-    apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+    apt-get update && apt-get install -y --no-install-recommends \
     qemu-system-arm \
     qemu-utils \
     qemu-efi-aarch64 \
@@ -55,17 +58,13 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean && \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install \
     pytest \
-    pytest-testinfra \
     pytest-timeout \
     pytest-xdist \
-    pytest-html \
     paramiko \
     requests \
     pexpect \
     netaddr \
-    scapy \
-    pyyaml \
-    python-magic
+    scapy
 
 # Configure libvirt
 RUN mkdir -p /var/run/libvirt && \

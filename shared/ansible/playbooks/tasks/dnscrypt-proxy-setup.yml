@@ -8,27 +8,16 @@
   register: dnscrypt_binary
   when: services_enabled.dnscrypt_proxy | default(false)
 
-- name: Install dnscrypt-proxy from APT (non-production profile, no registry binary)
-  ansible.builtin.apt:
-    name: dnscrypt-proxy
-    state: present
+- name: Skip dnscrypt-proxy setup if download not available
+  ansible.builtin.debug:
+    msg: >-
+      dnscrypt-proxy binary not found at /tmp/pimeleon-downloads/dnscrypt-proxy.tar.gz
+      - skipping setup
   when:
     - services_enabled.dnscrypt_proxy | default(false)
     - not (dnscrypt_binary.stat.exists | default(false))
 
-# All tasks below only run if registry binary was downloaded
-- name: Create dnscrypt-proxy user
-  ansible.builtin.user:
-    name: _dnscrypt-proxy
-    system: true
-    shell: /usr/sbin/nologin
-    home: /var/cache/dnscrypt-proxy
-    create_home: false
-    comment: "DNSCrypt proxy daemon"
-  when:
-    - services_enabled.dnscrypt_proxy | default(false)
-    - dnscrypt_download.stat.exists | default(false)
-
+# All tasks below only run if download exists
 - name: Create dnscrypt-proxy directories
   ansible.builtin.file:
     path: "{{ item.path }}"
@@ -38,8 +27,20 @@
     mode: "{{ item.mode }}"
   loop:
     - { path: /etc/dnscrypt-proxy, mode: '0755' }
-    - { path: /var/cache/dnscrypt-proxy, owner: '_dnscrypt-proxy', group: 'nogroup', mode: '0750' }
-    - { path: /var/log/dnscrypt-proxy, owner: '_dnscrypt-proxy', group: 'nogroup', mode: '0750' }
+    - { path: /var/cache/dnscrypt-proxy, mode: '0755' }
+    - { path: /var/log/dnscrypt-proxy, mode: '0755' }
+  when:
+    - services_enabled.dnscrypt_proxy | default(false)
+    - dnscrypt_download.stat.exists | default(false)
+
+- name: Create dnscrypt-proxy user
+  ansible.builtin.user:
+    name: _dnscrypt-proxy
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/cache/dnscrypt-proxy
+    create_home: false
+    comment: "DNSCrypt proxy daemon"
   when:
     - services_enabled.dnscrypt_proxy | default(false)
     - dnscrypt_download.stat.exists | default(false)
@@ -55,7 +56,7 @@
 
 - name: Install dnscrypt-proxy binary
   ansible.builtin.copy:
-    src: /tmp/pimeleon-downloads/linux-arm/dnscrypt-proxy
+    src: "/tmp/pimeleon-downloads/linux-{{ 'arm64' if rpi_arch == 'arm64' else 'arm' }}/dnscrypt-proxy"
     dest: /usr/local/bin/dnscrypt-proxy
     remote_src: true
     owner: root

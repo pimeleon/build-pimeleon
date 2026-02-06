@@ -4,19 +4,13 @@ set -euo pipefail
 # Stage 2: Customize system
 # Install packages and apply configurations
 
-# shellcheck disable=SC1091
-# shellcheck disable=SC1091
 source /scripts/common.sh
-# shellcheck disable=SC1091
-# shellcheck disable=SC1091
-source /scripts/lib-services.sh
 
 # Setup cleanup trap for error handling
-trap 'cleanup_on_exit' EXIT ERR INT TERM
+trap cleanup_on_exit EXIT ERR INT
 
 WORK_DIR=$1
 IMAGE_PATH=$2
-# CLEANUP_IMAGE_PATH="${IMAGE_PATH}"
 MOUNT_POINT="${WORK_DIR}/mount"
 BOOT_MOUNT="${WORK_DIR}/boot"
 IMAGE_NAME="pimeleon-${TARGET_PLATFORM:-rpi3-bookworm}"
@@ -28,8 +22,7 @@ SHARED_ANSIBLE_DIR="${ANSIBLE_DIR:-/ansible}"
 log_info "Starting system customization"
 
 # Mount image
-mount_image "${IMAGE_PATH}" "${MOUNT_POINT}"
-LOOP_DEVICE="${CLEANUP_LOOP_DEVICE}"
+LOOP_DEVICE=$(mount_image "${IMAGE_PATH}" "${MOUNT_POINT}")
 
 # Boot partition is already mounted at ${MOUNT_POINT}/boot by mount_image function
 BOOT_MOUNT="${MOUNT_POINT}/boot"
@@ -38,152 +31,174 @@ BOOT_MOUNT="${MOUNT_POINT}/boot"
 setup_chroot "${MOUNT_POINT}"
 
 # Configure APT cache for chroot environment early
-configure_chroot_apt_proxy "${MOUNT_POINT}"
-
-# Update sources.list to ensure it matches current configuration (even if using old base cache)
-log_info "Updating APT sources"
-if [[ "${RPI_ARCH:-armhf}" == "arm64" ]]; then
-    # arm64: standard Debian repos + non-free-firmware for bookworm+
-    sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
-deb http://deb.debian.org/debian ${RASPBIAN_VERSION:-bookworm} main contrib non-free non-free-firmware
-deb http://deb.debian.org/debian-security ${RASPBIAN_VERSION:-bookworm}-security main contrib non-free non-free-firmware
-deb http://deb.debian.org/debian ${RASPBIAN_VERSION:-bookworm}-updates main contrib non-free non-free-firmware
+if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+    log_info "Configuring APT cache for chroot environment"
+    sudo mkdir -p "${MOUNT_POINT}/etc/apt/apt.conf.d"
+    sudo tee "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy" > /dev/null <<EOF
+# APT Cache Configuration for Build Process
+Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
+# Longer timeouts for slow cache/upstream responses
+Acquire::http::Timeout "120";
+Acquire::https::Timeout "120";
+Acquire::Retries "3";
 EOF
-else
-    # armhf: Raspbian repos
-    sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
+fi
+
+# Update sources.list with current mirror (overrides cached base image)
+log_info "Updating APT sources to use: ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/}"
+sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
 deb ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/} ${RASPBIAN_VERSION:-bookworm} main contrib non-free rpi
 deb-src ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/} ${RASPBIAN_VERSION:-bookworm} main contrib non-free rpi
 EOF
 
-    # Ensure Raspbian keyring is present for verification
-    if [ ! -f "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" ]; then
-        log_info "Installing Raspbian archive keyring"
-        wget -qO- http://archive.raspbian.org/raspbian.public.key | \
-            gpg --dearmor | \
-            sudo tee "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" > /dev/null \
-            || die "Failed to fetch or install Raspbian GPG keyring"
-        sudo chmod 644 "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg"
-    fi
-fi
-
-# Ensure raspi.list is also present (Raspberry Pi Foundation repo)
-if [ ! -f "${MOUNT_POINT}/etc/apt/sources.list.d/raspi.list" ]; then
-    log_info "Restoring raspi.list"
-    sudo tee "${MOUNT_POINT}/etc/apt/sources.list.d/raspi.list" > /dev/null <<EOF
-deb [signed-by=/etc/apt/keyrings/raspberrypi-archive-keyring.gpg] http://archive.raspberrypi.com/debian/ ${RASPBIAN_VERSION:-bookworm} main
-EOF
-fi
-
 # Fix APT keyring deprecation warning (migrate from legacy trusted.gpg)
-migrate_apt_keyring "${MOUNT_POINT}"
+if [ -f "${MOUNT_POINT}/etc/apt/trusted.gpg" ]; then
+    log_info "Migrating legacy APT keyring to new format"
+    sudo mkdir -p "${MOUNT_POINT}/etc/apt/trusted.gpg.d"
+    sudo gpg --no-default-keyring \
+        --keyring "${MOUNT_POINT}/etc/apt/trusted.gpg" \
+        --export 2>/dev/null | \
+        sudo gpg --no-default-keyring \
+            --keyring "gnupg-ring:${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" \
+            --import 2>/dev/null || true
+    sudo chmod 644 "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" 2>/dev/null || true
+    sudo rm -f "${MOUNT_POINT}/etc/apt/trusted.gpg"
+fi
 
 # Update package lists
 log_info "Updating package lists"
-chroot_run "${MOUNT_POINT}" apt-get -qq update
-chroot_run "${MOUNT_POINT}" apt-get -qq -y upgrade
+chroot_run "${MOUNT_POINT}" apt-get -q update
 
-# Define package categories for better maintenance
-SYSTEM_PKGS=(
-    "systemd" "systemd-sysv" "systemd-resolved" "udev" "dbus" "policykit-1"
-    "locales" "locales-all" "tzdata" "fake-hwclock" "cron" "rsyslog" "logrotate"
-    "sudo" "parted" "pkg-config" "ca-certificates" "apt-transport-https"
-    "openssh-server" "zram-tools" "dphys-swapfile" "at"
-)
-
-SHELL_PKGS=(
-    "bash-completion" "zsh" "tmux" "mc" "vim" "nano" "less" "file" "tree"
-    "unzip" "zip" "bc" "jq" "strace" "lsof" "procps" "psmisc"
-)
-
-NET_CORE_PKGS=(
-    "iproute2" "net-tools" "nftables" "iptables" "ipset" "conntrack" "tcpdump"
-    "dnsutils" "wget" "curl" "nmap" "mtr-tiny" "traceroute" "whois" "socat"
-    "bind9" "bind9utils"
-)
-
-NET_ROUTER_PKGS=(
-    "bridge-utils" "vlan" "ppp" "pppoeconf" "wireguard-tools"
-    "wireless-tools" "wireless-regdb" "rfkill" "wpasupplicant" "iw"
-    "isc-dhcp-server"
-)
-
-MONITOR_PKGS=(
-    "htop" "atop" "iotop" "iftop" "nethogs" "nload" "bmon" "bwm-ng"
-    "sysstat" "iptraf-ng" "vnstat" "wavemon" "speedtest-cli" "sysbench"
-)
-
-HARDWARE_PKGS=(
-    "usbutils" "lshw" "hdparm" "ethtool"
-)
-
-BUILD_DEPS=(
-    "build-essential" "libevent-dev" "libnl-3-dev" "libnl-genl-3-dev"
-    "libssl-dev" "libzstd-dev" "sqlite3" "python3" "python3-pip"
-    "python3-venv" "python3-apt" "nodejs"
-)
-
-# Install essential packages by category for better visibility
-log_info "Installing system core packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${SYSTEM_PKGS[@]}"
-
-log_info "Installing shell and utility packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${SHELL_PKGS[@]}"
-
-log_info "Installing core networking packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${NET_CORE_PKGS[@]}"
-
-log_info "Installing routing and wireless packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${NET_ROUTER_PKGS[@]}"
-
-log_info "Installing monitoring and diagnostics packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${MONITOR_PKGS[@]}"
-
-log_info "Installing hardware-specific packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${HARDWARE_PKGS[@]}"
-
-log_info "Installing build dependencies and runtime environments"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${BUILD_DEPS[@]}"
-
-# Restore and protect resolv.conf (systemd-resolved might have converted it to a symlink)
-log_info "Restoring and protecting resolv.conf"
-sudo rm -f "${MOUNT_POINT}/etc/resolv.conf"
-sudo tee "${MOUNT_POINT}/etc/resolv.conf" > /dev/null <<EOF
-# DNS for chroot build environment (restored after package installation)
-nameserver 8.8.8.8
-nameserver 1.1.1.1
-EOF
-sudo chattr +i "${MOUNT_POINT}/etc/resolv.conf" 2>/dev/null || true
+# Install essential packages (full router stack)
+log_info "Installing essential packages"
+chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+    arp-scan \
+    arping \
+    arptables \
+    at \
+    atop \
+    bash-completion \
+    bc \
+    bmon \
+    build-essential \
+    bwm-ng \
+    ca-certificates \
+    conntrack \
+    curl \
+    dbus \
+    dnstop \
+    dnsutils \
+    dstat \
+    ethtool \
+    fake-hwclock \
+    file \
+    fping \
+    hdparm \
+    htop \
+    iftop \
+    ifstat \
+    iotop \
+    iperf3 \
+    iproute2 \
+    jq \
+    less \
+    libevent-dev \
+    libnl-3-dev \
+    libnl-genl-3-dev \
+    libssl-dev \
+    libzstd-dev \
+    locales \
+    locales-all \
+    logrotate \
+    lshw \
+    lsof \
+    man-db \
+    manpages \
+    mc \
+    mtr-tiny \
+    nano \
+    ncdu \
+    netcat-openbsd \
+    net-tools \
+    nethogs \
+    nftables \
+    nload \
+    iptables \
+    ipset \
+    iptraf-ng \
+    nmap \
+    nodejs \
+    openssh-server \
+    parted \
+    pkg-config \
+    policykit-1 \
+    ppp \
+    pppoeconf \
+    procps \
+    psmisc \
+    python3 \
+    python3-apt \
+    python3-pip \
+    python3-venv \
+    rsyslog \
+    smartmontools \
+    socat \
+    speedtest-cli \
+    sqlite3 \
+    strace \
+    sudo \
+    sysbench \
+    sysstat \
+    systemd \
+    systemd-sysv \
+    tcpdump \
+    tmux \
+    traceroute \
+    tree \
+    tshark \
+    udev \
+    unzip \
+    usbutils \
+    vim \
+    vlan \
+    vnstat \
+    wavemon \
+    wget \
+    whiptail \
+    whois \
+    wireguard-tools \
+    wireless-tools \
+    zip \
+    zram-tools \
+    zsh
 
 # Verify Python3 installation (required for Ansible)
-log_info "Verifying Python3 installation..."
-if ! chroot_run "${MOUNT_POINT}" python3 --version > /dev/null 2>&1; then
+if ! chroot_run "${MOUNT_POINT}" python3 --version; then
     log_error "Python3 not installed - Ansible will fail"
     die "Python3 installation failed"
 fi
-PYTHON_VER=$(chroot_run "${MOUNT_POINT}" python3 --version)
-log_info "Python3 installed: ${PYTHON_VER}"
+log_info "Python3 installed: $(chroot_run "${MOUNT_POINT}" python3 --version)"
 
 # Install WiFi firmware (may fail if non-free not available)
 log_info "Installing WiFi firmware"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
-    firmware-brcm80211 || die "WiFi firmware (firmware-brcm80211) installation failed — wireless AP cannot function"
+chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+    firmware-brcm80211 || log_warn "WiFi firmware not available, wireless may not work"
 
-# Install Pi-specific packages (kernel and firmware)
+# Install Pi-specific packages (kernel, bootloader, firmware)
 log_info "Installing Raspberry Pi kernel and firmware"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
     raspberrypi-kernel \
-    raspberrypi-bootloader
+    libraspberrypi-bin
 
 # Verify Pi boot firmware was installed to boot partition
 log_info "Verifying Pi boot firmware installation"
 FIRMWARE_OK=true
-[[ -f "${BOOT_MOUNT}/bootcode.bin" ]] || { log_error "bootcode.bin not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/start.elf" ]] || { log_error "start.elf not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/fixup.dat" ]] || { log_error "fixup.dat not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/kernel7.img" ]] || { log_error "kernel7.img not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/bcm2710-rpi-3-b-plus.dtb" ]] || { log_error "Pi 3B+ device tree not found"; FIRMWARE_OK=false; }
-[[ -d "${BOOT_MOUNT}/overlays" ]] || { log_error "Boot overlays not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/bootcode.bin" ]] || { log_warn "bootcode.bin not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/start.elf" ]] || { log_warn "start.elf not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/fixup.dat" ]] || { log_warn "fixup.dat not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/kernel7.img" ]] || { log_warn "kernel7.img not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/bcm2710-rpi-3-b-plus.dtb" ]] || { log_warn "Pi 3B+ device tree not found"; FIRMWARE_OK=false; }
+[[ -d "${BOOT_MOUNT}/overlays" ]] || { log_warn "Boot overlays not found"; FIRMWARE_OK=false; }
 if [[ "$FIRMWARE_OK" == "true" ]]; then
     log_info "All Pi boot firmware files verified"
 else
@@ -192,50 +207,89 @@ fi
 
 # Install basic networking tools
 log_info "Installing basic networking tools"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
     bridge-utils \
     isc-dhcp-server \
     rfkill \
     wireless-regdb
 
-# Install core services from pi-router-apps artifacts
-install_hostapd "${MOUNT_POINT}"
-install_wpasupplicant "${MOUNT_POINT}"
-install_pihole "${MOUNT_POINT}"
-install_tor "${MOUNT_POINT}"
+# Build hostapd from official w1.fi source (WPA3/SAE support)
+log_info "Building hostapd from source with WPA3/SAE support"
+HOSTAPD_VERSION="hostap_2_10"
+HOSTAPD_BUILD_DIR="${MOUNT_POINT}/tmp/hostapd-build"
+
+# Clone hostap repository on builder host (has network access)
+sudo mkdir -p "${HOSTAPD_BUILD_DIR}"
+if [[ ! -d "${HOSTAPD_BUILD_DIR}/hostap" ]]; then
+    log_info "Cloning hostap repository (${HOSTAPD_VERSION})..."
+    sudo git clone --depth 1 --branch "${HOSTAPD_VERSION}" \
+        https://git.w1.fi/hostap.git "${HOSTAPD_BUILD_DIR}/hostap"
+fi
+
+# Copy build script into chroot
+sudo cp /scripts/build-hostapd.sh "${MOUNT_POINT}/tmp/build-hostapd.sh"
+sudo chmod +x "${MOUNT_POINT}/tmp/build-hostapd.sh"
+
+# Build hostapd inside chroot (ARM cross-compilation via QEMU)
+log_info "Compiling hostapd inside chroot (this may take a while)..."
+chroot_run "${MOUNT_POINT}" /tmp/build-hostapd.sh
+
+# Verify hostapd installed
+if [[ -x "${MOUNT_POINT}/usr/local/bin/hostapd" ]]; then
+    log_info "hostapd compiled and installed successfully"
+    chroot_run "${MOUNT_POINT}" /usr/local/bin/hostapd -v 2>&1 | head -3 || true
+else
+    die "hostapd compilation failed - binary not found"
+fi
+
+# Cleanup build artifacts
+sudo rm -rf "${HOSTAPD_BUILD_DIR}"
+sudo rm -f "${MOUNT_POINT}/tmp/build-hostapd.sh"
+
+# Build Pi-hole FTL from source (if enabled)
+if is_service_enabled "pihole" 2>/dev/null; then
+    log_info "Building Pi-hole FTL from source"
+    sudo cp /scripts/build-pihole-ftl.sh "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
+    sudo chmod +x "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
+    chroot_run "${MOUNT_POINT}" /tmp/build-pihole-ftl.sh
+    if [[ -x "${MOUNT_POINT}/usr/local/bin/pihole-FTL" ]]; then
+        log_info "Pi-hole FTL compiled and installed successfully"
+        chroot_run "${MOUNT_POINT}" /usr/local/bin/pihole-FTL --version || true
+    else
+        die "Pi-hole FTL compilation failed - binary not found"
+    fi
+    sudo rm -f "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
+else
+    log_info "Pi-hole not enabled in profile, skipping FTL build"
+fi
 
 # Install DNS server packages (dnscrypt-proxy uses pre-built binary, not APT)
 log_info "Installing DNS server packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
     bind9 \
     bind9utils
 
 # Install security packages
 log_info "Installing security packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
     fail2ban
 
-# Install proxy packages from pi-router-apps artifacts
-install_privoxy "${MOUNT_POINT}"
+# Install proxy packages
+log_info "Installing proxy packages"
+chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+    privoxy
 
 # Generate Privoxy filters from AdBlock lists (runs on x86, outputs to chroot)
 log_info "Generating Privoxy ad-blocking filters"
 if [[ -x /scripts/generate-privoxy-filters.sh ]]; then
     /scripts/generate-privoxy-filters.sh "${MOUNT_POINT}"
 else
-    die "FATAL: Privoxy filter generator not found at /scripts/generate-privoxy-filters.sh"
+    log_warn "Privoxy filter generator not found, skipping"
 fi
 
-# Disable NetworkManager (Bookworm default) in favor of systemd-networkd
-log_info "Configuring systemd-networkd as network manager"
-chroot_run "${MOUNT_POINT}" systemctl disable NetworkManager 2>/dev/null || log_warn "Could not disable NetworkManager — service may not be installed"
-chroot_run "${MOUNT_POINT}" systemctl disable ModemManager 2>/dev/null || log_warn "Could not disable ModemManager — service may not be installed"
-chroot_run "${MOUNT_POINT}" systemctl mask NetworkManager 2>/dev/null || log_warn "Could not mask NetworkManager — it may still start on boot"
-
 # Mask wpa_supplicant (we use hostapd for AP mode, not client mode)
-log_info "Disabling wpasupplicant"
-chroot_run "${MOUNT_POINT}" systemctl disable wpa_supplicant 2>/dev/null || log_warn "Could not disable wpa_supplicant — service may not be installed"
-chroot_run "${MOUNT_POINT}" systemctl mask wpa_supplicant 2>/dev/null || log_warn "Could not mask wpa_supplicant — it may still start on boot"
+log_info "Configuring systemd-networkd as network manager"
+chroot_run "${MOUNT_POINT}" systemctl mask wpa_supplicant 2>/dev/null || true
 
 # Configure system
 log_info "Configuring system"
@@ -267,7 +321,7 @@ echo "AllowUsers pim" | sudo tee -a "${MOUNT_POINT}/etc/ssh/sshd_config" > /dev/
 
 # Create standard groups if they don't exist
 log_info "Ensuring standard groups exist"
-for group in adm dialout cdrom users netdev; do
+for group in adm dialout cdrom audio video plugdev games users input netdev; do
     chroot_run "${MOUNT_POINT}" groupadd -f "$group" 2>/dev/null || true
 done
 
@@ -277,26 +331,22 @@ for group in gpio i2c spi; do
     chroot_run "${MOUNT_POINT}" groupadd -f -r "$group" || true
 done
 
-# Create Pimeleon management user (UID/GID 1000 like default pi user)
-log_info "Creating pim management user"
-# Ensure pim group is GID 1000
-chroot_run "${MOUNT_POINT}" groupadd -f -g 1000 pim
-# Ensure pim user is UID 1000
-chroot_run "${MOUNT_POINT}" useradd --create-home -u 1000 -s /bin/zsh -g pim -G adm,dialout,cdrom,users,netdev,gpio,i2c,spi pim || true
-
-# Create Pimeleon service users (using same pim group)
-log_info "Creating Pimeleon service users"
+# Create Pimeleon service group and users
+log_info "Creating Pimeleon service group and users"
+chroot_run "${MOUNT_POINT}" groupadd -f -r pim
 chroot_run "${MOUNT_POINT}" useradd -r -s /usr/sbin/nologin -g pim -d /opt/pimeleon/api pim-api || true
 chroot_run "${MOUNT_POINT}" useradd -r -s /usr/sbin/nologin -g pim -d /opt/pimeleon/proxy pim-proxy || true
 chroot_run "${MOUNT_POINT}" useradd -r -s /usr/sbin/nologin -g pim -d /var/lib/ngrok pim-ngrok || true
 
 # Verify users
 log_info "Verifying Pimeleon users"
-chroot_run "${MOUNT_POINT}" id pim || true
 chroot_run "${MOUNT_POINT}" id pim-api || true
 chroot_run "${MOUNT_POINT}" id pim-proxy || true
 chroot_run "${MOUNT_POINT}" id pim-ngrok || true
 
+# Create pim management user (full sudo via sudoers.d, not sudo group)
+log_info "Creating pim management user"
+chroot_run "${MOUNT_POINT}" useradd --create-home -s /bin/zsh -g pim -G adm,dialout,cdrom,audio,video,plugdev,games,users,input,netdev,gpio,i2c,spi pim || true
 # Ensure home directory exists (fallback if useradd -m fails)
 sudo mkdir -p "${MOUNT_POINT}/home/pim"
 chroot_run "${MOUNT_POINT}" chown pim:pim /home/pim
@@ -308,7 +358,7 @@ echo "${TEMP_PASSWORD}" | sudo tee "${OUTPUT_DIR}/pim-initial-password.txt" > /d
 sudo chmod 600 "${OUTPUT_DIR}/pim-initial-password.txt"
 log_warn "Initial password saved to: ${OUTPUT_DIR}/pim-initial-password.txt"
 
-# Create full sudo access for pim user (password-less)
+# Create full sudo access for pim user (passwordless)
 sudo mkdir -p "${MOUNT_POINT}/etc/sudoers.d"
 sudo chmod 755 "${MOUNT_POINT}/etc/sudoers.d"
 cat > /tmp/sudoers-pim << EOF
@@ -322,29 +372,30 @@ sudo chmod 440 "${MOUNT_POINT}/etc/sudoers.d/010_pim-admin"
 # =============================================================================
 log_info "Downloading files for chroot installation"
 
+# Version numbers
+DNSCRYPT_VERSION="2.1.15"
+
 # Create download directory in cache (outside image to save space)
 DOWNLOAD_DIR="${CACHE_DIR}/pimeleon-downloads"
 sudo mkdir -p "${DOWNLOAD_DIR}"
 sudo chmod 755 "${DOWNLOAD_DIR}"
 sudo chown "$(id -u):$(id -g)" "${DOWNLOAD_DIR}"
 
-# Fetch pre-built binaries from pi-router-apps (production only)
-# Source is routed by get_pimeleon_apps_artifact: GitLab registry (dev CI) or GitHub releases (prod CI)
-# Non-production profiles fall back to APT sources via Ansible
-# shellcheck disable=SC2043
-for pkg in dnscrypt-proxy; do
-    if [[ "${PIMELEON_PROFILE:-development}" == "production" ]]; then
-        if ! get_pimeleon_apps_artifact "${pkg}" "${RPI_ARCH}" "${DOWNLOAD_DIR}"; then
-            if is_service_enabled "${pkg//-/_}" 2>/dev/null; then
-                die "Failed to fetch ${pkg} from pi-router-apps and it is enabled in this profile."
-            else
-                log_warn "Failed to fetch ${pkg} from pi-router-apps; service is not enabled, continuing."
-            fi
-        fi
+# Download dnscrypt-proxy (ARM binary - no source build needed)
+# Map RPI_ARCH to dnscrypt-proxy release naming: armhf->arm, arm64->arm64
+DNSCRYPT_ARCH="arm"
+if [[ "${RPI_ARCH}" == "arm64" ]]; then
+    DNSCRYPT_ARCH="arm64"
+fi
+log_info "Downloading dnscrypt-proxy ${DNSCRYPT_VERSION} for ${DNSCRYPT_ARCH}"
+DNSCRYPT_URL="https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNSCRYPT_VERSION}/dnscrypt-proxy-linux_${DNSCRYPT_ARCH}-${DNSCRYPT_VERSION}.tar.gz"
+if ! curl -fsSL -o "${DOWNLOAD_DIR}/dnscrypt-proxy.tar.gz" "${DNSCRYPT_URL}"; then
+    if is_service_enabled "dnscrypt_proxy" 2>/dev/null; then
+        die "Failed to download dnscrypt-proxy, which is enabled in the current profile."
     else
-        log_info "Profile '${PIMELEON_PROFILE:-development}': skipping artifact fetch for ${pkg}, APT source will be used"
+        log_warn "Failed to download dnscrypt-proxy, but it is not enabled. Continuing."
     fi
-done
+fi
 
 # Pi-hole FTL is built from source (see build-pihole-ftl.sh)
 # Tor is installed from official Tor Project repository (see tor-setup.yml)
@@ -352,11 +403,7 @@ done
 # Copy downloads into chroot for Ansible to find
 log_info "Copying downloads into chroot"
 sudo mkdir -p "${MOUNT_POINT}/tmp/pimeleon-downloads"
-if [[ -n "$(ls -A "${DOWNLOAD_DIR}" 2>/dev/null)" ]]; then
-    sudo cp -r "${DOWNLOAD_DIR}"/* "${MOUNT_POINT}/tmp/pimeleon-downloads/"
-else
-    log_info "No files found in ${DOWNLOAD_DIR} to copy"
-fi
+sudo cp -r "${DOWNLOAD_DIR}"/* "${MOUNT_POINT}/tmp/pimeleon-downloads/" 2>/dev/null || true
 sudo chmod -R 755 "${MOUNT_POINT}/tmp/pimeleon-downloads"
 
 # Install ngrok (for remote access tunneling)
@@ -364,187 +411,113 @@ log_info "Downloading ngrok"
 curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc 2>&1 | chroot_run "${MOUNT_POINT}" tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
 echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" 2>&1 | chroot_run "${MOUNT_POINT}" tee /etc/apt/sources.list.d/ngrok.list
 log_info "Installing ngrok for remote access tunneling"
-chroot_run "${MOUNT_POINT}" apt-get -qq update
-chroot_run "${MOUNT_POINT}" apt-get -qq -y upgrade
-chroot_run "${MOUNT_POINT}" apt-get -qq -y install ngrok
+chroot_run "${MOUNT_POINT}" apt-get -q update
+chroot_run "${MOUNT_POINT}" apt-get -qy install ngrok
 
 # =============================================================================
 # Install Pimeleon Web UI and API
 # =============================================================================
-log_info "Installing Pimeleon Web UI and API..."
+log_info "Building Pimeleon Web UI from GitLab..."
+
+# Configurable via environment variables (see docker-compose.yml)
+PIMELEON_UI_REPO="${PIMELEON_UI_REPO:-https://gitlab.pirouter.dev/pimeleon/pirouter-ui.git}"
+
+# Branch: env var takes precedence, otherwise select based on profile
+if [[ -n "${PIMELEON_UI_BRANCH:-}" ]]; then
+    # Use explicitly configured branch
+    :
+elif [[ "${PIMELEON_PROFILE:-development}" == "development" ]]; then
+    PIMELEON_UI_BRANCH="staging"
+else
+    PIMELEON_UI_BRANCH="master"
+fi
+
+PIMELEON_UI_BUILD_DIR="${CACHE_DIR}/pirouter-ui"
+
+# Ensure build directory is writable (CI cache may be root-owned)
+sudo mkdir -p "${PIMELEON_UI_BUILD_DIR}"
+sudo chown "$(id -u):$(id -g)" "${PIMELEON_UI_BUILD_DIR}"
+
+# Construct authenticated URL if token is available
+if [[ -n "${PIMELEON_UI_BUILD_TOKEN:-}" ]]; then
+    PIMELEON_UI_REPO_AUTH=$(echo "${PIMELEON_UI_REPO}" | sed "s|https://|https://oauth2:${PIMELEON_UI_BUILD_TOKEN}@|")
+else
+    PIMELEON_UI_REPO_AUTH="${PIMELEON_UI_REPO}"
+fi
+
+# Clone or update repo
+if [[ -d "${PIMELEON_UI_BUILD_DIR}/.git" ]]; then
+    log_info "Updating existing pirouter-ui clone..."
+    # Fetch specific branch (shallow clones don't have remote tracking refs)
+    git -C "${PIMELEON_UI_BUILD_DIR}" fetch origin "${PIMELEON_UI_BRANCH}"
+    # Create/reset local branch from FETCH_HEAD (origin/branch doesn't exist in shallow clones)
+    git -C "${PIMELEON_UI_BUILD_DIR}" checkout -B "${PIMELEON_UI_BRANCH}" FETCH_HEAD
+else
+    log_info "Cloning pirouter-ui from ${PIMELEON_UI_REPO} (branch: ${PIMELEON_UI_BRANCH})..."
+    git clone --depth 1 --branch "${PIMELEON_UI_BRANCH}" "${PIMELEON_UI_REPO_AUTH}" "${PIMELEON_UI_BUILD_DIR}"
+fi
+
+# Build UI and API using pnpm (Node.js 22 installed in builder image)
+log_info "Building Pimeleon UI and API (${PIMELEON_PROFILE:-development} mode, branch: ${PIMELEON_UI_BRANCH})..."
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
+NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm install --frozen-lockfile
+NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm build
+popd > /dev/null
+
+# =============================================================================
+# Copy Pimeleon UI/API files to chroot (if available)
+# =============================================================================
+log_info "Copying Pimeleon UI/API files (if available)"
+
+# Determine source paths from built artifacts
+PIMELEON_UI_SRC="${PIMELEON_UI_BUILD_DIR}/apps/ui/dist/spa"
+PIMELEON_PROXY_SRC="${PIMELEON_UI_BUILD_DIR}/apps/api/.output/server"
+
+# FastAPI source (Python - no build step)
+if [[ -d "${PIMELEON_UI_BUILD_DIR}/apps/api-fastapi" ]]; then
+    PIMELEON_API_SRC="${PIMELEON_UI_BUILD_DIR}/apps/api-fastapi"
+    log_info "Pimeleon FastAPI found at ${PIMELEON_API_SRC}"
+else
+    PIMELEON_API_SRC="${CONFIG_DIR}/services/api-fastapi"
+fi
+
+log_info "Pimeleon UI source: ${PIMELEON_UI_SRC}"
+log_info "Pimeleon Proxy source: ${PIMELEON_PROXY_SRC}"
 
 # Destination paths inside chroot image
 PIMELEON_API_DEST="${MOUNT_POINT}/opt/pimeleon/api"
 PIMELEON_PROXY_DEST="${MOUNT_POINT}/opt/pimeleon/proxy"
 PIMELEON_UI_DEST="${MOUNT_POINT}/opt/pimeleon/ui"
 
-# Try to fetch from artifact (local cache or registry)
-UI_FETCHED=false
-if [[ "${PIMELEON_PROFILE:-}" == "production" ]]; then
-    log_info "Attempting to fetch pirouter-ui artifact..."
-    sudo mkdir -p "${DOWNLOAD_DIR}"
-    if get_pimeleon_apps_artifact "pirouter-ui" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
-        log_info "Fetched pirouter-ui artifact. Extracting..."
-        EXTRACT_DIR="/tmp/pirouter-ui-extract"
-        sudo rm -rf "${EXTRACT_DIR}"
-        mkdir -p "${EXTRACT_DIR}"
-        sudo tar -xzf "${DOWNLOAD_DIR}/pirouter-ui.tar.gz" -C "${EXTRACT_DIR}"
-
-        # Copy extracted files to destinations
-        # Expected layout in tarball:
-        # apps/ui/dist/spa/ -> ui/
-        # apps/api/.output/server/ -> proxy/
-        # apps/api-fastapi/ -> api/
-
-        if [[ -d "${EXTRACT_DIR}/apps/ui/dist/spa" ]]; then
-            sudo mkdir -p "${PIMELEON_UI_DEST}"
-            sudo rsync -a "${EXTRACT_DIR}/apps/ui/dist/spa/" "${PIMELEON_UI_DEST}/"
-            log_info "UI extracted from registry artifact"
-        fi
-
-        if [[ -d "${EXTRACT_DIR}/apps/api/.output/server" ]]; then
-            sudo mkdir -p "${PIMELEON_PROXY_DEST}"
-            sudo rsync -a "${EXTRACT_DIR}/apps/api/.output/server/" "${PIMELEON_PROXY_DEST}/"
-            log_info "Proxy extracted from registry artifact"
-        fi
-
-        if [[ -d "${EXTRACT_DIR}/apps/api-fastapi" ]]; then
-            sudo mkdir -p "${PIMELEON_API_DEST}"
-            sudo rsync -a --exclude '__pycache__' "${EXTRACT_DIR}/apps/api-fastapi/" "${PIMELEON_API_DEST}/"
-            log_info "API extracted from registry artifact"
-        fi
-
-        sudo rm -rf "${EXTRACT_DIR}"
-        UI_FETCHED=true
-    fi
+# Copy FastAPI server if available
+if [[ -d "${PIMELEON_API_SRC}" ]] && [[ -f "${PIMELEON_API_SRC}/requirements.txt" ]]; then
+    log_info "Copying Pimeleon Python FastAPI server files"
+    sudo mkdir -p "${PIMELEON_API_DEST}"
+    sudo rsync -a --exclude '__pycache__' --exclude '*.pyc' --exclude 'logs' --exclude 'venv' --exclude '.env' --exclude '.env.example' "${PIMELEON_API_SRC}/" "${PIMELEON_API_DEST}/"
+    log_info "Python FastAPI server copied: $(du -sh "${PIMELEON_API_DEST}" | cut -f1)"
+else
+    log_warn "Python FastAPI server not found at ${PIMELEON_API_SRC}, skipping"
 fi
 
-if [[ "$UI_FETCHED" == "false" ]]; then
-    log_info "Falling back to cloning and building Pimeleon Web UI from GitLab..."
-    # Fix for 504 Gateway Timeout and SSL issues with local GitLab
-    git config --global http.sslVerify false
-    git config --global http.lowSpeedLimit 0
-    git config --global http.lowSpeedTime 999999
-    git config --global core.compression 0
+# Copy Nitro proxy if available
+if [[ -d "${PIMELEON_PROXY_SRC}" ]] && [[ -f "${PIMELEON_PROXY_SRC}/index.mjs" ]]; then
+    log_info "Copying pre-built Pimeleon Nuxt proxy files"
+    sudo mkdir -p "${PIMELEON_PROXY_DEST}"
+    sudo rsync -a --exclude 'node_modules' --exclude '.nuxt' --exclude 'logs' "${PIMELEON_PROXY_SRC}/" "${PIMELEON_PROXY_DEST}/"
+    log_info "Nitro proxy copied: $(du -sh "${PIMELEON_PROXY_DEST}" | cut -f1)"
+else
+    log_warn "Nitro proxy not found at ${PIMELEON_PROXY_SRC}, skipping"
+fi
 
-    # Configurable via environment variables (see docker-compose.yml)
-    PIMELEON_UI_REPO="${PIMELEON_UI_REPO:-https://gitlab.pirouter.dev/pimeleon/pirouter-ui.git}"
-
-    # Branch: env var takes precedence, otherwise select based on profile
-    if [[ -n "${PIMELEON_UI_BRANCH:-}" ]]; then
-        # Use explicitly configured branch
-        :
-    elif [[ "${PIMELEON_PROFILE:-development}" == "development" ]]; then
-        PIMELEON_UI_BRANCH="staging"
-    else
-        PIMELEON_UI_BRANCH="master"
-    fi
-
-    PIMELEON_UI_BUILD_DIR="${CACHE_DIR}/pirouter-ui"
-
-    # Ensure build directory is writable (CI cache may be root-owned)
-    sudo mkdir -p "${PIMELEON_UI_BUILD_DIR}"
-    sudo chown "$(id -u):$(id -g)" "${PIMELEON_UI_BUILD_DIR}"
-
-    # Construct authenticated URL if token is available
-    if [[ -n "${PIMELEON_UI_BUILD_TOKEN:-}" ]]; then
-        PIMELEON_UI_REPO_AUTH="${PIMELEON_UI_REPO/https:\/\//https:\/\/oauth2:${PIMELEON_UI_BUILD_TOKEN}@}"
-    else
-        PIMELEON_UI_REPO_AUTH="${PIMELEON_UI_REPO}"
-    fi
-
-    # Clone or update repo
-    if [[ -d "${PIMELEON_UI_BUILD_DIR}/.git" ]]; then
-        log_info "Updating existing pirouter-ui clone..."
-        # Discard any local changes (e.g. from pnpm add in previous build run)
-        git -C "${PIMELEON_UI_BUILD_DIR}" reset --hard HEAD
-        # Fetch specific branch (shallow clones don't have remote tracking refs)
-        git -C "${PIMELEON_UI_BUILD_DIR}" fetch origin "${PIMELEON_UI_BRANCH}"
-        # Create/reset local branch from FETCH_HEAD (origin/branch doesn't exist in shallow clones)
-        git -C "${PIMELEON_UI_BUILD_DIR}" checkout -B "${PIMELEON_UI_BRANCH}" FETCH_HEAD
-    else
-        log_info "Cloning pirouter-ui from ${PIMELEON_UI_REPO} (branch: ${PIMELEON_UI_BRANCH})..."
-        git clone --depth 1 --branch "${PIMELEON_UI_BRANCH}" "${PIMELEON_UI_REPO_AUTH}" "${PIMELEON_UI_BUILD_DIR}"
-    fi
-
-    # Build UI and API using pnpm (Node.js 22 installed in builder image)
-    log_info "Building Pimeleon UI and API (${PIMELEON_PROFILE:-development} mode, branch: ${PIMELEON_UI_BRANCH})..."
-    export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-    pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
-
-    # Configure pnpm caching and proxy if APT_PROXY is set
-    if has_apt_proxy; then
-        log_info "pnpm: using cache at ${CACHE_DIR}/.pnpm-store and proxy at ${APT_PROXY}"
-        pnpm config set store-dir "${CACHE_DIR}/.pnpm-store"
-        pnpm config set proxy "http://${APT_PROXY}"
-        pnpm config set https-proxy "http://${APT_PROXY}"
-    else
-        log_info "pnpm: no proxy configured"
-        pnpm config delete store-dir
-        pnpm config delete proxy
-        pnpm config delete https-proxy
-    fi
-
-    # Always start with clean node_modules to avoid store mismatch (ERR_PNPM_UNEXPECTED_STORE)
-    # or included dependencies conflicts (ERR_PNPM_INCLUDED_DEPS_CONFLICT)
-    rm -rf node_modules
-
-    # Ensure jose is present in the API package
-    pnpm --filter "@pi-router/api" add jose
-    export CI=true
-    pnpm install --frozen-lockfile
-    NODE_ENV="${PIMELEON_PROFILE:-production}" pnpm build
-    popd > /dev/null
-
-    # =============================================================================
-    # Copy Pimeleon UI/API files to chroot (if available)
-    # =============================================================================
-    log_info "Copying Pimeleon UI/API files (if available)"
-
-    # Determine source paths from built artifacts
-    PIMELEON_UI_SRC="${PIMELEON_UI_BUILD_DIR}/apps/ui/dist/spa"
-    PIMELEON_PROXY_SRC="${PIMELEON_UI_BUILD_DIR}/apps/api/.output/server"
-
-    # FastAPI source (Python - no build step)
-    if [[ -d "${PIMELEON_UI_BUILD_DIR}/apps/api-fastapi" ]]; then
-        PIMELEON_API_SRC="${PIMELEON_UI_BUILD_DIR}/apps/api-fastapi"
-        log_info "Pimeleon FastAPI found at ${PIMELEON_API_SRC}"
-    else
-        PIMELEON_API_SRC="${CONFIG_DIR}/services/api-fastapi"
-    fi
-
-    log_info "Pimeleon UI source: ${PIMELEON_UI_SRC}"
-    log_info "Pimeleon Proxy source: ${PIMELEON_PROXY_SRC}"
-
-    # Copy FastAPI server if available
-    if [[ -d "${PIMELEON_API_SRC}" ]] && [[ -f "${PIMELEON_API_SRC}/requirements.txt" ]]; then
-        log_info "Copying Pimeleon Python FastAPI server files"
-        sudo mkdir -p "${PIMELEON_API_DEST}"
-        sudo rsync -a --exclude '__pycache__' --exclude '*.pyc' --exclude 'logs' --exclude 'venv' --exclude '.env' --exclude '.env.example' "${PIMELEON_API_SRC}/" "${PIMELEON_API_DEST}/"
-        log_info "Python FastAPI server copied: $(du -sh "${PIMELEON_API_DEST}" | cut -f1)"
-    else
-        die "FATAL: Python FastAPI server not found at ${PIMELEON_API_SRC}"
-    fi
-
-    # Copy Nitro proxy if available
-    if [[ -d "${PIMELEON_PROXY_SRC}" ]] && [[ -f "${PIMELEON_PROXY_SRC}/index.mjs" ]]; then
-        log_info "Copying pre-built Pimeleon Nuxt proxy files"
-        sudo mkdir -p "${PIMELEON_PROXY_DEST}"
-        sudo rsync -a --exclude '.nuxt' --exclude 'logs' "${PIMELEON_PROXY_SRC}/" "${PIMELEON_PROXY_DEST}/"
-        log_info "Nitro proxy copied: $(du -sh "${PIMELEON_PROXY_DEST}" | cut -f1)"
-    else
-        die "FATAL: Nitro proxy not found at ${PIMELEON_PROXY_SRC}"
-    fi
-
-    # Copy Quasar SPA if available
-    if [[ -d "${PIMELEON_UI_SRC}" ]] && [[ -f "${PIMELEON_UI_SRC}/index.html" ]]; then
-        log_info "Copying pre-built Pimeleon Quasar UI files"
-        sudo mkdir -p "${PIMELEON_UI_DEST}"
-        sudo rsync -a --exclude 'node_modules' --exclude '.quasar' --exclude 'logs' "${PIMELEON_UI_SRC}/" "${PIMELEON_UI_DEST}/"
-        log_info "Quasar SPA copied: $(du -sh "${PIMELEON_UI_DEST}" | cut -f1)"
-    else
-        die "FATAL: Quasar SPA not found at ${PIMELEON_UI_SRC}"
-    fi
+# Copy Quasar SPA if available
+if [[ -d "${PIMELEON_UI_SRC}" ]] && [[ -f "${PIMELEON_UI_SRC}/index.html" ]]; then
+    log_info "Copying pre-built Pimeleon Quasar UI files"
+    sudo mkdir -p "${PIMELEON_UI_DEST}"
+    sudo rsync -a --exclude 'node_modules' --exclude '.quasar' --exclude 'logs' "${PIMELEON_UI_SRC}/" "${PIMELEON_UI_DEST}/"
+    log_info "Quasar SPA copied: $(du -sh "${PIMELEON_UI_DEST}" | cut -f1)"
+else
+    log_warn "Quasar SPA not found at ${PIMELEON_UI_SRC}, skipping"
 fi
 
 # Set interim ownership to root:root for chroot operations
@@ -562,7 +535,7 @@ SHARED_VARS_DIR="${SHARED_ANSIBLE_DIR}/vars"
 PLAYBOOKS_DIR="${SHARED_ANSIBLE_DIR}/playbooks"
 
 # Apply Ansible playbooks if available
-if [[ -d "${PLAYBOOKS_DIR}" ]] && [[ -n "$(ls -A "${PLAYBOOKS_DIR}"/*.yml 2>/dev/null)" ]]; then
+if [[ -d "${PLAYBOOKS_DIR}" ]] && [[ -n "$(ls -A ${PLAYBOOKS_DIR}/*.yml 2>/dev/null)" ]]; then
     log_info "Applying Ansible playbooks (Monorepo mode)"
     log_info "App: ${TARGET_PLATFORM:-not set}"
     export ANSIBLE_CONFIG="${SHARED_ANSIBLE_DIR}/ansible.cfg"
@@ -570,18 +543,10 @@ if [[ -d "${PLAYBOOKS_DIR}" ]] && [[ -n "$(ls -A "${PLAYBOOKS_DIR}"/*.yml 2>/dev
     export PYTHONUNBUFFERED=1
 
     # Determine platform group from environment (3B+ -> raspberrypi_3bplus, 4B -> raspberrypi_4b)
-    PLATFORM_GROUP="raspberrypi_$(echo "${PIMELEON_RPI_MODEL:-3B+}" | tr '[:upper:]' '[:lower:]' | tr -d '+')"
+    PLATFORM_GROUP="raspberrypi_$(echo ${PIMELEON_RPI_MODEL:-3B+} | tr '[:upper:]' '[:lower:]' | tr -d '+')"
     log_info "Platform group: ${PLATFORM_GROUP}"
 
     # Create temporary inventory with platform group membership
-    proxy_vars=""
-    if has_apt_proxy; then
-        proxy_url="http://${APT_PROXY}"
-        proxy_vars="http_proxy=\"${proxy_url}\"
-https_proxy=\"${proxy_url}\"
-no_proxy=\"localhost,127.0.0.1,local\""
-    fi
-
     cat > "${WORK_DIR}/inventory" <<EOF
 [all]
 pimeleon ansible_connection=chroot ansible_host=${MOUNT_POINT}
@@ -596,39 +561,28 @@ pimeleon
 ansible_python_interpreter=/usr/bin/python3
 EOF
 
-    # Append proxy vars if available (avoids empty variable expansion issues)
-    if [[ -n "${proxy_vars}" ]]; then
-        echo "${proxy_vars}" >> "${WORK_DIR}/inventory"
-    fi
-
     # Setup group_vars directory structure for Ansible
     mkdir -p "${WORK_DIR}/group_vars/all"
     mkdir -p "${WORK_DIR}/group_vars/raspberrypi"
     mkdir -p "${WORK_DIR}/group_vars/${PLATFORM_GROUP}"
 
     # Layer 1: Copy shared common vars (lowest priority)
-    # Exclude profiles/ dir — only the selected profile should be loaded (copied at line 512)
     if [[ -d "${SHARED_VARS_DIR}/common" ]]; then
         log_info "Loading shared common vars from: ${SHARED_VARS_DIR}/common"
-        find "${SHARED_VARS_DIR}/common" -maxdepth 1 -not -name profiles -not -path "${SHARED_VARS_DIR}/common" \
-            -exec cp -R {} "${WORK_DIR}/group_vars/all/" \;
+        cp -r "${SHARED_VARS_DIR}/common/"* "${WORK_DIR}/group_vars/all/" 2>/dev/null || true
     fi
 
     # Layer 2: Copy platform vars (raspberrypi family)
     if [[ -d "${SHARED_VARS_DIR}/platform/raspberrypi" ]]; then
         log_info "Loading platform vars from: ${SHARED_VARS_DIR}/platform/raspberrypi"
-        if [[ -n "$(ls -A "${SHARED_VARS_DIR}/platform/raspberrypi/" 2>/dev/null)" ]]; then
-            cp -R "${SHARED_VARS_DIR}/platform/raspberrypi/"* "${WORK_DIR}/group_vars/raspberrypi/"
-        fi
+        cp -r "${SHARED_VARS_DIR}/platform/raspberrypi/"* "${WORK_DIR}/group_vars/raspberrypi/" 2>/dev/null || true
     fi
 
     # Layer 3: Copy app-specific vars (highest priority - overrides shared)
     APP_VARS_DIR="${WORKSPACE_DIR:-/workspace}/apps/${TARGET_PLATFORM}/vars"
     if [[ -d "${APP_VARS_DIR}" ]]; then
         log_info "Loading app-specific vars from: ${APP_VARS_DIR}"
-        if [[ -n "$(ls -A "${APP_VARS_DIR}/" 2>/dev/null)" ]]; then
-            cp -R "${APP_VARS_DIR}/"* "${WORK_DIR}/group_vars/${PLATFORM_GROUP}/"
-        fi
+        cp -r "${APP_VARS_DIR}/"* "${WORK_DIR}/group_vars/${PLATFORM_GROUP}/" 2>/dev/null || true
     fi
 
     # Copy profile vars to all group
@@ -638,9 +592,9 @@ EOF
     fi
 
     # Run playbooks with platform, version, app, and profile extra-vars
-    for playbook in "${PLAYBOOKS_DIR}"/*.yml; do
-        log_info "Running playbook: $(basename "$playbook")"
-        sudo -E ansible-playbook \
+    for playbook in ${PLAYBOOKS_DIR}/*.yml; do
+        log_info "Running playbook: $(basename $playbook)"
+        sudo -E ansible-playbook -v \
             -i "${WORK_DIR}/inventory" \
             --extra-vars "platform_model=${PIMELEON_RPI_MODEL:-3B+}" \
             --extra-vars "rpi_arch=${RPI_ARCH:-armhf}" \
@@ -652,7 +606,7 @@ EOF
             "$playbook" 2>&1 | tee -a "${ANSIBLE_LOG_FILE}" || die "Playbook failed: $playbook. See ${ANSIBLE_LOG_FILE} for details."
     done
 else
-    die "FATAL: No Ansible playbooks found at: ${PLAYBOOKS_DIR}"
+    log_warn "No Ansible playbooks found at: ${PLAYBOOKS_DIR}"
 fi
 
 # Copy custom configs if available
@@ -660,18 +614,18 @@ if [[ -d "${CONFIG_DIR}" ]]; then
     log_info "Copying custom configurations"
 
     # Network configs
-    if [[ -d "${CONFIG_DIR}/network" ]] && [[ -n "$(ls -A "${CONFIG_DIR}/network"/* 2>/dev/null)" ]]; then
-        sudo cp -R "${CONFIG_DIR}/network/"* "${MOUNT_POINT}/etc/network/"
+    if [[ -d "${CONFIG_DIR}/network" ]] && [[ -n "$(ls -A ${CONFIG_DIR}/network/* 2>/dev/null)" ]]; then
+        sudo cp -r "${CONFIG_DIR}/network/"* "${MOUNT_POINT}/etc/network/" || true
     fi
 
     # Security configs
-    if [[ -d "${CONFIG_DIR}/security" ]] && [[ -n "$(ls -A "${CONFIG_DIR}/security"/* 2>/dev/null)" ]]; then
-        sudo cp -R "${CONFIG_DIR}/security/"* "${MOUNT_POINT}/etc/"
+    if [[ -d "${CONFIG_DIR}/security" ]] && [[ -n "$(ls -A ${CONFIG_DIR}/security/* 2>/dev/null)" ]]; then
+        sudo cp -r "${CONFIG_DIR}/security/"* "${MOUNT_POINT}/etc/" || true
     fi
 
     # Service configs
-    if [[ -d "${CONFIG_DIR}/services" ]] && [[ -n "$(ls -A "${CONFIG_DIR}/services"/* 2>/dev/null)" ]]; then
-        sudo cp -R "${CONFIG_DIR}/services/"* "${MOUNT_POINT}/etc/"
+    if [[ -d "${CONFIG_DIR}/services" ]] && [[ -n "$(ls -A ${CONFIG_DIR}/services/* 2>/dev/null)" ]]; then
+        sudo cp -r "${CONFIG_DIR}/services/"* "${MOUNT_POINT}/etc/" || true
     fi
 fi
 
@@ -681,31 +635,16 @@ if [[ -f "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy" ]]; then
     sudo rm -f "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy"
 fi
 
-# Configure static resolv.conf for production
+# Configure static resolv.conf for production (BIND9 handles DNS)
 # This must be done AFTER all network operations (git clone, apt, etc.)
 log_info "Configuring static DNS resolver for production"
-sudo chattr -i "${MOUNT_POINT}/etc/resolv.conf" 2>/dev/null || true
-sudo rm -f "${MOUNT_POINT}/etc/resolv.conf"
-sudo tee "${MOUNT_POINT}/etc/resolv.conf" > /dev/null <<EOF
-# DNS for chroot build environment
-nameserver 8.8.8.8
-nameserver 1.1.1.1
-# nameserver 127.0.0.1
+cat > /tmp/resolv.conf <<EOF
+# Static DNS configuration - BIND9 on localhost
+nameserver 127.0.0.1
+options edns0 trust-ad
 EOF
+sudo cp /tmp/resolv.conf "${MOUNT_POINT}/etc/resolv.conf"
 sudo chmod 644 "${MOUNT_POINT}/etc/resolv.conf"
-
-# Get version information
-log_info "Generating version info: ${IMAGE_PATH}.version.txt"
-cat > "${IMAGE_PATH}.version.txt" <<EOF
-Build Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-Raspbian Version: ${RASPBIAN_VERSION:-bookworm}
-Kernel Version: $(chroot_run "${MOUNT_POINT}" uname -r || echo "unknown")
-Pi Model: ${PIMELEON_RPI_MODEL:-3B+}
-Builder Version: 1.0.0
-EOF
-
-# Verify stage completion
-verify_stage 2 "${MOUNT_POINT}"
 
 # Cleanup chroot
 cleanup_chroot "${MOUNT_POINT}"

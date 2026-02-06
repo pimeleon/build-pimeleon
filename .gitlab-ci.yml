@@ -81,14 +81,14 @@ warm-cache:
       when: never
     - when: on_success
   cache:
-    key: base-system-${PIMELEON_RPI_MODEL:-3B+}-${RASPBIAN_VERSION:-bookworm}
+    key: base-system-${TARGET_PLATFORM:-rpi3-bookworm}
     paths:
       - cache/
     policy: pull-push
   script:
     - mkdir -p cache
     - |
-      CACHE_FILE="cache/pimeleon-${PIMELEON_RPI_MODEL:-3B+}-${RASPBIAN_VERSION:-bookworm}-base.tar.gz"
+      CACHE_FILE="cache/pimeleon-${TARGET_PLATFORM:-rpi3-bookworm}-base.tar.gz"
       if [ -f "$CACHE_FILE" ]; then
         echo "Cache found: $CACHE_FILE"
         ls -lh "$CACHE_FILE"
@@ -105,10 +105,30 @@ security:trivy:
   image:
     name: aquasec/trivy:latest
     entrypoint: [""]
+  tags:
+    - linux
   rules:
     - when: on_success
+  cache:
+    key: trivy-db
+    paths:
+      - .trivy-cache/
+    policy: pull-push
+  variables:
+    TRIVY_CACHE_DIR: .trivy-cache
   script:
-    - trivy fs --exit-code 0 --no-progress --scanners vuln --format json -o trivy-report.json .
+    - mkdir -p ${TRIVY_CACHE_DIR}/db
+    - |
+      # Download DB if not cached
+      if [ ! -f "${TRIVY_CACHE_DIR}/db/trivy.db" ]; then
+        echo "Downloading Trivy DB with retries..."
+        for i in 1 2 3; do
+          trivy image --download-db-only --cache-dir ${TRIVY_CACHE_DIR} && break
+          echo "Retry $i failed, waiting..."
+          sleep 10
+        done
+      fi
+    - trivy fs --config trivy.yaml --cache-dir ${TRIVY_CACHE_DIR} --skip-db-update --exit-code 0 --no-progress --scanners vuln --format json -o trivy-report.json .
   artifacts:
     paths:
       - trivy-report.json
@@ -140,6 +160,8 @@ security:gitleaks:
 lint:yaml:
   stage: lint
   image: python:3.11-slim
+  tags:
+    - python
   rules:
     - if: '$CI_COMMIT_TAG'
       when: never
@@ -147,12 +169,14 @@ lint:yaml:
   before_script:
     - pip install --quiet yamllint
   script:
-    - yamllint -c .yamllint . || true
+    - yamllint -c .yamllint .
   allow_failure: true
 
 lint:ansible:
   stage: lint
   image: python:3.11-slim
+  tags:
+    - python
   rules:
     - if: '$CI_COMMIT_TAG'
       when: never
@@ -160,18 +184,20 @@ lint:ansible:
   before_script:
     - pip install --quiet ansible-lint
   script:
-    - ansible-lint ansible/playbooks/*.yml || true
+    - ansible-lint shared/ansible/playbooks/*.yml
   allow_failure: true
 
 lint:shell:
   stage: lint
   image: koalaman/shellcheck-alpine:latest
+  tags:
+    - linux
   rules:
     - if: '$CI_COMMIT_TAG'
       when: never
     - when: on_success
   script:
-    - find . -name "*.sh" -type f -exec shellcheck {} \; || true
+    - find . -name "*.sh" -type f -exec shellcheck {} \;
   allow_failure: true
 
 # ============================================
@@ -186,8 +212,9 @@ build:containers:
       when: never
     - when: on_success
   script:
-    - docker build --cache-from ${CI_REGISTRY_IMAGE}/builder:latest -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest ./containers/builder
-    - docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest ./containers/tester
+    - docker build --cache-from ${CI_REGISTRY_IMAGE}/builder:latest -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest -f ./shared/containers/builder/Dockerfile .
+    # Tester: no-cache to ensure scripts are always copied fresh
+    - docker build --no-cache -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest ./shared/containers/tester
     - docker push $BUILD_IMAGE
     - docker push ${CI_REGISTRY_IMAGE}/builder:latest
     - docker push $TEST_IMAGE
@@ -198,7 +225,7 @@ build:pimeleon:
   stage: build
   needs: ["warm-cache", "build:containers"]
   cache:
-    key: base-system-${PIMELEON_RPI_MODEL:-3B+}-${RASPBIAN_VERSION:-bookworm}
+    key: base-system-${TARGET_PLATFORM:-rpi3-bookworm}
     paths:
       - cache/
     policy: pull
@@ -209,36 +236,47 @@ build:pimeleon:
     # RPi 3B+ builds (release/rpi3-* branches)
     - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi3-/'
       variables:
-        PIMELEON_RPI_MODEL: "3B+"
-        RASPBIAN_VERSION: "bookworm"
+        TARGET_PLATFORM: "rpi3-bookworm"
     # RPi 4B builds (release/rpi4-* branches)
     - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi4-/'
       variables:
-        PIMELEON_RPI_MODEL: "4B"
-        RASPBIAN_VERSION: "bookworm"
+        TARGET_PLATFORM: "rpi4-bookworm"
     # Default for develop (use RPi 3B+ as reference build)
     - if: '$CI_COMMIT_BRANCH == "develop"'
       variables:
-        PIMELEON_RPI_MODEL: "3B+"
-        RASPBIAN_VERSION: "bookworm"
+        TARGET_PLATFORM: "rpi3-bookworm"
     - when: on_success
   script:
-    - echo "Building Pimeleon for ${PIMELEON_RPI_MODEL:-3B+} (${RASPBIAN_VERSION:-bookworm})..."
+    - echo "Building Pimeleon app ${TARGET_PLATFORM:-rpi3-bookworm}..."
     - mkdir -p output cache
     - |
-      docker run --rm \
+      # Calculate version from conventional commits
+      chmod +x ./shared/scripts/get-next-version.sh
+      PIMELEON_VERSION=$(./shared/scripts/get-next-version.sh "${TARGET_PLATFORM:-rpi3-bookworm}")
+      echo "Building version: ${PIMELEON_VERSION}"
+    - |
+      # Create container, copy scripts, then start
+      CONTAINER_ID=$(docker create \
         --privileged \
         -v /dev:/dev:rw \
         -v $CI_PROJECT_DIR/output:/output \
         -v $CI_PROJECT_DIR/cache:/cache \
         -v $CI_PROJECT_DIR/configs:/configs \
-        -v $CI_PROJECT_DIR/ansible:/ansible \
-        -e BUILD_CACHE_DIR=/cache \
+        -v $CI_PROJECT_DIR/shared/ansible:/ansible:ro \
+        -e WORKSPACE_DIR=/workspace \
+        -e CACHE_DIR=/cache \
         -e OUTPUT_DIR=/output \
-        -e PIMELEON_RPI_MODEL=${PIMELEON_RPI_MODEL:-3B+} \
-        -e RASPBIAN_VERSION=${RASPBIAN_VERSION:-bookworm} \
+        -e TARGET_PLATFORM=${TARGET_PLATFORM:-rpi3-bookworm} \
+        -e PIMELEON_VERSION=${PIMELEON_VERSION} \
         -e APT_CACHE_SERVER=${APT_PROXY%:*} \
-        $BUILD_IMAGE
+        -e PIMELEON_UI_BUILD_TOKEN=${PIMELEON_UI_BUILD_TOKEN} \
+        $BUILD_IMAGE)
+      # Copy scripts into container
+      docker cp shared/scripts/. $CONTAINER_ID:/scripts/
+      # Start container and wait for completion
+      docker start -a $CONTAINER_ID
+      # Cleanup
+      docker rm $CONTAINER_ID || true
     - echo "Build output:"
     - ls -la output/ || true
     - sudo chown -R "$(id -u):$(id -g)" output/ || true
@@ -309,7 +347,7 @@ test:integration:
 publish:image:
   stage: publish
   tags:
-    - containers
+    - lightweight
   needs: ["build:pimeleon", "test:smoke"]
   rules:
     # Publish on platform release branches
@@ -329,6 +367,8 @@ publish:image:
 publish:pages:
   stage: publish
   image: python:3.11-slim
+  tags:
+    - lightweight
   needs: ["test:smoke"]
   rules:
     # Publish docs from develop or release branches
@@ -353,6 +393,8 @@ publish:pages:
 release:rpi3-bookworm:
   stage: release
   image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
+  tags:
+    - lightweight
   cache: {}
   needs:
     - job: build:pimeleon
@@ -420,6 +462,8 @@ release:rpi3-bookworm:
 release:rpi4-bookworm:
   stage: release
   image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
+  tags:
+    - lightweight
   cache: {}
   needs:
     - job: build:pimeleon

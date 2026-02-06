@@ -56,7 +56,7 @@
     - services_enabled.dhcp_server | default(true)
     - wifi_interface is defined
 
-- name: Configure isc-dhcp-server to start after hostapd and bind9
+- name: Configure isc-dhcp-server to start after hostapd
   ansible.builtin.template:
     src: dhcp/isc-dhcp-server.service.override.j2
     dest: /etc/systemd/system/isc-dhcp-server.service.d/override.conf

@@ -10,30 +10,52 @@ mgmt_interface: "eth0:0"
 # Ethernet availability (override for Zero W)
 ethernet_available: true
 
-# WiFi AP network settings
+# Default network settings (used by all internal interfaces)
+default_ip: "192.168.42.1"
+default_netmask: "255.255.255.0"
+default_netmask_cidr: "24"
+default_subnet: "192.168.42.0/24"
+
+# WiFi AP network settings (wlan0 - primary interface)
 wifi_ap_ip: "192.168.42.1"
 wifi_ap_netmask: "255.255.255.0"
 wifi_ap_network: "192.168.42.0/24"
-
-# LAN Aliases (Tied to primary WiFi AP)
-lan_ip: "{{ wifi_ap_ip }}"
-lan_network: "{{ wifi_ap_network }}"
 
 # Management network
 mgmt_ip: "172.16.0.1"
 mgmt_netmask: "255.255.255.0"
 
 # DHCP configuration
+dhcp_range_start: "192.168.42.100"
+dhcp_range_end: "192.168.42.200"
+dhcp_lease_time: "12h"
+
 wifi_dhcp_range_start: "192.168.42.100"
 wifi_dhcp_range_end: "192.168.42.200"
-dhcp_lease_time: "12h"
+
+# Service ports
+dnscrypt_port: 5054
+pihole_port: 5553
+privoxy_port: 8118
+squid_http_port: 3128
+squid_transparent_port: 3129
+squid_https_port: 31443
+
+# DNS nameservers (for services that need upstream DNS)
+dns_local: "127.0.0.1"
+dns_internal: "{{ default_ip }}"
 
 # WiFi AP configuration
 wifi_ssid: "pimeleon"
-wifi_passphrase: "changeme123!"
+wifi_passphrase: "changeme123"
 wifi_channel: 6
 wifi_hw_mode: "g"
 wifi_country_code: "US"
+
+# DNS servers
+upstream_dns:
+  - "8.8.8.8"
+  - "8.8.4.4"
 
 # NTP servers for DHCP clients
 ntp_servers:
@@ -43,18 +65,3 @@ ntp_servers:
 
 # DNS domain
 dns_domain: "pimeleon.local"
-domain_name: "{{ dns_domain }}"
-
-# Internal Service Ports
-pihole_port: 5553
-
-# Template Context Facts
-default_ip: "{{ wifi_ap_ip }}"
-dns_local: "127.0.0.1"
-dns_internal: "{{ wifi_ap_ip }}"
-hostname: "pimeleon"
-
-# Squid Proxy Configuration
-squid_http_port: 3128
-squid_transparent_port: 3129
-squid_https_port: 31443

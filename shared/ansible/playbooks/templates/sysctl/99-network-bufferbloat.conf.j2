@@ -25,9 +25,11 @@ net.core.wmem_max = 4194304
 # IP forwarding
 net.ipv4.ip_forward = 1
 net.ipv4.conf.all.forwarding = 1
+net.ipv4.conf.{{ wifi_interface | default('wlan0') }}.forwarding = 1
 
-# Disable reverse path filtering for LAN interfaces (required for routing)
+# Disable reverse path filtering for WiFi interface (required for routing)
 net.ipv4.conf.all.rp_filter = 0
+net.ipv4.conf.{{ wifi_interface | default('wlan0') }}.rp_filter = 0
 
 # IPv6 settings
 net.ipv6.conf.default.disable_ipv6 = 0

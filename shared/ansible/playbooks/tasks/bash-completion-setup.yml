@@ -23,7 +23,7 @@
 
 - name: Bash Completion | Ensure /etc/bash_completion is sourced for pim user
   ansible.builtin.template:
-    src: "system/bashrc.j2"
+    src: "bashrc.j2"
     dest: "/home/pim/.bashrc"
     owner: "pim"
     group: "pim"
@@ -31,7 +31,7 @@
 
 - name: Bash Completion | Ensure /etc/bash_completion is sourced for root user
   ansible.builtin.template:
-    src: "system/bashrc.j2"
+    src: "bashrc.j2"
     dest: "/root/.bashrc"
     owner: "root"
     group: "root"

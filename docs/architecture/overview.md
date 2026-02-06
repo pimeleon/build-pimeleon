@@ -1,6 +1,7 @@
 # Architecture Overview
 
-The Pimeleon Build System is a containerized, multi-stage build pipeline that creates bootable Raspberry Pi images using ARM cross-compilation and QEMU emulation.
+The Pimeleon Build System is a containerized, multi-stage build pipeline that creates
+bootable Raspberry Pi images using ARM cross-compilation and QEMU emulation.
 
 ## High-Level Architecture
 
@@ -36,7 +37,7 @@ graph TB
     end
 
     subgraph "External Resources"
-        R[APT Cache<br/>192.168.76.5:3142]
+        R[APT Cache<br/>192.168.42.5:3142]
         S[Raspbian Archive<br/>archive.raspbian.org]
         T[Pi Foundation<br/>archive.raspberrypi.org]
     end
@@ -196,7 +197,7 @@ sequenceDiagram
 flowchart TD
     A[Builder Script] --> B{APT Cache<br/>Configured?}
 
-    B -->|Yes| C[Check APT Cache<br/>192.168.76.5:3142]
+    B -->|Yes| C[Check APT Cache<br/>192.168.42.5:3142]
     B -->|No| D[Direct Download]
 
     C --> E{Package<br/>in Cache?}
@@ -458,19 +459,19 @@ graph TB
 
 <div class="grid cards" markdown>
 
--   **Container Details**
+- **Container Details**
 
     Detailed specifications of each container, Dockerfiles, and tools
 
     [:octicons-arrow-right-24: Containers](containers.md)
 
--   **Build Pipeline**
+- **Build Pipeline**
 
     Deep dive into each build stage and what happens
 
     [:octicons-arrow-right-24: Build Pipeline](build-pipeline.md)
 
--   **Network Design**
+- **Network Design**
 
     Network architecture, interfaces, and routing configuration
 

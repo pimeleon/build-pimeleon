@@ -265,12 +265,12 @@ configure_ethernet() {
     local current_mode="DHCP"
     local current_ip=""
 
-    if [[ -f /etc/systemd/network/10-eth0-wan.network ]]; then
-        if grep -q "DHCP=yes" /etc/systemd/network/10-eth0-wan.network 2>/dev/null; then
+    if [[ -f /etc/systemd/network/10-wan.network ]]; then
+        if grep -q "DHCP=yes" /etc/systemd/network/10-wan.network 2>/dev/null; then
             current_mode="DHCP"
         else
             current_mode="Static"
-            current_ip=$(grep -E "^Address=" /etc/systemd/network/10-eth0-wan.network 2>/dev/null | cut -d= -f2 || echo "")
+            current_ip=$(grep -E "^Address=" /etc/systemd/network/10-wan.network 2>/dev/null | cut -d= -f2 || echo "")
         fi
     fi
 
@@ -292,9 +292,9 @@ configure_ethernet() {
 }
 
 configure_eth_dhcp() {
-    cat > /etc/systemd/network/10-eth0-wan.network <<EOF
+    cat > /etc/systemd/network/10-wan.network <<EOF
 [Match]
-Type=ether
+Name=eth0
 
 [Network]
 DHCP=yes
@@ -324,9 +324,9 @@ configure_eth_static() {
         return
     fi
 
-    cat > /etc/systemd/network/10-eth0-wan.network <<EOF
+    cat > /etc/systemd/network/10-wan.network <<EOF
 [Match]
-Type=ether
+Name=eth0
 
 [Network]
 Address=$ip
@@ -558,6 +558,7 @@ load_ssh_config() {
         source "$SSH_CONFIG"
     else
         SSH_WLAN0="yes"
+        SSH_ETH0="no"
     fi
 }
 
@@ -568,6 +569,7 @@ save_ssh_config() {
 # Managed by pim-config - do not edit manually
 # Set to 'yes' to allow SSH, 'no' to block
 SSH_WLAN0=$SSH_WLAN0
+SSH_ETH0=$SSH_ETH0
 EOF
 }
 
@@ -583,6 +585,10 @@ EOF
         echo 'iifname "wlan0" tcp dport 22 counter drop comment "SSH blocked on wlan0"' >> "$SSH_NFT"
     fi
 
+    if [[ "$SSH_ETH0" == "no" ]]; then
+        echo 'iifname "eth0" tcp dport 22 counter drop comment "SSH blocked on eth0"' >> "$SSH_NFT"
+    fi
+
     # Reload nftables
     if nft -f /etc/nftables.conf 2>/dev/null; then
         return 0
@@ -596,13 +602,16 @@ menu_ssh_access() {
 
     while true; do
         local wlan0_status="[ ]"
+        local eth0_status="[ ]"
         [[ "$SSH_WLAN0" == "yes" ]] && wlan0_status="[*]"
+        [[ "$SSH_ETH0" == "yes" ]] && eth0_status="[*]"
 
         local choice
         choice=$(whiptail --title "SSH Access Control" --menu \
-            "Toggle SSH access per interface:\n\n$wlan0_status wlan0 (WiFi AP)\n\nNote: SSH on eth0 (WAN) is always blocked." \
+            "Toggle SSH access per interface:\n\n$wlan0_status wlan0 (WiFi AP / LAN)\n$eth0_status eth0 (WAN / LAN server)\n\nRecommended: Enable wlan0, disable eth0 (WAN)" \
             $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
             "1" "Toggle wlan0 SSH (currently: $SSH_WLAN0)" \
+            "2" "Toggle eth0 SSH (currently: $SSH_ETH0)" \
             "B" "Back to System Settings" \
             3>&1 1>&2 2>&3) || break
 
@@ -616,6 +625,19 @@ menu_ssh_access() {
                 save_ssh_config
                 if update_ssh_nftables; then
                     whiptail --msgbox "SSH on wlan0: $SSH_WLAN0\nFirewall rules updated." 10 50
+                else
+                    whiptail --msgbox "SSH config saved but firewall reload failed.\nChanges will apply on next reboot." 10 50
+                fi
+                ;;
+            2)
+                if [[ "$SSH_ETH0" == "yes" ]]; then
+                    SSH_ETH0="no"
+                else
+                    SSH_ETH0="yes"
+                fi
+                save_ssh_config
+                if update_ssh_nftables; then
+                    whiptail --msgbox "SSH on eth0: $SSH_ETH0\nFirewall rules updated." 10 50
                 else
                     whiptail --msgbox "SSH config saved but firewall reload failed.\nChanges will apply on next reboot." 10 50
                 fi

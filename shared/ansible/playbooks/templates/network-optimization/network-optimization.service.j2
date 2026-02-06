@@ -1,6 +1,5 @@
 # Network Optimization Service for Pimeleon
 # Implements CAKE QoS, txqueuelen tuning, and WiFi power management
-# Ported from working gw configuration
 
 [Unit]
 Description=Network Optimization (CAKE QoS, txqueuelen, WiFi power)
@@ -18,7 +17,7 @@ ExecStartPre=-/sbin/ifconfig {{ wifi_interface | default('wlan0') }} txqueuelen 
 # Disable WiFi power save for better latency
 ExecStartPre=-/sbin/iw {{ wifi_interface | default('wlan0') }} set power_save off
 
-# Apply CAKE QoS to all interfaces
+# Apply CAKE QoS to interfaces
 # - {{ wan_interface | default('eth0') }} (WAN): {{ wan_bandwidth | default('200mbit') }}
 # - {{ wifi_interface | default('wlan0') }} (WiFi): {{ wifi_bandwidth | default('40mbit') }}
 # Options: diffserv3 triple-isolate for fair bandwidth sharing

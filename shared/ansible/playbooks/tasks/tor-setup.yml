@@ -1,23 +1,67 @@
 ---
-# Tor installation from APT package
-# Provides anonymity network routing
-# Uses Debian's maintained Tor package for reliability
+# Tor installation from official Tor Project repository
+# https://support.torproject.org/little-t-tor/getting-started/installing/
+# Provides anonymity network routing with automatic security updates
 
-- name: Check if Tor is already installed (built from source)
-  ansible.builtin.stat:
-    path: /usr/local/bin/tor
-  register: tor_source_bin
+- name: Install Tor repository prerequisites
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - gnupg
+    state: present
+    update_cache: false
+  when: services_enabled.tor | default(false)
 
-- name: Install Tor from APT
+- name: Create keyrings directory
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: '0755'
+  when: services_enabled.tor | default(false)
+
+- name: Download Tor Project GPG key
+  ansible.builtin.get_url:
+    url: https://deb.torproject.org/torproject.org/A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89.asc
+    dest: /tmp/tor-keyring.asc
+    mode: '0644'
+  when: services_enabled.tor | default(false)
+
+- name: Convert Tor GPG key to keyring format
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /usr/share/keyrings/deb.torproject.org-keyring.gpg /tmp/tor-keyring.asc
+    creates: /usr/share/keyrings/deb.torproject.org-keyring.gpg
+  when: services_enabled.tor | default(false)
+
+- name: Remove temporary GPG key file
+  ansible.builtin.file:
+    path: /tmp/tor-keyring.asc
+    state: absent
+  when: services_enabled.tor | default(false)
+
+- name: Add Tor Project repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/tor.sources
+    content: |
+      Types: deb deb-src
+      URIs: https://deb.torproject.org/torproject.org/
+      Suites: {{ raspbian_version | default('bookworm') }}
+      Components: main
+      Signed-By: /usr/share/keyrings/deb.torproject.org-keyring.gpg
+    mode: '0644'
+  when: services_enabled.tor | default(false)
+
+- name: Update apt cache for Tor repository
+  ansible.builtin.apt:
+    update_cache: true
+  when: services_enabled.tor | default(false)
+
+- name: Install Tor from official repository
   ansible.builtin.apt:
     name:
       - tor
-      - tor-geoipdb
     state: present
     update_cache: false
-  when:
-    - services_enabled.tor | default(false)
-    - not (tor_source_bin.stat.exists | default(false))
+  when: services_enabled.tor | default(false)
 
 - name: Ensure debian-tor group exists
   ansible.builtin.group:
@@ -66,14 +110,5 @@
   when: services_enabled.tor | default(false)
   notify: Restart tor
 
-- name: Deploy Tor systemd service unit
-  ansible.builtin.template:
-    src: tor/tor.service.j2
-    dest: /etc/systemd/system/tor.service
-    mode: '0644'
-  when: services_enabled.tor | default(false)
-  notify:
-    - Reload systemd
-    - Restart tor
-
 # Note: Tor service enablement happens in stage3-optimize.sh (outside chroot)
+# The package installs its own systemd service file

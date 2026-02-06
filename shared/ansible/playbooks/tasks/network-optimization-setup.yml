@@ -22,16 +22,9 @@
 # ZRAM swap configuration for better memory management on Pi
 - name: Deploy zram swap configuration
   ansible.builtin.template:
-    src: system/zramswap.j2
+    src: zramswap.j2
     dest: /etc/default/zramswap
     mode: '0644'
   when: services_enabled.zram | default(true)
 
-- name: Deploy dphys-swapfile configuration
-  ansible.builtin.template:
-    src: system/dphys-swapfile.j2
-    dest: /etc/dphys-swapfile
-    mode: '0644'
-  when: services_enabled.swapfile | default(true)
-
-# Note: zramswap and dphys-swapfile service enablement happens in stage3-optimize.sh (outside chroot)
+# Note: zramswap service enablement happens in stage3-optimize.sh (outside chroot)

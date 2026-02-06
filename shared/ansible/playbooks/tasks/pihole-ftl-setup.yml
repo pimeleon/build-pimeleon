@@ -1,54 +1,23 @@
 ---
-# Pi-hole configuration for Pimeleon
-# Most of the installation is handled in stage2-customize.sh via the official installer
+# Pi-hole FTL configuration
+# Binary is built from source in stage2-customize.sh
+# This task only configures the service (no installation)
 
-- name: Check if pihole-FTL is installed
-  ansible.builtin.stat:
-    path: /usr/bin/pihole-FTL
-  register: pihole_ftl_bin
-  when: services_enabled.pihole | default(false)
-
-- name: Check if pihole-FTL is installed in /usr/local/bin
+- name: Check if pihole-FTL binary exists
   ansible.builtin.stat:
     path: /usr/local/bin/pihole-FTL
-  register: pihole_ftl_local_bin
-  when:
-    - services_enabled.pihole | default(false)
-    - not (pihole_ftl_bin.stat.exists | default(false))
-
-- name: Set pihole_ftl_path fact
-  ansible.builtin.set_fact:
-    pihole_ftl_path: >-
-      {{ pihole_ftl_bin.stat.path if pihole_ftl_bin.stat.exists else
-      (pihole_ftl_local_bin.stat.path if pihole_ftl_local_bin.stat.exists else '') }}
+  register: pihole_binary
   when: services_enabled.pihole | default(false)
 
-- name: Warn if Pi-hole is not installed but enabled
+- name: Skip Pi-hole setup if binary not built
   ansible.builtin.debug:
-    msg: "Pi-hole FTL binary not found - check stage2 logs"
+    msg: "Pi-hole FTL binary not found - was it built in stage2?"
   when:
     - services_enabled.pihole | default(false)
-    - pihole_ftl_path == ""
+    - not (pihole_binary.stat.exists | default(false))
 
-# Ensure directories exist (redundant but safe)
-- name: Create Pi-hole directories
-  ansible.builtin.file:
-    path: "{{ item.path }}"
-    state: directory
-    owner: "{{ item.owner | default('pihole') }}"
-    group: "{{ item.group | default('pihole') }}"
-    mode: "{{ item.mode }}"
-  loop:
-    - { path: /etc/pihole, mode: '0775' }
-    - { path: /etc/pihole/config_backups, mode: '0755' }
-    - { path: /var/lib/pihole, mode: '0755' }
-    - { path: /var/log/pihole, mode: '0755' }
-    - { path: /run/pihole, mode: '0755' }
-  when:
-    - services_enabled.pihole | default(false)
-    - pihole_ftl_path != ""
-
-- name: Create Pi-hole FTL configuration (v6)
+# All tasks below only run if binary exists
+- name: Create Pi-hole FTL configuration
   ansible.builtin.template:
     src: pihole/pihole.toml.j2
     dest: /etc/pihole/pihole.toml
@@ -57,8 +26,19 @@
     mode: '0644'
   when:
     - services_enabled.pihole | default(false)
-    - pihole_ftl_path != ""
+    - pihole_binary.stat.exists | default(false)
   notify: Restart pihole-FTL
+
+- name: Create setupVars.conf for compatibility
+  ansible.builtin.template:
+    src: pihole/setupVars.conf.j2
+    dest: /etc/pihole/setupVars.conf
+    owner: pihole
+    group: pihole
+    mode: '0644'
+  when:
+    - services_enabled.pihole | default(false)
+    - pihole_binary.stat.exists | default(false)
 
 - name: Create Pi-hole FTL systemd service
   ansible.builtin.template:
@@ -67,19 +47,9 @@
     mode: '0644'
   when:
     - services_enabled.pihole | default(false)
-    - pihole_ftl_path != ""
+    - pihole_binary.stat.exists | default(false)
   notify:
     - Reload systemd
     - Restart pihole-FTL
-
-- name: Create pihole CLI symlink
-  ansible.builtin.file:
-    src: "{{ pihole_ftl_path }}"
-    dest: /usr/local/bin/pihole
-    state: link
-    force: true
-  when:
-    - services_enabled.pihole | default(false)
-    - pihole_ftl_path != ""
 
 # Note: pihole-FTL service enablement happens in stage3-optimize.sh (outside chroot)

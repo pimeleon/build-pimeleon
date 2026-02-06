@@ -19,11 +19,11 @@ Analysis of critical services running on the production Pimeleon (gw host).
 
 | Interface | IP Address | Role |
 |-----------|------------|------|
-| **eth0** | DHCP (195.138.66.74/16) | WAN - Internet uplink |
-| **eth1** | 192.168.76.1/24 | LAN - Wired internal network |
-| **wlan0** | 192.168.77.1/24 | WiFi - Wireless access point |
+| **eth0** | DHCP client | WAN - Internet uplink |
+| **wlan0** | 192.168.42.1/24 | WiFi - Wireless access point |
 
 ### IPv6 Configuration
+
 - eth1: fd00:ffff:0:1176::1/64 (ULA)
 - wlan0: fd00:ffff:0:1177::1/64 (ULA)
 
@@ -97,17 +97,20 @@ Clients → BIND9 (53) → Pi-hole (5553) → dnscrypt-proxy (5054) → Internet
 ## Firewall Configuration (nftables)
 
 ### Default Policies
+
 - **Input:** DROP (whitelist)
 - **Forward:** DROP (whitelist)
 - **Output:** ACCEPT
 
 ### NAT Rules
+
 - Masquerade LAN (eth1) → WAN (eth0)
 - Masquerade WiFi (wlan0) → WAN (eth0)
 - HTTP redirect to Privoxy (8118)
-- Port forwarding: TCP 33996, UDP 50044 → 192.168.76.10
+- Port forwarding: TCP 33996, UDP 50044 → 192.168.42.10
 
 ### Allowed Inbound (WAN)
+
 - HTTPS (443)
 - GitLab (8443)
 - DNS (53)
@@ -119,9 +122,9 @@ Clients → BIND9 (53) → Pi-hole (5553) → dnscrypt-proxy (5054) → Internet
 | Setting | Value |
 |---------|-------|
 | Domain | pirouter.dev |
-| Wired LAN Pool | 192.168.76.100-254 |
-| WiFi Pool | 192.168.77.100-254 |
-| DNS Server | 192.168.76.1 |
+| Wired LAN Pool | 192.168.42.100-254 |
+| WiFi Pool | 192.168.42.100-254 |
+| DNS Server | 192.168.42.1 |
 | Lease Time | 86400s (default) |
 | DDNS | Enabled (updates BIND9) |
 
@@ -139,11 +142,13 @@ Clients → BIND9 (53) → Pi-hole (5553) → dnscrypt-proxy (5054) → Internet
 ## Resource Considerations
 
 ### Memory Usage
+
 - Total: 921MB
 - Used: ~51%
 - Swap: 206MB active (indicates memory pressure)
 
 ### Recommendations for Pi 3B+
+
 1. Running Tor + Privoxy + Squid simultaneously is resource-heavy
 2. Consider disabling unused services (NFS, Samba if not needed)
 3. Squid caching may be excessive for limited RAM

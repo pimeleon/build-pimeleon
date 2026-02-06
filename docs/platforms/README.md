@@ -2,7 +2,9 @@
 
 ## Overview
 
-Pimeleon Build System supports Raspberry Pi single-board computers through a YAML-based hardware profile system. The build system creates custom router images optimized for each supported model.
+Pimeleon Build System supports Raspberry Pi single-board computers through a YAML-based
+hardware profile system. The build system creates custom router images optimized for each
+supported model.
 
 ## Supported Platforms
 
@@ -12,17 +14,20 @@ Pimeleon Build System supports Raspberry Pi single-board computers through a YAM
 | Raspberry Pi | 4 Model B | ARMv8 (64-bit capable) | 🚧 Partial | Core Team |
 
 **Status Levels**:
+
 - ✅ **Stable**: Production-ready, extensively tested, full support
 - 🚧 **Partial**: Builds work but not fully optimized for hardware
 
 ## Quick Platform Selection
 
 ### Raspberry Pi 3B+ (Recommended for most users)
+
 - **Best for**: Budget-friendly router, proven platform
 - **Estimated Cost**: ~$35-45 USD
 - **Throughput**: ~300 Mbps (Ethernet over USB 2.0)
 
 ### Raspberry Pi 4B (High Performance)
+
 - **Best for**: Gigabit throughput, future-proof builds
 - **Estimated Cost**: ~$45-75 USD
 - **Throughput**: ~940 Mbps (true Gigabit Ethernet)
@@ -99,7 +104,8 @@ ssh pi@<device-ip>
 
 ## Future Platform Support
 
-See [Multi-Platform Strategy](../architecture/multi-platform-strategy.md) for the roadmap on expanding platform support to additional ARM SBCs.
+See [Multi-Platform Strategy](../architecture/multi-platform-strategy.md) for the roadmap on
+expanding platform support to additional ARM SBCs.
 
 ---
 
