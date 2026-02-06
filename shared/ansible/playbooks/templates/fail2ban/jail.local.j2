@@ -1,0 +1,71 @@
+# fail2ban jail configuration
+
+[INCLUDES]
+before = paths-debian.conf
+
+[DEFAULT]
+# Ban duration and thresholds
+bantime = {{ fail2ban_bantime | default(3600) }}
+findtime = {{ fail2ban_findtime | default(600) }}
+maxretry = {{ fail2ban_maxretry | default(3) }}
+
+# Ignore local networks
+ignoreip = 127.0.0.1/8 {{ default_subnet }}
+
+# Backend settings
+backend = auto
+usedns = warn
+logencoding = auto
+enabled = false
+
+# Use nftables for banning
+banaction = nftables-multiport
+banaction_allports = nftables-allports
+action = %(action_)s
+
+# Logging
+protocol = tcp
+chain = INPUT
+port = 0:65535
+
+# SSH Protection
+[sshd]
+enabled = true
+filter = sshd
+port = ssh
+logpath = /var/log/auth.log
+backend = %(sshd_backend)s
+maxretry = 3
+bantime = 7200
+findtime = 300
+
+# Recidive jail for repeat offenders
+[recidive]
+enabled = true
+filter = recidive
+logpath = /var/log/fail2ban.log
+banaction = %(banaction_allports)s
+bantime = 604800
+findtime = 86400
+maxretry = 5
+
+# Named/BIND protection
+[named-refused]
+enabled = {{ 'true' if services_enabled.dns_server | default(true) else 'false' }}
+filter = named-refused
+port = domain,953
+logpath = /var/log/named/security.log
+maxretry = 5
+bantime = 1800
+findtime = 300
+
+# Generic PAM protection
+[pam-generic]
+enabled = true
+filter = pam-generic
+banaction = %(banaction_allports)s
+logpath = %(syslog_authpriv)s
+backend = %(syslog_backend)s
+maxretry = 5
+bantime = 3600
+findtime = 600

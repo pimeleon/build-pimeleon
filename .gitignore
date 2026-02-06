@@ -57,6 +57,7 @@ secrets/
 .env
 .env.*
 !.env.example
+!.env.defaults
 
 # VM images and states
 *.qcow2.backup
@@ -68,6 +69,9 @@ libvirt/images/
 # Package manager
 node_modules/
 vendor/
+
+# Downloaded external sources (fetched during build)
+shared/ansible/playbooks/files/
 
 # Pimeleon build system
 *test*.*
@@ -83,3 +87,7 @@ site/assets/javascripts/lunr/min/lunr.*.min.js
 !site/assets/javascripts/lunr/min/lunr.stemmer.support.min.js
 # Git backup files
 .git.backup*.tar.gz
+
+# AI instruction files (local only)
+CLAUDE.md
+GEMINI.md

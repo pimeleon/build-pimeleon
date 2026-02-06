@@ -1,0 +1,30 @@
+---
+# Logrotate setup tasks for Pimeleon
+# Configures log rotation for system and service logs
+# Optimized for limited Pi storage
+
+- name: Deploy rsyslog logrotate configuration
+  ansible.builtin.template:
+    src: logrotate/rsyslog.j2
+    dest: /etc/logrotate.d/rsyslog
+    mode: '0644'
+
+- name: Deploy privoxy logrotate configuration
+  ansible.builtin.template:
+    src: logrotate/privoxy.j2
+    dest: /etc/logrotate.d/privoxy
+    mode: '0644'
+  when: services_enabled.proxy_services | default(true)
+
+- name: Deploy hostapd logrotate configuration
+  ansible.builtin.template:
+    src: logrotate/hostapd.j2
+    dest: /etc/logrotate.d/hostapd
+    mode: '0644'
+  when: services_enabled.hostapd | default(true)
+
+- name: Deploy pimeleon logrotate configuration
+  ansible.builtin.template:
+    src: logrotate/pimeleon.j2
+    dest: /etc/logrotate.d/pimeleon
+    mode: '0644'

@@ -1,0 +1,16 @@
+# Pimeleon tmpfiles.d cleanup configuration
+# Cleans temporary directories to preserve SD card space
+
+# Clean /var/tmp files older than 7 days
+d /var/tmp 1777 root root 7d -
+
+# Clean subdirectories in /var/tmp older than 7 days
+D /var/tmp/* - - - 7d -
+
+# Keep pimeleon working directories but clean old files
+d /var/tmp/pimeleon 0755 root root - -
+D /var/tmp/pimeleon/* - - - 1d -
+
+# Keep adblock2privoxy cache but clean old files
+d /var/tmp/adblock2privoxy 0755 root root - -
+D /var/tmp/adblock2privoxy/* - - - 1d -

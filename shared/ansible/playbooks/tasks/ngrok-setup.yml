@@ -1,0 +1,47 @@
+---
+# tasks file for ngrok-setup
+# NOTE: ngrok binary installed via apt in stage2 (from ngrok repo)
+
+- name: Create ngrok data directory
+  ansible.builtin.file:
+    path: /var/lib/ngrok
+    state: directory
+    owner: pim-ngrok
+    group: pim
+    mode: '0750'
+
+- name: Create ngrok config file placeholder
+  ansible.builtin.copy:
+    dest: /var/lib/ngrok/ngrok.yml
+    owner: pim-ngrok
+    group: pim
+    mode: '0640'
+    content: |
+      # ngrok configuration
+      # Add your authtoken here after first boot:
+      # authtoken: YOUR_AUTHTOKEN
+      version: "2"
+      tunnels: {}
+    force: false
+
+- name: Create ngrok systemd service
+  ansible.builtin.template:
+    src: ngrok/ngrok.service.j2
+    dest: /etc/systemd/system/ngrok.service
+    mode: '0644'
+  notify:
+    - Reload systemd
+
+- name: Copy ngrok README
+  ansible.builtin.template:
+    src: ngrok/ngrok-README.md
+    dest: /var/lib/ngrok/README.md
+    owner: pim-ngrok
+    group: pim
+    mode: '0644'
+
+- name: Disable and mask ngrok service
+  ansible.builtin.systemd:
+    name: ngrok
+    enabled: false
+    masked: true

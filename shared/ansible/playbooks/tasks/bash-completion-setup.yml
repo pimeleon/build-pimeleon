@@ -1,0 +1,38 @@
+---
+- name: Bash Completion | Install bash-completion package
+  ansible.builtin.apt:
+    name: bash-completion
+    state: present
+    update_cache: true
+
+- name: Bash Completion | Create Bash Completion Directory
+  ansible.builtin.file:
+    path: "/etc/bash_completion.d"
+    state: directory
+    owner: "root"
+    group: "root"
+    mode: "0755"
+
+- name: Bash Completion | Copy Pimeleon Completion Script
+  ansible.builtin.copy:
+    src: "services/bash-completion/pimeleon-completion.bash"
+    dest: "/etc/bash_completion.d/pimeleon-completion.bash"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+
+- name: Bash Completion | Ensure /etc/bash_completion is sourced for pim user
+  ansible.builtin.template:
+    src: "bashrc.j2"
+    dest: "/home/pim/.bashrc"
+    owner: "pim"
+    group: "pim"
+    mode: "0644"
+
+- name: Bash Completion | Ensure /etc/bash_completion is sourced for root user
+  ansible.builtin.template:
+    src: "bashrc.j2"
+    dest: "/root/.bashrc"
+    owner: "root"
+    group: "root"
+    mode: "0644"

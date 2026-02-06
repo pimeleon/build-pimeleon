@@ -1,0 +1,23 @@
+# {{ ansible_managed }}
+# hostapd systemd service for Pimeleon router
+
+[Unit]
+Description=IEEE 802.11 AP, IEEE 802.1X/WPA/WPA2/WPA3 Authenticator
+Documentation=man:hostapd(8)
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=/run/hostapd.pid
+EnvironmentFile=/etc/default/hostapd
+Environment=DAEMON_CONF=/etc/hostapd/hostapd.conf
+Environment=DAEMON_OPTS="-t -f /var/log/hostapd.log"
+ExecStart=/usr/local/bin/hostapd -B -P /run/hostapd.pid $DAEMON_OPTS $DAEMON_CONF
+KillSignal=SIGINT
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,39 @@
+---
+# fail2ban setup tasks for Pimeleon
+# Intrusion prevention system
+# Note: fail2ban installed in stage2-customize.sh
+
+- name: Configure fail2ban jail.local
+  ansible.builtin.template:
+    src: fail2ban/jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: '0644'
+  when: services_enabled.fail2ban | default(true)
+  notify: Restart fail2ban
+
+- name: Configure fail2ban to use nftables
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.d/00-nftables.conf
+    content: |
+      # Use nftables instead of iptables
+      [DEFAULT]
+      banaction = nftables-multiport
+      banaction_allports = nftables-allports
+    mode: '0644'
+  when: services_enabled.fail2ban | default(true)
+  notify: Restart fail2ban
+
+- name: Create BIND9 security log directory
+  ansible.builtin.file:
+    path: /var/log/named
+    state: directory
+    owner: bind
+    group: bind
+    mode: '0755'
+  when:
+    - services_enabled.fail2ban | default(true)
+    - services_enabled.dns_server | default(true)
+
+# Note: fail2ban service enablement happens in stage3-optimize.sh (outside chroot)

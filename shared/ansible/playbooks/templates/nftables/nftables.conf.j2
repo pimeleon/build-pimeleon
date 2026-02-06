@@ -1,0 +1,141 @@
+#!/usr/sbin/nft -f
+# Pimeleon nftables firewall configuration
+
+flush ruleset
+
+table inet pimeleon {
+    # TCP flag validation checks
+    chain tcp_checks {
+        tcp flags & (fin | syn | rst | psh | ack | urg) == fin | psh | urg drop
+        tcp flags & (fin | syn | rst | psh | ack | urg) == 0x0 drop
+        tcp flags & (syn | rst) == syn | rst drop
+        tcp flags & (fin | rst) == fin | rst drop
+        tcp flags & (fin | syn) == fin | syn drop
+        tcp flags & (fin | psh | ack) == fin | psh drop
+        tcp sport 0 tcp flags & (fin | syn | rst | ack) == syn drop
+    }
+
+    # fail2ban dynamic rules (populated by fail2ban-nftables)
+    chain fail2ban {
+    }
+
+    chain input {
+        type filter hook input priority filter; policy drop;
+
+        # Connection tracking
+        ct state established,related accept
+        ct state invalid drop
+        ct state new,untracked jump fail2ban
+
+        # Loopback
+        iif "lo" accept
+
+        # Block internal services from all non-loopback interfaces (defense in depth)
+        # API port 8000 - localhost only, Nitro proxy accesses it
+        tcp dport 8000 iif != "lo" counter drop comment "Block API from network"
+        # Nitro proxy port 3000 - localhost only, nginx/caddy forwards to it
+        tcp dport 3000 iif != "lo" counter drop comment "Block Nitro proxy from network"
+
+        # SSH access control (managed by pim-config, before blanket accepts)
+        include "/etc/nftables.d/ssh-access.nft"
+
+        # WiFi interface - full trust (except blocked ports above)
+        iifname "{{ wifi_interface }}" counter accept
+
+        # WAN interface - restricted (no SSH)
+        iifname "{{ wan_interface }}" jump wan_input
+
+        # Drop broadcast/anycast/multicast
+        fib daddr type broadcast drop
+        fib daddr type anycast drop
+        fib daddr type multicast drop
+
+        # Log and drop
+        limit rate 1/minute log prefix "INPUT_DROP: "
+        counter drop
+    }
+
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+
+        # Connection tracking
+        ct state established,related accept
+        ct state invalid drop
+        ct state new,untracked jump fail2ban
+
+        # TCP sanity checks
+        meta l4proto tcp jump tcp_checks
+
+        # WiFi forwarding to WAN
+        iifname "{{ wifi_interface }}" jump wifi_forward
+
+{% if port_forwards | default([]) | length > 0 %}
+        # Allow port-forwarded traffic from WAN
+        iifname "{{ wan_interface }}" ct status dnat accept
+{% else %}
+        # WAN inbound - drop all (no port forwards configured)
+        iifname "{{ wan_interface }}" drop
+{% endif %}
+
+        # Drop broadcast/anycast/multicast
+        fib daddr type broadcast drop
+        fib daddr type anycast drop
+        fib daddr type multicast drop
+
+        # Log and drop
+        limit rate 1/minute log prefix "FORWARD_DROP: "
+        counter drop
+    }
+
+    chain output {
+        type filter hook output priority filter; policy accept;
+        counter accept
+    }
+
+    # WiFi can reach WAN
+    chain wifi_forward {
+        oifname "{{ wan_interface }}" counter accept
+    }
+
+    # WAN input rules - minimal services, no SSH
+    chain wan_input {
+        # TCP sanity checks
+        meta l4proto tcp jump tcp_checks
+
+        # ICMP
+        meta l4proto ipv6-icmp accept
+        ip protocol icmp accept
+
+        # Drop everything else from WAN
+        counter drop
+    }
+}
+
+table ip nat {
+    chain prerouting {
+        type nat hook prerouting priority dstnat; policy accept;
+{% if port_forwards | default([]) | length > 0 %}
+
+        # Port forwarding rules (DNAT)
+{% for fwd in port_forwards %}
+        iifname "{{ wan_interface }}" {{ fwd.proto }} dport {{ fwd.port }} dnat to {{ fwd.dest }}{% if fwd.dest_port is defined %}:{{ fwd.dest_port }}{% endif %} comment "Forward {{ fwd.proto }}/{{ fwd.port }}"
+{% endfor %}
+{% endif %}
+{% if services_enabled.proxy_services | default(true) %}
+
+        # Transparent HTTP proxy via Privoxy
+        iifname "{{ wifi_interface }}" tcp dport 80 \
+            ip saddr {{ default_subnet }} \
+            ip daddr != {{ default_subnet }} \
+            counter redirect to :{{ privoxy_port }} \
+            comment "Privoxy redirect from WiFi"
+{% endif %}
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+
+        # Masquerade internal traffic to WAN
+        oifname "{{ wan_interface }}" ip saddr 192.168.0.0/16 counter masquerade
+    }
+}

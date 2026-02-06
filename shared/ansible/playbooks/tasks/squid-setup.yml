@@ -1,0 +1,84 @@
+---
+# Squid Proxy Setup for Pimeleon
+# Caching proxy with SSL bumping for content filtering
+# Only enabled when services_enabled.squid is true
+
+- name: Install Squid with SSL support
+  ansible.builtin.apt:
+    name:
+      - squid-openssl
+      - ssl-cert
+    state: present
+    update_cache: false
+  when: services_enabled.squid | default(false)
+
+- name: Create Squid SSL certificate directory
+  ansible.builtin.file:
+    path: /etc/squid/ssl_cert
+    state: directory
+    owner: proxy
+    group: proxy
+    mode: '0700'
+  when: services_enabled.squid | default(false)
+
+- name: Generate Squid CA certificate
+  ansible.builtin.shell: |
+    openssl req -new -newkey rsa:2048 -sha256 -days 3650 -nodes -x509 \
+      -subj "/C=US/ST=Private/L=Private/O=Pimeleon/CN=Pimeleon Proxy CA" \
+      -keyout /etc/squid/ssl_cert/myCA.pem \
+      -out /etc/squid/ssl_cert/myCA.pem
+    chmod 600 /etc/squid/ssl_cert/myCA.pem
+    chown proxy:proxy /etc/squid/ssl_cert/myCA.pem
+  args:
+    creates: /etc/squid/ssl_cert/myCA.pem
+  when: services_enabled.squid | default(false)
+
+- name: Create SSL certificate database directory
+  ansible.builtin.file:
+    path: /var/lib/ssl_db
+    state: directory
+    owner: proxy
+    group: proxy
+    mode: '0700'
+  when: services_enabled.squid | default(false)
+
+- name: Initialize SSL certificate database
+  ansible.builtin.shell: |
+    /lib/squid/security_file_certgen -c -s /var/lib/ssl_db -M 4MB
+    chown -R proxy:proxy /var/lib/ssl_db
+  args:
+    creates: /var/lib/ssl_db/index.txt
+  when: services_enabled.squid | default(false)
+
+- name: Create Squid cache directory
+  ansible.builtin.file:
+    path: /var/spool/squid
+    state: directory
+    owner: proxy
+    group: proxy
+    mode: '0755'
+  when: services_enabled.squid | default(false)
+
+- name: Configure Squid
+  ansible.builtin.template:
+    src: squid/squid.conf.j2
+    dest: /etc/squid/squid.conf
+    owner: root
+    group: root
+    mode: '0644'
+  when: services_enabled.squid | default(false)
+  notify: Restart squid
+
+- name: Configure SSL nobump sites
+  ansible.builtin.template:
+    src: squid/nobump_sites.txt.j2
+    dest: /etc/squid/nobump_sites.txt
+    owner: root
+    group: root
+    mode: '0644'
+  when: services_enabled.squid | default(false)
+  notify: Restart squid
+
+# Note: Squid cache initialization (squid -z) happens on first boot
+# Cannot run in chroot during build - squid service will auto-initialize
+# Note: Squid service enablement happens in stage3-optimize.sh (outside chroot)

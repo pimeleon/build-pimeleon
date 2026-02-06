@@ -1,0 +1,12 @@
+# Pimeleon service logrotate configuration
+# Daily rotation for Pimeleon API and UI logs
+
+/var/log/pimeleon/*.log {
+    daily
+    rotate {{ logrotate_pimeleon_rotate | default(7) }}
+    missingok
+    notifempty
+    compress
+    delaycompress
+    create 0644 root root
+}

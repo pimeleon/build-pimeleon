@@ -1,0 +1,14 @@
+# Pimeleon privoxy logrotate configuration
+# Daily rotation with compression for ad-blocking proxy logs
+
+/var/log/privoxy/logfile
+/var/log/privoxy/jarfile
+/var/log/privoxy/errorfile {
+    create 0640 privoxy adm
+    missingok
+    rotate {{ logrotate_privoxy_rotate | default(2) }}
+    compress
+    sharedscripts
+    daily
+    minsize {{ logrotate_privoxy_minsize | default('128M') }}
+}

@@ -2,7 +2,9 @@
 
 ## Overview
 
-This document describes the strategic approach for evolving `pimeleon-build` from a Raspberry Pi-specific build system into a multi-platform ARM router build system while maintaining backward compatibility and the "Pimeleon" brand identity.
+This document describes the strategic approach for evolving `pimeleon-build` from a
+Raspberry Pi-specific build system into a multi-platform ARM router build system while
+maintaining backward compatibility and the "Pimeleon" brand identity.
 
 **Strategy**: Enhanced Monorepo with Platform Profiles
 **Timeline**: 3-6 months (5 phases)
@@ -13,6 +15,7 @@ This document describes the strategic approach for evolving `pimeleon-build` fro
 ## Strategic Goals
 
 ### Technical Goals
+
 - Support multiple ARM SBCs (Raspberry Pi, Orange Pi, Rock Pi, etc.)
 - Maintain single repository for all platforms
 - Achieve 100% backward compatibility with existing Pi builds
@@ -20,12 +23,14 @@ This document describes the strategic approach for evolving `pimeleon-build` fro
 - Enable community contributions with minimal friction
 
 ### Community Goals
+
 - Core team maintains primary platforms (Raspberry Pi, Orange Pi)
 - Community members can become platform maintainers
 - Accept contributions for new platforms via standard PR process
 - Platform-specific support handled by platform maintainers
 
 ### Marketing Goals
+
 - Maintain "Pimeleon" as primary brand identity
 - Raspberry Pi remains the flagship, primary platform
 - Multi-platform support as value-add, not main selling point
@@ -114,6 +119,7 @@ pimeleon-build/
 **Solution**: YAML-based hardware profiles that describe platform-specific configurations.
 
 **Benefits**:
+
 - Single source of truth for hardware specifications
 - Easy to add new platforms (just create YAML file)
 - Version-controlled platform configurations
@@ -128,6 +134,7 @@ See [Hardware Profiles](hardware-profiles.md) for detailed schema.
 **Solution**: Optional pre/post hooks that platforms can provide.
 
 **Implementation**:
+
 ```bash
 # In build.sh
 if [[ -f "platforms/${PLATFORM}/hooks/pre-customize.sh" ]]; then
@@ -136,6 +143,7 @@ fi
 ```
 
 **Benefits**:
+
 - Platforms control their own special logic
 - Core build pipeline stays clean
 - Opt-in complexity (Pi doesn't need hooks)
@@ -147,6 +155,7 @@ fi
 **Solution**: Alias old variables to new ones, maintain API compatibility.
 
 **Implementation**:
+
 ```bash
 # New variables
 PIMELEON_PLATFORM="${PIMELEON_PLATFORM:-raspberrypi}"
@@ -169,12 +178,14 @@ fi
 **Solution**: Replace hardcoded values with profile-driven conditionals.
 
 **Before**:
+
 ```bash
 # stage2-customize.sh (line 74)
 sudo cp "${MOUNT_POINT}/boot/bcm2710-rpi-3-b-plus.dtb" "${BOOT_MOUNT}/"
 ```
 
 **After**:
+
 ```bash
 # Load from profile
 if [[ -n "${BOOT_DEVICE_TREE}" ]]; then
@@ -189,11 +200,13 @@ fi
 **Solution**: Platform-specific cache keys.
 
 **Before**:
+
 ```bash
 CACHE_KEY="pimeleon-rpi3-bullseye-base-v1.tar.gz"
 ```
 
 **After**:
+
 ```bash
 CACHE_KEY="${PLATFORM}-${MODEL}-${OS_VERSION}-${ARCH}-base-v${VERSION}.tar.gz"
 # Example: orangepi-5-plus-bookworm-arm64-base-v1.tar.gz
@@ -226,18 +239,21 @@ The core team (maintainers of this repository) will:
 Community members can become **Platform Maintainers** for specific platforms:
 
 **Requirements**:
+
 - Successfully submit working platform profile + tests
 - Commit to maintaining platform for 6+ months minimum
 - Respond to platform-specific issues within 2 weeks
 - Keep platform up-to-date with core system changes
 
 **Benefits**:
+
 - Listed as maintainer in `platforms/${PLATFORM}/README.md`
 - Optional write access to platform-specific directory
 - Recognition badge in community
 - Direct input on platform-specific features
 
 **Responsibilities**:
+
 - Maintain platform profile accuracy
 - Fix platform-specific build issues
 - Update platform documentation
@@ -248,6 +264,7 @@ Community members can become **Platform Maintainers** for specific platforms:
 See [Contributing Platforms](../contributing/adding-platforms.md) for detailed guide.
 
 **High-level process**:
+
 1. Fork repository
 2. Create `platforms/${PLATFORM}/profiles/${MODEL}.yaml`
 3. Add platform-specific tests
@@ -301,11 +318,13 @@ See [Contributing Platforms](../contributing/adding-platforms.md) for detailed g
 ### SEO Strategy
 
 **Primary Keywords** (maintain current rankings):
+
 - "raspberry pi router"
 - "pi router build"
 - "custom raspberry pi router"
 
 **Secondary Keywords** (expand reach):
+
 - "orange pi router"
 - "arm router build"
 - "sbc router firmware"

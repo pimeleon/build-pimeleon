@@ -1,0 +1,11 @@
+# Pimeleon hostapd logrotate configuration
+# Daily rotation for WiFi access point logs
+
+/var/log/hostapd.log {
+    daily
+    rotate {{ logrotate_hostapd_rotate | default(3) }}
+    missingok
+    notifempty
+    compress
+    delaycompress
+}

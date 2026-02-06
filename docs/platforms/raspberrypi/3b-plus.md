@@ -1,6 +1,7 @@
 # Raspberry Pi 3 Model B+
 
-The Raspberry Pi 3B+ is the **primary, fully-supported platform** for Pimeleon. All build scripts are optimized and tested for this hardware.
+The Raspberry Pi 3B+ is the **primary, fully-supported platform** for Pimeleon. All build
+scripts are optimized and tested for this hardware.
 
 ## Status
 

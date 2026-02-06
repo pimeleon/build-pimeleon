@@ -2,11 +2,14 @@
 
 ## Overview
 
-Thank you for your interest in adding support for a new ARM platform to Pimeleon! This guide will walk you through the process of contributing a new hardware platform.
+Thank you for your interest in adding support for a new ARM platform to Pimeleon! This guide
+will walk you through the process of contributing a new hardware platform.
 
-**Target Audience**: Community members who want to add support for new ARM single-board computers (Orange Pi, Rock Pi, Nano Pi, etc.)
+**Target Audience**: Community members who want to add support for new ARM single-board
+computers (Orange Pi, Rock Pi, Nano Pi, etc.)
 
 **Prerequisites**:
+
 - Familiarity with the target hardware
 - Basic understanding of Linux boot process
 - Git and Docker knowledge
@@ -32,6 +35,7 @@ Before submitting your platform contribution, ensure you have completed:
 Before creating a profile, gather the following information about your target hardware:
 
 #### Hardware Specifications
+
 - **SoC (System-on-Chip)**: Model number (e.g., RK3588, Allwinner H6)
 - **CPU Architecture**: armhf (32-bit) or arm64 (64-bit)
 - **RAM**: Available memory sizes
@@ -39,24 +43,28 @@ Before creating a profile, gather the following information about your target ha
 - **Network**: Ethernet speed, WiFi chip, Bluetooth
 
 #### Boot Requirements
+
 - **Bootloader**: U-Boot, vendor firmware, or other
 - **Device Tree**: DTB filename and source location
 - **Boot Partition**: Size and filesystem type required
 - **Boot Configuration**: Scripts or config files needed
 
 #### Operating System
+
 - **Recommended Distribution**: Armbian, Debian, Ubuntu
 - **Kernel**: Mainline, vendor, or Armbian kernel
 - **Package Repository**: APT mirror URL
 - **Firmware Packages**: Required firmware packages
 
 #### References
+
 - Hardware vendor documentation
 - Community wiki (Armbian docs, manufacturer forums)
 - Existing device tree sources
 - Similar platform profiles in this project
 
 **Example Research for Orange Pi 5 Plus**:
+
 ```
 Hardware:
 - SoC: Rockchip RK3588
@@ -83,17 +91,20 @@ OS:
 ### Step 2: Set Up Development Environment
 
 1. **Fork and clone the repository**:
+
    ```bash
    git clone https://github.com/yourusername/pimeleon-build.git
    cd pimeleon-build
    ```
 
 2. **Create a feature branch**:
+
    ```bash
    git checkout -b platform/orangepi-5plus
    ```
 
 3. **Install dependencies**:
+
    ```bash
    # Ensure Docker and Docker Compose installed
    docker --version
@@ -109,11 +120,13 @@ OS:
 ### Step 3: Create Platform Structure
 
 1. **Create platform directories**:
+
    ```bash
    mkdir -p platforms/orangepi/{profiles,hooks,tests,docs}
    ```
 
 2. **Copy template files**:
+
    ```bash
    # Use Raspberry Pi as reference template
    cp platforms/raspberrypi/profiles/3b-plus.yaml \
@@ -396,6 +409,7 @@ Use the validation script to check your profile:
 ```
 
 **Expected output**:
+
 ```
 Validating profile: platforms/orangepi/profiles/5-plus.yaml
 ✅ Profile validation passed
@@ -432,12 +446,14 @@ tail -f output/build-*.log
 **Common build issues**:
 
 1. **Package not found**: Check package name and repository availability
+
    ```bash
    # Test package availability in chroot
    chroot_run apt-cache search linux-image
    ```
 
 2. **Device tree not found**: Verify DTB path and kernel package contents
+
    ```bash
    # List available device trees
    ls mount/boot/*.dtb
@@ -445,12 +461,14 @@ tail -f output/build-*.log
    ```
 
 3. **Bootloader installation fails**: Check hook script permissions and paths
+
    ```bash
    # Make hook executable
    chmod +x platforms/orangepi/hooks/install-bootloader.sh
    ```
 
 4. **Template rendering errors**: Check Jinja2 syntax and variable names
+
    ```bash
    # Test template manually
    python3 scripts/render-template.py platforms/orangepi/templates/boot.scr.j2
@@ -489,6 +507,7 @@ qemu-system-aarch64 \
 ```
 
 **Expected behavior**:
+
 - Kernel loads and boots
 - Console output visible
 - Network interfaces detected
@@ -499,6 +518,7 @@ qemu-system-aarch64 \
 #### Option B: Real Hardware Testing (Recommended for Final Validation)
 
 1. **Flash image to SD card or eMMC**:
+
    ```bash
    # Find device
    lsblk
@@ -514,6 +534,7 @@ qemu-system-aarch64 \
    - Power on device
 
 3. **Monitor boot**:
+
    ```bash
    # Connect via serial console
    sudo screen /dev/ttyUSB0 1500000
@@ -523,6 +544,7 @@ qemu-system-aarch64 \
    ```
 
 4. **Verify functionality**:
+
    ```bash
    # Check kernel version
    uname -a
@@ -538,6 +560,7 @@ qemu-system-aarch64 \
    ```
 
 **Document test results**:
+
 ```
 Hardware: Orange Pi 5 Plus (16GB)
 Storage: eMMC 64GB
@@ -587,10 +610,12 @@ make build
 
 1. Boot from SD card with Armbian
 2. Flash image to eMMC:
+
    ```bash
    sudo dd if=output/pimeleon-*.img of=/dev/mmcblk1 bs=4M status=progress
    sudo sync
    ```
+
 3. Reboot from eMMC
 
 ## Known Issues
@@ -613,6 +638,7 @@ sudo reboot
 ### Serial Console Access
 
 Connect UART adapter to pins:
+
 - TX: Pin 8 (GPIO14)
 - RX: Pin 10 (GPIO15)
 - GND: Pin 6
@@ -634,6 +660,7 @@ screen /dev/ttyUSB0 1500000
 Maintainer: @yourusername
 
 Report issues: [GitHub Issues](https://github.com/yourorg/pimeleon-build/issues)
+
 ```
 
 ---
@@ -710,6 +737,7 @@ pytest platforms/
 ### Step 12: Submit Pull Request
 
 1. **Commit your changes**:
+
    ```bash
    git add platforms/orangepi/
    git commit -m "feat(platform): add Orange Pi 5 Plus support
@@ -724,6 +752,7 @@ pytest platforms/
    ```
 
 2. **Push to your fork**:
+
    ```bash
    git push origin platform/orangepi-5plus
    ```
@@ -733,6 +762,7 @@ pytest platforms/
    **Title**: `feat(platform): Add Orange Pi 5 Plus support`
 
    **Description**:
+
    ```markdown
    ## Platform Information
 
@@ -834,18 +864,21 @@ Once your platform is merged, you'll be listed as the platform maintainer.
 ## Platform Status Levels
 
 ### Experimental
+
 - Initial submission
 - Limited testing
 - May have known issues
 - Community support only
 
 ### Beta
+
 - Proven to work on real hardware
 - Documentation complete
 - Regular testing
 - Core team + maintainer support
 
 ### Stable
+
 - Extensively tested
 - Production-ready
 - Full documentation
@@ -898,7 +931,8 @@ A: Yes! You can be maintainer for multiple platforms if you have the time and ha
 
 ### Q: What if I can't commit to long-term maintenance?
 
-A: You can still contribute! Mark it as "experimental" and note in the PR that you're contributing without ongoing maintenance commitment. The community may adopt it later.
+A: You can still contribute! Mark it as "experimental" and note in the PR that you're
+contributing without ongoing maintenance commitment. The community may adopt it later.
 
 ---
 

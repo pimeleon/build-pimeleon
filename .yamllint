@@ -23,3 +23,4 @@ ignore: |
   node_modules/
   cache/
   output/
+  shared/ansible/playbooks/files/

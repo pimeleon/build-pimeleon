@@ -1,0 +1,16 @@
+---
+# Udev rules for consistent interface naming
+
+- name: Create udev rules directory
+  ansible.builtin.file:
+    path: /etc/udev/rules.d
+    state: directory
+    mode: '0755'
+
+- name: Deploy persistent network interface naming rules
+  ansible.builtin.template:
+    src: udev/70-persistent-net.rules.j2
+    dest: /etc/udev/rules.d/70-persistent-net.rules
+    owner: root
+    group: root
+    mode: '0644'

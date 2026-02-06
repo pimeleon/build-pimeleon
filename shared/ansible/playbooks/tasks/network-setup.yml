@@ -1,0 +1,59 @@
+---
+# Network setup tasks for Pimeleon
+
+- name: Create systemd-networkd directory
+  ansible.builtin.file:
+    path: /etc/systemd/network
+    state: directory
+    mode: '0755'
+
+- name: Configure WAN interface link (MAC address)
+  ansible.builtin.template:
+    src: network/00-default.link.j2
+    dest: /etc/systemd/network/00-default.link
+    mode: '0644'
+
+- name: Disable default systemd-networkd link policy
+  ansible.builtin.file:
+    src: /dev/null
+    dest: /etc/systemd/network/99-default.link
+    state: link
+    force: true
+
+- name: Configure WAN interface (eth0)
+  ansible.builtin.template:
+    src: network/10-eth0-wan.network.j2
+    dest: /etc/systemd/network/10-eth0-wan.network
+    mode: '0644'
+
+- name: Create hostapd configuration directory
+  ansible.builtin.file:
+    path: /etc/hostapd
+    state: directory
+    mode: '0755'
+  when: services_enabled.wifi_ap | default(true)
+
+- name: Configure hostapd for WiFi AP
+  ansible.builtin.template:
+    src: hostapd/hostapd.conf.j2
+    dest: /etc/hostapd/hostapd.conf
+    mode: '0600'
+  when: services_enabled.wifi_ap | default(true)
+
+- name: Enable hostapd daemon config
+  ansible.builtin.copy:
+    dest: /etc/default/hostapd
+    content: |
+      DAEMON_CONF="/etc/hostapd/hostapd.conf"
+    mode: '0644'
+  when: services_enabled.wifi_ap | default(true)
+
+- name: Configure nftables firewall
+  ansible.builtin.template:
+    src: nftables/nftables.conf.j2
+    dest: /etc/nftables.conf
+    mode: '0755'
+  when: services_enabled.firewall | default(true)
+
+# Note: DHCP handled by isc-dhcp-server (dhcp-setup.yml)
+# Note: DNS handled by bind9 + pihole + dnscrypt-proxy (dns-setup.yml)

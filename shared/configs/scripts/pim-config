@@ -1,0 +1,841 @@
+#!/bin/bash
+#
+# pimeleon-config - Configuration utility for Pimeleon Router
+# Similar to raspi-config but tailored for Pimeleon
+#
+
+set -euo pipefail
+
+# Constants
+BACKUP_DIR="/var/lib/pimeleon/backups"
+CONFIG_DIRS="/etc/hostapd /etc/dhcp /etc/nftables.conf /etc/systemd/network /etc/bind /etc/pimeleon"
+VERSION="1.0.0"
+FIRST_RUN_MARKER="/var/lib/pimeleon/.pim-config.ran"
+
+# Colors for non-whiptail output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Check for root
+check_root() {
+    if [[ $EUID -ne 0 ]]; then
+        echo -e "${RED}Error: This script must be run as root${NC}"
+        echo "Try: sudo pim-config"
+        exit 1
+    fi
+}
+
+# Check for whiptail
+check_whiptail() {
+    if ! command -v whiptail &>/dev/null; then
+        echo -e "${RED}Error: whiptail not found${NC}"
+        echo "Install with: sudo apt-get install whiptail"
+        exit 1
+    fi
+}
+
+# Calculate terminal size
+calc_wt_size() {
+    WT_HEIGHT=20
+    WT_WIDTH=70
+    WT_MENU_HEIGHT=$((WT_HEIGHT - 8))
+}
+
+#=============================================================================
+# Network Functions
+#=============================================================================
+
+get_current_wifi_mode() {
+    if systemctl is-active --quiet hostapd; then
+        echo "AP"
+    elif systemctl is-active --quiet wpa_supplicant; then
+        echo "Client"
+    else
+        echo "Disabled"
+    fi
+}
+
+get_current_wifi_ssid() {
+    local mode=$(get_current_wifi_mode)
+    if [[ "$mode" == "AP" ]]; then
+        grep -E "^ssid=" /etc/hostapd/hostapd.conf 2>/dev/null | cut -d= -f2 || echo "N/A"
+    elif [[ "$mode" == "Client" ]]; then
+        iwgetid -r 2>/dev/null || echo "Not connected"
+    else
+        echo "N/A"
+    fi
+}
+
+configure_wifi_mode() {
+    local current=$(get_current_wifi_mode)
+    local choice
+
+    choice=$(whiptail --title "WiFi Mode" --menu \
+        "Current mode: $current\n\nSelect WiFi mode:" \
+        $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+        "AP" "Access Point (other devices connect to this)" \
+        "Client" "Client mode (connect to existing WiFi)" \
+        "Disable" "Disable WiFi completely" \
+        3>&1 1>&2 2>&3) || return
+
+    case "$choice" in
+        "AP")
+            configure_wifi_ap
+            ;;
+        "Client")
+            configure_wifi_client
+            ;;
+        "Disable")
+            systemctl stop hostapd wpa_supplicant 2>/dev/null || true
+            systemctl disable hostapd wpa_supplicant 2>/dev/null || true
+            whiptail --msgbox "WiFi disabled" 8 40
+            ;;
+    esac
+}
+
+configure_wifi_ap() {
+    local current_ssid=$(grep -E "^ssid=" /etc/hostapd/hostapd.conf 2>/dev/null | cut -d= -f2 || echo "pimeleon")
+    local current_pass=$(grep -E "^wpa_passphrase=" /etc/hostapd/hostapd.conf 2>/dev/null | cut -d= -f2 || echo "")
+
+    local ssid=$(whiptail --inputbox "Enter WiFi network name (SSID):" 8 60 "$current_ssid" 3>&1 1>&2 2>&3) || return
+
+    if [[ -z "$ssid" ]]; then
+        whiptail --msgbox "SSID cannot be empty" 8 40
+        return
+    fi
+
+    local pass=$(whiptail --passwordbox "Enter WiFi password (min 8 characters):" 8 60 3>&1 1>&2 2>&3) || return
+
+    if [[ ${#pass} -lt 8 ]]; then
+        whiptail --msgbox "Password must be at least 8 characters" 8 40
+        return
+    fi
+
+    # Ask about WPS
+    local wps_enabled="no"
+    if whiptail --yesno "Enable WPS (Wi-Fi Protected Setup)?\n\nWPS allows easy device connection but has security vulnerabilities.\n\nRecommended: No" 12 60; then
+        wps_enabled="yes"
+    fi
+
+    # Update hostapd config
+    sed -i "s/^ssid=.*/ssid=$ssid/" /etc/hostapd/hostapd.conf
+    sed -i "s/^wpa_passphrase=.*/wpa_passphrase=$pass/" /etc/hostapd/hostapd.conf
+
+    # Update WPS settings
+    if [[ "$wps_enabled" == "yes" ]]; then
+        # Enable WPS - uncomment or add wps_state=2
+        if grep -q "^#wps_state=" /etc/hostapd/hostapd.conf; then
+            sed -i "s/^#wps_state=.*/wps_state=2/" /etc/hostapd/hostapd.conf
+        elif grep -q "^wps_state=" /etc/hostapd/hostapd.conf; then
+            sed -i "s/^wps_state=.*/wps_state=2/" /etc/hostapd/hostapd.conf
+        else
+            echo "wps_state=2" >> /etc/hostapd/hostapd.conf
+        fi
+    else
+        # Disable WPS - comment out or set to 0
+        if grep -q "^wps_state=" /etc/hostapd/hostapd.conf; then
+            sed -i "s/^wps_state=.*/#wps_state=0/" /etc/hostapd/hostapd.conf
+        fi
+    fi
+
+    # Enable AP mode
+    systemctl stop wpa_supplicant 2>/dev/null || true
+    systemctl disable wpa_supplicant 2>/dev/null || true
+    systemctl enable hostapd
+    systemctl restart hostapd
+
+    local wps_status="disabled"
+    [[ "$wps_enabled" == "yes" ]] && wps_status="enabled"
+    whiptail --msgbox "WiFi AP configured:\nSSID: $ssid\nWPS: $wps_status\n\nHostapd restarted." 12 50
+}
+
+configure_wifi_client() {
+    local ssid=$(whiptail --inputbox "Enter WiFi network name (SSID) to connect to:" 8 60 3>&1 1>&2 2>&3) || return
+
+    if [[ -z "$ssid" ]]; then
+        whiptail --msgbox "SSID cannot be empty" 8 40
+        return
+    fi
+
+    local pass=$(whiptail --passwordbox "Enter WiFi password:" 8 60 3>&1 1>&2 2>&3) || return
+
+    # Create wpa_supplicant config
+    cat > /etc/wpa_supplicant/wpa_supplicant-wlan0.conf <<EOF
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+country=$(cat /etc/hostapd/hostapd.conf 2>/dev/null | grep -E "^country_code=" | cut -d= -f2 || echo "US")
+
+network={
+    ssid="$ssid"
+    psk="$pass"
+    key_mgmt=WPA-PSK
+}
+EOF
+    chmod 600 /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
+
+    # Switch to client mode
+    systemctl stop hostapd 2>/dev/null || true
+    systemctl disable hostapd 2>/dev/null || true
+    systemctl enable wpa_supplicant@wlan0
+    systemctl restart wpa_supplicant@wlan0
+
+    # Wait for connection
+    sleep 3
+
+    if iwgetid -r &>/dev/null; then
+        local ip=$(ip -4 addr show wlan0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || echo "Obtaining...")
+        whiptail --msgbox "Connected to: $ssid\nIP Address: $ip" 10 50
+    else
+        whiptail --msgbox "Connection initiated.\nCheck status with: iwgetid" 10 50
+    fi
+}
+
+configure_wifi_country() {
+    local current=$(grep -E "^country_code=" /etc/hostapd/hostapd.conf 2>/dev/null | cut -d= -f2 || echo "US")
+
+    local country=$(whiptail --title "WiFi Country Code" --menu \
+        "Current: $current\n\nSelect your country for WiFi regulatory compliance:" \
+        $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+        "US" "United States" \
+        "GB" "United Kingdom" \
+        "DE" "Germany" \
+        "FR" "France" \
+        "UA" "Ukraine" \
+        "PL" "Poland" \
+        "JP" "Japan" \
+        "AU" "Australia" \
+        "CA" "Canada" \
+        "Other" "Enter custom code" \
+        3>&1 1>&2 2>&3) || return
+
+    if [[ "$country" == "Other" ]]; then
+        country=$(whiptail --inputbox "Enter 2-letter country code (ISO 3166-1):" 8 50 "$current" 3>&1 1>&2 2>&3) || return
+    fi
+
+    if [[ -z "$country" || ${#country} -ne 2 ]]; then
+        whiptail --msgbox "Invalid country code" 8 40
+        return
+    fi
+
+    country=$(echo "$country" | tr '[:lower:]' '[:upper:]')
+
+    # Update hostapd
+    sed -i "s/^country_code=.*/country_code=$country/" /etc/hostapd/hostapd.conf
+
+    # Update wpa_supplicant if exists
+    if [[ -f /etc/wpa_supplicant/wpa_supplicant-wlan0.conf ]]; then
+        sed -i "s/^country=.*/country=$country/" /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
+    fi
+
+    # Set regulatory domain
+    iw reg set "$country" 2>/dev/null || true
+
+    whiptail --msgbox "WiFi country set to: $country\n\nRestart WiFi to apply changes." 10 50
+}
+
+configure_wifi_channel() {
+    local current=$(grep -E "^channel=" /etc/hostapd/hostapd.conf 2>/dev/null | cut -d= -f2 || echo "6")
+
+    local channel=$(whiptail --title "WiFi Channel" --menu \
+        "Current: $current\n\nSelect WiFi channel (2.4GHz):" \
+        $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+        "1" "Channel 1 (2412 MHz)" \
+        "6" "Channel 6 (2437 MHz) - Recommended" \
+        "11" "Channel 11 (2462 MHz)" \
+        "auto" "Auto-select best channel" \
+        3>&1 1>&2 2>&3) || return
+
+    if [[ "$channel" == "auto" ]]; then
+        channel="0"
+    fi
+
+    sed -i "s/^channel=.*/channel=$channel/" /etc/hostapd/hostapd.conf
+
+    if systemctl is-active --quiet hostapd; then
+        systemctl restart hostapd
+        whiptail --msgbox "WiFi channel changed to: $channel\nHostapd restarted." 10 50
+    else
+        whiptail --msgbox "WiFi channel set to: $channel\nChanges apply on next AP start." 10 50
+    fi
+}
+
+configure_ethernet() {
+    local current_mode="DHCP"
+    local current_ip=""
+
+    if [[ -f /etc/systemd/network/10-wan.network ]]; then
+        if grep -q "DHCP=yes" /etc/systemd/network/10-wan.network 2>/dev/null; then
+            current_mode="DHCP"
+        else
+            current_mode="Static"
+            current_ip=$(grep -E "^Address=" /etc/systemd/network/10-wan.network 2>/dev/null | cut -d= -f2 || echo "")
+        fi
+    fi
+
+    local choice=$(whiptail --title "Ethernet Configuration (eth0)" --menu \
+        "Current mode: $current_mode ${current_ip:+($current_ip)}\n\nSelect configuration:" \
+        $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+        "DHCP" "Obtain IP address automatically" \
+        "Static" "Configure static IP address" \
+        3>&1 1>&2 2>&3) || return
+
+    case "$choice" in
+        "DHCP")
+            configure_eth_dhcp
+            ;;
+        "Static")
+            configure_eth_static
+            ;;
+    esac
+}
+
+configure_eth_dhcp() {
+    cat > /etc/systemd/network/10-wan.network <<EOF
+[Match]
+Name=eth0
+
+[Network]
+DHCP=yes
+UseDNS=no
+
+[DHCPv4]
+UseDNS=no
+UseRoutes=yes
+EOF
+
+    systemctl restart systemd-networkd
+    sleep 2
+
+    local ip=$(ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || echo "Obtaining...")
+    whiptail --msgbox "Ethernet configured for DHCP\nCurrent IP: $ip" 10 50
+}
+
+configure_eth_static() {
+    local current_ip=$(ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || echo "192.168.1.100")
+    local current_gw=$(ip route | grep default | grep eth0 | awk '{print $3}' || echo "192.168.1.1")
+
+    local ip=$(whiptail --inputbox "Enter IP address with CIDR (e.g., 192.168.1.100/24):" 8 60 "${current_ip}/24" 3>&1 1>&2 2>&3) || return
+    local gateway=$(whiptail --inputbox "Enter gateway IP address:" 8 60 "$current_gw" 3>&1 1>&2 2>&3) || return
+
+    if [[ -z "$ip" || -z "$gateway" ]]; then
+        whiptail --msgbox "IP and gateway cannot be empty" 8 40
+        return
+    fi
+
+    cat > /etc/systemd/network/10-wan.network <<EOF
+[Match]
+Name=eth0
+
+[Network]
+Address=$ip
+Gateway=$gateway
+DNS=127.0.0.1
+UseDNS=no
+
+[Route]
+Gateway=$gateway
+EOF
+
+    systemctl restart systemd-networkd
+    sleep 2
+
+    whiptail --msgbox "Ethernet configured:\nIP: $ip\nGateway: $gateway" 10 50
+}
+
+view_network_status() {
+    local status=""
+
+    # Interface status
+    status+="=== Interface Status ===\n"
+    for iface in eth0 wlan0; do
+        if ip link show "$iface" &>/dev/null; then
+            local state=$(ip link show "$iface" | grep -oP '(?<=state )\w+')
+            local ip=$(ip -4 addr show "$iface" | grep -oP '(?<=inet\s)\d+(\.\d+){3}/\d+' || echo "No IP")
+            status+="$iface: $state - $ip\n"
+        fi
+    done
+
+    # WiFi specific
+    status+="\n=== WiFi ===\n"
+    status+="Mode: $(get_current_wifi_mode)\n"
+    status+="SSID: $(get_current_wifi_ssid)\n"
+
+    # Default route
+    status+="\n=== Routing ===\n"
+    status+="Default: $(ip route | grep default | head -1 || echo 'No default route')\n"
+
+    # DNS
+    status+="\n=== DNS ===\n"
+    status+="$(grep nameserver /etc/resolv.conf | head -2 || echo 'No DNS configured')\n"
+
+    # Active connections
+    status+="\n=== Active Connections ===\n"
+    status+="$(ss -tun state established | wc -l) established connections\n"
+
+    whiptail --title "Network Status" --msgbox "$status" 24 70 --scrolltext
+}
+
+#=============================================================================
+# System Functions
+#=============================================================================
+
+change_password() {
+    whiptail --msgbox "You will be prompted to enter a new password for the 'pim' user.\n\nPress OK to continue." 10 50
+
+    if passwd pim; then
+        whiptail --msgbox "Password changed successfully" 8 40
+    else
+        whiptail --msgbox "Failed to change password" 8 40
+    fi
+}
+
+set_timezone() {
+    local current=$(timedatectl show --property=Timezone --value 2>/dev/null || echo "UTC")
+
+    # Get list of common timezones
+    local tz=$(whiptail --title "Timezone" --menu \
+        "Current: $current\n\nSelect timezone:" \
+        $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+        "UTC" "Coordinated Universal Time" \
+        "Europe/London" "London, UK" \
+        "Europe/Paris" "Paris, France" \
+        "Europe/Berlin" "Berlin, Germany" \
+        "Europe/Kyiv" "Kyiv, Ukraine" \
+        "Europe/Warsaw" "Warsaw, Poland" \
+        "America/New_York" "New York, USA" \
+        "America/Los_Angeles" "Los Angeles, USA" \
+        "Asia/Tokyo" "Tokyo, Japan" \
+        "Other" "Enter custom timezone" \
+        3>&1 1>&2 2>&3) || return
+
+    if [[ "$tz" == "Other" ]]; then
+        tz=$(whiptail --inputbox "Enter timezone (e.g., Europe/Rome):" 8 50 "$current" 3>&1 1>&2 2>&3) || return
+    fi
+
+    if timedatectl set-timezone "$tz" 2>/dev/null; then
+        whiptail --msgbox "Timezone set to: $tz" 8 50
+    else
+        whiptail --msgbox "Failed to set timezone.\nCheck: timedatectl list-timezones" 10 50
+    fi
+}
+
+view_system_info() {
+    local info=""
+
+    # System
+    info+="=== System ===\n"
+    info+="Hostname: $(hostname)\n"
+    info+="Uptime: $(uptime -p)\n"
+    info+="Kernel: $(uname -r)\n"
+
+    # CPU
+    info+="\n=== CPU ===\n"
+    if [[ -f /sys/class/thermal/thermal_zone0/temp ]]; then
+        local temp=$(($(cat /sys/class/thermal/thermal_zone0/temp) / 1000))
+        info+="Temperature: ${temp}C\n"
+    fi
+    info+="Load: $(cat /proc/loadavg | cut -d' ' -f1-3)\n"
+
+    # Memory
+    info+="\n=== Memory ===\n"
+    local mem_total=$(free -m | awk '/^Mem:/{print $2}')
+    local mem_used=$(free -m | awk '/^Mem:/{print $3}')
+    local mem_pct=$((mem_used * 100 / mem_total))
+    info+="RAM: ${mem_used}MB / ${mem_total}MB (${mem_pct}%)\n"
+
+    local swap_total=$(free -m | awk '/^Swap:/{print $2}')
+    if [[ $swap_total -gt 0 ]]; then
+        local swap_used=$(free -m | awk '/^Swap:/{print $3}')
+        info+="Swap: ${swap_used}MB / ${swap_total}MB\n"
+    fi
+
+    # Disk
+    info+="\n=== Disk ===\n"
+    info+="$(df -h / | awk 'NR==2{printf "Root: %s / %s (%s used)", $3, $2, $5}')\n"
+
+    # Network throughput
+    info+="\n=== Network (today) ===\n"
+    if [[ -f /proc/net/dev ]]; then
+        local rx=$(awk '/eth0/{print $2}' /proc/net/dev | numfmt --to=iec 2>/dev/null || echo "N/A")
+        local tx=$(awk '/eth0/{print $10}' /proc/net/dev | numfmt --to=iec 2>/dev/null || echo "N/A")
+        info+="eth0: RX $rx / TX $tx\n"
+    fi
+
+    whiptail --title "System Information" --msgbox "$info" 24 60 --scrolltext
+}
+
+view_logs() {
+    local choice=$(whiptail --title "View Logs" --menu \
+        "Select log to view:" \
+        $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+        "errors" "Recent errors (all services)" \
+        "auth" "Authentication log" \
+        "network" "Network services" \
+        "dhcp" "DHCP server" \
+        "hostapd" "WiFi AP" \
+        "firewall" "Firewall (nftables)" \
+        3>&1 1>&2 2>&3) || return
+
+    local log_content=""
+
+    case "$choice" in
+        "errors")
+            log_content=$(journalctl -p err -n 50 --no-pager 2>/dev/null || echo "No errors found")
+            ;;
+        "auth")
+            log_content=$(journalctl -u sshd -n 30 --no-pager 2>/dev/null || tail -30 /var/log/auth.log 2>/dev/null || echo "No auth logs")
+            ;;
+        "network")
+            log_content=$(journalctl -u systemd-networkd -n 30 --no-pager 2>/dev/null || echo "No network logs")
+            ;;
+        "dhcp")
+            log_content=$(journalctl -u isc-dhcp-server -n 30 --no-pager 2>/dev/null || echo "No DHCP logs")
+            ;;
+        "hostapd")
+            log_content=$(journalctl -u hostapd -n 30 --no-pager 2>/dev/null || echo "No hostapd logs")
+            ;;
+        "firewall")
+            log_content=$(journalctl -k -n 30 --no-pager 2>/dev/null | grep -i nft || echo "No firewall logs")
+            ;;
+    esac
+
+    whiptail --title "Logs: $choice" --msgbox "$log_content" 24 78 --scrolltext
+}
+
+#=============================================================================
+# Services Functions
+#=============================================================================
+
+view_services_status() {
+    local services=(
+        "hostapd:WiFi AP"
+        "isc-dhcp-server:DHCP Server"
+        "bind9:DNS Server"
+        "dnscrypt-proxy:DNSCrypt"
+        "nftables:Firewall"
+        "fail2ban:Intrusion Prevention"
+        "systemd-networkd:Network Manager"
+        "sshd:SSH Server"
+        "privoxy:Web Proxy"
+    )
+
+    local status=""
+    status+="Service Status:\n\n"
+
+    for svc in "${services[@]}"; do
+        local name="${svc%%:*}"
+        local desc="${svc##*:}"
+        local state="inactive"
+        local color="[ ]"
+
+        if systemctl is-active --quiet "$name" 2>/dev/null; then
+            state="active"
+            color="[*]"
+        elif systemctl is-enabled --quiet "$name" 2>/dev/null; then
+            state="enabled"
+            color="[-]"
+        fi
+
+        status+="$color $desc ($name): $state\n"
+    done
+
+    status+="\nLegend: [*]=running [-]=enabled [ ]=stopped"
+
+    whiptail --title "Services Status" --msgbox "$status" 22 60
+}
+
+#=============================================================================
+# SSH Access Control Functions
+#=============================================================================
+
+SSH_CONFIG="/etc/pimeleon/ssh-interfaces.conf"
+SSH_NFT="/etc/nftables.d/ssh-access.nft"
+
+load_ssh_config() {
+    if [[ -f "$SSH_CONFIG" ]]; then
+        source "$SSH_CONFIG"
+    else
+        SSH_WLAN0="yes"
+        SSH_ETH0="no"
+    fi
+}
+
+save_ssh_config() {
+    mkdir -p "$(dirname "$SSH_CONFIG")"
+    cat > "$SSH_CONFIG" << EOF
+# SSH Interface Access Control
+# Managed by pim-config - do not edit manually
+# Set to 'yes' to allow SSH, 'no' to block
+SSH_WLAN0=$SSH_WLAN0
+SSH_ETH0=$SSH_ETH0
+EOF
+}
+
+update_ssh_nftables() {
+    mkdir -p /etc/nftables.d
+
+    # Generate nftables rules based on config
+    cat > "$SSH_NFT" << 'EOF'
+# SSH access control rules - managed by pim-config
+EOF
+
+    if [[ "$SSH_WLAN0" == "no" ]]; then
+        echo 'iifname "wlan0" tcp dport 22 counter drop comment "SSH blocked on wlan0"' >> "$SSH_NFT"
+    fi
+
+    if [[ "$SSH_ETH0" == "no" ]]; then
+        echo 'iifname "eth0" tcp dport 22 counter drop comment "SSH blocked on eth0"' >> "$SSH_NFT"
+    fi
+
+    # Reload nftables
+    if nft -f /etc/nftables.conf 2>/dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+menu_ssh_access() {
+    load_ssh_config
+
+    while true; do
+        local wlan0_status="[ ]"
+        local eth0_status="[ ]"
+        [[ "$SSH_WLAN0" == "yes" ]] && wlan0_status="[*]"
+        [[ "$SSH_ETH0" == "yes" ]] && eth0_status="[*]"
+
+        local choice
+        choice=$(whiptail --title "SSH Access Control" --menu \
+            "Toggle SSH access per interface:\n\n$wlan0_status wlan0 (WiFi AP / LAN)\n$eth0_status eth0 (WAN / LAN server)\n\nRecommended: Enable wlan0, disable eth0 (WAN)" \
+            $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+            "1" "Toggle wlan0 SSH (currently: $SSH_WLAN0)" \
+            "2" "Toggle eth0 SSH (currently: $SSH_ETH0)" \
+            "B" "Back to System Settings" \
+            3>&1 1>&2 2>&3) || break
+
+        case $choice in
+            1)
+                if [[ "$SSH_WLAN0" == "yes" ]]; then
+                    SSH_WLAN0="no"
+                else
+                    SSH_WLAN0="yes"
+                fi
+                save_ssh_config
+                if update_ssh_nftables; then
+                    whiptail --msgbox "SSH on wlan0: $SSH_WLAN0\nFirewall rules updated." 10 50
+                else
+                    whiptail --msgbox "SSH config saved but firewall reload failed.\nChanges will apply on next reboot." 10 50
+                fi
+                ;;
+            2)
+                if [[ "$SSH_ETH0" == "yes" ]]; then
+                    SSH_ETH0="no"
+                else
+                    SSH_ETH0="yes"
+                fi
+                save_ssh_config
+                if update_ssh_nftables; then
+                    whiptail --msgbox "SSH on eth0: $SSH_ETH0\nFirewall rules updated." 10 50
+                else
+                    whiptail --msgbox "SSH config saved but firewall reload failed.\nChanges will apply on next reboot." 10 50
+                fi
+                ;;
+            B) break ;;
+        esac
+    done
+}
+
+#=============================================================================
+# Backup/Restore Functions
+#=============================================================================
+
+backup_config() {
+    mkdir -p "$BACKUP_DIR"
+
+    local timestamp=$(date +%Y%m%d-%H%M%S)
+    local backup_file="$BACKUP_DIR/pimeleon-backup-$timestamp.tar.gz"
+
+    whiptail --infobox "Creating backup..." 5 30
+
+    if tar -czf "$backup_file" \
+        /etc/hostapd/hostapd.conf \
+        /etc/dhcp/dhcpd.conf \
+        /etc/nftables.conf \
+        /etc/systemd/network/*.network \
+        /etc/bind/named.conf* \
+        /etc/pimeleon/ \
+        /etc/wpa_supplicant/wpa_supplicant-wlan0.conf \
+        2>/dev/null; then
+
+        local size=$(du -h "$backup_file" | cut -f1)
+        whiptail --msgbox "Backup created:\n$backup_file\nSize: $size" 10 60
+    else
+        whiptail --msgbox "Backup created with warnings:\n$backup_file\n\nSome files may not exist yet." 10 60
+    fi
+}
+
+restore_config() {
+    mkdir -p "$BACKUP_DIR"
+
+    # List available backups
+    local backups=()
+    while IFS= read -r file; do
+        local name=$(basename "$file")
+        local date=$(stat -c %y "$file" | cut -d. -f1)
+        backups+=("$file" "$name ($date)")
+    done < <(find "$BACKUP_DIR" -name "pimeleon-backup-*.tar.gz" -type f | sort -r | head -10)
+
+    if [[ ${#backups[@]} -eq 0 ]]; then
+        whiptail --msgbox "No backups found in:\n$BACKUP_DIR" 10 50
+        return
+    fi
+
+    local selected=$(whiptail --title "Restore Configuration" --menu \
+        "Select backup to restore:" \
+        $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+        "${backups[@]}" \
+        3>&1 1>&2 2>&3) || return
+
+    if whiptail --yesno "Restore from:\n$(basename "$selected")\n\nThis will overwrite current configuration.\nContinue?" 12 60; then
+        whiptail --infobox "Restoring backup..." 5 30
+
+        if tar -xzf "$selected" -C / 2>/dev/null; then
+            whiptail --msgbox "Configuration restored.\n\nReboot recommended to apply all changes." 10 50
+        else
+            whiptail --msgbox "Restore failed. Check backup file integrity." 10 50
+        fi
+    fi
+}
+
+#=============================================================================
+# Reboot Function
+#=============================================================================
+
+do_reboot() {
+    if whiptail --yesno "Are you sure you want to reboot now?" 8 40; then
+        whiptail --infobox "Rebooting..." 5 20
+        sleep 1
+        reboot
+    fi
+}
+
+#=============================================================================
+# Menus
+#=============================================================================
+
+menu_network() {
+    while true; do
+        local choice=$(whiptail --title "Network Configuration" --menu \
+            "Configure network settings:" \
+            $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+            "1" "WiFi Mode (AP/Client)" \
+            "2" "WiFi Country Code" \
+            "3" "WiFi Channel" \
+            "4" "Ethernet (Static/DHCP)" \
+            "5" "View Network Status" \
+            "B" "Back to Main Menu" \
+            3>&1 1>&2 2>&3) || break
+
+        case "$choice" in
+            1) configure_wifi_mode ;;
+            2) configure_wifi_country ;;
+            3) configure_wifi_channel ;;
+            4) configure_ethernet ;;
+            5) view_network_status ;;
+            B) break ;;
+        esac
+    done
+}
+
+menu_system() {
+    while true; do
+        local choice=$(whiptail --title "System Configuration" --menu \
+            "Configure system settings:" \
+            $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+            "1" "Change Password (pim user)" \
+            "2" "Set Timezone" \
+            "3" "SSH Access Control" \
+            "4" "View System Info" \
+            "5" "View Logs" \
+            "B" "Back to Main Menu" \
+            3>&1 1>&2 2>&3) || break
+
+        case "$choice" in
+            1) change_password ;;
+            2) set_timezone ;;
+            3) menu_ssh_access ;;
+            4) view_system_info ;;
+            5) view_logs ;;
+            B) break ;;
+        esac
+    done
+}
+
+menu_backup() {
+    while true; do
+        local choice=$(whiptail --title "Backup & Restore" --menu \
+            "Backup and restore configuration:" \
+            $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+            "1" "Backup Configuration" \
+            "2" "Restore Configuration" \
+            "B" "Back to Main Menu" \
+            3>&1 1>&2 2>&3) || break
+
+        case "$choice" in
+            1) backup_config ;;
+            2) restore_config ;;
+            B) break ;;
+        esac
+    done
+}
+
+main_menu() {
+    while true; do
+        local choice=$(whiptail --title "Pimeleon Configuration v$VERSION" --menu \
+            "Welcome to Pimeleon Router Configuration\n\nSelect an option:" \
+            $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
+            "1" "Network Configuration" \
+            "2" "System Settings" \
+            "3" "Services Status" \
+            "4" "Backup & Restore" \
+            "R" "Reboot" \
+            "Q" "Quit" \
+            3>&1 1>&2 2>&3)
+
+        local exit_status=$?
+        if [[ $exit_status -ne 0 ]]; then
+            break
+        fi
+
+        case "$choice" in
+            1) menu_network ;;
+            2) menu_system ;;
+            3) view_services_status ;;
+            4) menu_backup ;;
+            R) do_reboot ;;
+            Q) break ;;
+        esac
+    done
+}
+
+#=============================================================================
+# Main
+#=============================================================================
+
+main() {
+    check_root
+    check_whiptail
+    calc_wt_size
+
+    # Create first-run marker (hides MOTD hint after first use)
+    mkdir -p "$(dirname "$FIRST_RUN_MARKER")"
+    touch "$FIRST_RUN_MARKER"
+
+    main_menu
+    clear
+    echo "Goodbye!"
+}
+
+main "$@"

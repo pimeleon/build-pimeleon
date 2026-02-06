@@ -1,0 +1,80 @@
+# Pimeleon boot configuration
+# {{ ansible_managed }}
+# Platform: {{ platform_model | default('unknown') }}
+#
+# For more options and information see
+# http://rpf.io/configtxt
+# Some settings may impact device functionality. See link above for details
+# and ensure compatibility with your specific Raspberry Pi model.
+
+# uncomment if you get no picture on HDMI for a default "safe" mode
+#hdmi_safe=1
+
+# uncomment this if your display has a black border of unused pixels visible
+# and your display can output without overscan
+#disable_overscan=1
+
+# GPU memory (64MB for HDMI console, 16MB would be headless only)
+gpu_mem={{ config_txt.gpu_mem | default(64) }}
+
+# uncomment the following to adjust overscan. Use positive numbers if console
+# goes off screen, and negative if there is too much border
+overscan_left=16
+overscan_right=16
+#overscan_top=16
+#overscan_bottom=16
+
+# uncomment to force a console size. By default it will be display's size minus
+# overscan.
+#framebuffer_width=1280
+#framebuffer_height=720
+
+# uncomment if hdmi display is not detected and composite is being output
+hdmi_force_hotplug=1
+
+# uncomment to force a specific HDMI mode (this will force VGA)
+#hdmi_group=1
+#hdmi_mode=4
+
+# uncomment to force a HDMI mode rather than DVI. This can make audio work in
+# DMT (computer monitor) modes
+hdmi_drive=2
+
+# uncomment to increase signal to HDMI, if you have interference, blanking, or
+# no display
+#config_hdmi_boost=4
+
+# uncomment for composite PAL
+#sdtv_mode=2
+
+# CPU frequency
+arm_freq={{ config_txt.arm_freq | default(1200) }}
+{% if config_txt.over_voltage is defined %}
+over_voltage={{ config_txt.over_voltage }}
+{% endif %}
+
+# UART for serial console debugging
+enable_uart={{ config_txt.enable_uart | default(1) }}
+
+# Uncomment some or all of these to enable the optional hardware interfaces
+#dtparam=i2c_arm={{ config_txt.dtparam_i2c | default('on') }}
+#dtparam=i2s=o{{ config_txt.dtparam_i2s | default('on') }}
+#dtparam=spi=o{{ config_txt.dtparam_spi | default('on') }}
+
+# USB power (Pi 3B+ can supply more current)
+{% if config_txt.max_usb_current is defined %}
+max_usb_current={{ config_txt.max_usb_current }}
+{% endif %}
+
+# Disable Bluetooth (frees up UART and saves power)
+# Uncomment this to enable the lirc-rpi module for IR receiver support
+{% for overlay in device_tree_overlays | default([]) %}
+dtoverlay={{ overlay | regex_replace('\.dtbo$', '') }}
+{% endfor %}
+
+# Additional overlays and parameters are documented /boot/overlays/README
+
+# Disable audio (loads snd_bcm2835 when enabled)
+dtparam=audio=off
+# Start with graphical environment disabled
+start_x=0

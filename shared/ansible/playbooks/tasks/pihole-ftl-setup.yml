@@ -1,0 +1,55 @@
+---
+# Pi-hole FTL configuration
+# Binary is built from source in stage2-customize.sh
+# This task only configures the service (no installation)
+
+- name: Check if pihole-FTL binary exists
+  ansible.builtin.stat:
+    path: /usr/local/bin/pihole-FTL
+  register: pihole_binary
+  when: services_enabled.pihole | default(false)
+
+- name: Skip Pi-hole setup if binary not built
+  ansible.builtin.debug:
+    msg: "Pi-hole FTL binary not found - was it built in stage2?"
+  when:
+    - services_enabled.pihole | default(false)
+    - not (pihole_binary.stat.exists | default(false))
+
+# All tasks below only run if binary exists
+- name: Create Pi-hole FTL configuration
+  ansible.builtin.template:
+    src: pihole/pihole.toml.j2
+    dest: /etc/pihole/pihole.toml
+    owner: pihole
+    group: pihole
+    mode: '0644'
+  when:
+    - services_enabled.pihole | default(false)
+    - pihole_binary.stat.exists | default(false)
+  notify: Restart pihole-FTL
+
+- name: Create setupVars.conf for compatibility
+  ansible.builtin.template:
+    src: pihole/setupVars.conf.j2
+    dest: /etc/pihole/setupVars.conf
+    owner: pihole
+    group: pihole
+    mode: '0644'
+  when:
+    - services_enabled.pihole | default(false)
+    - pihole_binary.stat.exists | default(false)
+
+- name: Create Pi-hole FTL systemd service
+  ansible.builtin.template:
+    src: pihole/pihole-FTL.service.j2
+    dest: /etc/systemd/system/pihole-FTL.service
+    mode: '0644'
+  when:
+    - services_enabled.pihole | default(false)
+    - pihole_binary.stat.exists | default(false)
+  notify:
+    - Reload systemd
+    - Restart pihole-FTL
+
+# Note: pihole-FTL service enablement happens in stage3-optimize.sh (outside chroot)

@@ -1,0 +1,268 @@
+---
+# Main playbook for Pimeleon configuration
+- name: Pimeleon Complete Setup
+  hosts: pimeleon
+
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+  # Disable initial fact gathering - we'll do it after ensuring Python exists
+  gather_facts: false
+
+  pre_tasks:
+    # Bootstrap Python if missing (for minimal debootstrap environments)
+    - name: Ensure Python3 is installed (raw bootstrap)
+      ansible.builtin.raw: |
+        if ! command -v python3 >/dev/null 2>&1; then
+          apt-get -q update && apt-get install -qy python3-minimal
+        fi
+      changed_when: false
+
+    # Now gather facts with Python available
+    - name: Gather facts
+      ansible.builtin.setup:
+
+    - name: Display build information
+      ansible.builtin.debug:
+        msg: |
+          Building Pimeleon image
+          Profile: {{ pimeleon_profile | default('development') }}
+          Platform: {{ platform_model | default('3B+') }}
+          Debian: {{ debian_version | default('bookworm') }}
+
+    - name: Load profile configuration
+      ansible.builtin.include_vars:
+        file: >-
+          {{ playbook_dir }}/../inventory/group_vars/all/profiles/{{
+          pimeleon_profile | default('development') }}.yml
+      failed_when: false
+
+  tasks:
+    # Tier 1: Core setup (always run)
+    - name: Run base setup
+      ansible.builtin.include_tasks: tasks/base-setup.yml
+      tags: [base, core]
+
+    - name: Run udev setup for interface naming
+      ansible.builtin.include_tasks: tasks/udev-setup.yml
+      tags: [udev, network, core]
+
+    - name: Run logrotate setup
+      ansible.builtin.include_tasks: tasks/logrotate-setup.yml
+      tags: [logrotate, core]
+
+    - name: Run network setup
+      ansible.builtin.include_tasks: tasks/network-setup.yml
+      tags: [network, core]
+
+    - name: Run WiFi setup
+      ansible.builtin.include_tasks: tasks/wifi-setup.yml
+      tags: [wifi, network, core]
+
+    - name: Run hostapd setup (built from source with WPA3 support)
+      ansible.builtin.include_tasks: tasks/hostapd-setup.yml
+      tags: [hostapd, wifi, network]
+      when: services_enabled.hostapd | default(true)
+
+    - name: Run DNS setup (must run before DHCP for RNDC key)
+      ansible.builtin.include_tasks: tasks/dns-setup.yml
+      tags: [dns, network, core]
+
+    - name: Run DHCP setup
+      ansible.builtin.include_tasks: tasks/dhcp-setup.yml
+      tags: [dhcp, network, core]
+
+    - name: Run Pi-hole FTL setup (compiled from source, no web UI)
+      ansible.builtin.include_tasks: tasks/pihole-ftl-setup.yml
+      tags: [pihole, dns, core]
+      when: services_enabled.pihole | default(false)
+
+    - name: Run dnscrypt-proxy setup (pre-built binary)
+      ansible.builtin.include_tasks: tasks/dnscrypt-proxy-setup.yml
+      tags: [dnscrypt, dns, privacy]
+      when: services_enabled.dnscrypt_proxy | default(false)
+
+    - name: Run firewall setup
+      ansible.builtin.include_tasks: tasks/firewall-setup.yml
+      tags: [firewall, security, core]
+
+    - name: Run security hardening
+      ansible.builtin.include_tasks: tasks/security-hardening.yml
+      tags: [security, core]
+
+    - name: Run Bash Completion Setup
+      ansible.builtin.include_tasks: tasks/bash-completion-setup.yml
+      tags: [bash-completion, shell]
+
+    - name: Run Zsh Setup for pim user
+      ansible.builtin.include_tasks: tasks/zsh-setup.yml
+      tags: [zsh, shell]
+
+    # mDNS/Service Discovery
+    - name: Run Avahi mDNS setup
+      ansible.builtin.include_tasks: tasks/avahi-setup.yml
+      tags: [avahi, mdns, network]
+      when: services_enabled.avahi | default(false)
+
+    # Tier 2: Security services
+    - name: Run fail2ban setup
+      ansible.builtin.include_tasks: tasks/fail2ban-setup.yml
+      tags: [fail2ban, security]
+      when: services_enabled.fail2ban | default(true)
+
+    # Tier 3: Proxy services
+    - name: Run privoxy setup
+      ansible.builtin.include_tasks: tasks/privoxy-setup.yml
+      tags: [privoxy, proxy, services]
+      when: services_enabled.proxy_services | default(true)
+
+    - name: Run squid setup
+      ansible.builtin.include_tasks: tasks/squid-setup.yml
+      tags: [squid, proxy, services, caching]
+      when: services_enabled.squid | default(false)
+
+    - name: Run Tor setup
+      ansible.builtin.include_tasks: tasks/tor-setup.yml
+      tags: [tor, proxy, services, anonymity]
+      when: services_enabled.tor | default(false)
+
+    # Tier 4: Performance optimization
+    - name: Run network optimization setup
+      ansible.builtin.include_tasks: tasks/network-optimization-setup.yml
+      tags: [network-optimization, optimization, performance]
+      when: services_enabled.network_optimization | default(true)
+
+    - name: Run Pimeleon UI and API setup
+      ansible.builtin.include_tasks: tasks/pimeleon-ui-setup.yml
+      tags: [pimeleon-ui, services]
+
+    - name: Run ngrok setup
+      ansible.builtin.include_tasks: tasks/ngrok-setup.yml
+      tags: [ngrok, services]
+
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: |
+          Pimeleon configuration completed!
+          Profile: {{ pimeleon_profile | default('development') }}
+
+  handlers:
+    # Note: All service handlers skip in chroot - services start on first boot
+    # SSH
+    - name: Restart SSH
+      ansible.builtin.systemd:
+        name: ssh
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    # Network
+    - name: Restart systemd-networkd
+      ansible.builtin.systemd:
+        name: systemd-networkd
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    # DNS
+    - name: Restart bind9
+      ansible.builtin.systemd:
+        name: bind9
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    - name: Restart dnscrypt-proxy
+      ansible.builtin.systemd:
+        name: dnscrypt-proxy
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    - name: Restart pihole-FTL
+      ansible.builtin.systemd:
+        name: pihole-FTL
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    # DHCP
+    - name: Restart isc-dhcp-server
+      ansible.builtin.systemd:
+        name: isc-dhcp-server
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    # WiFi
+    - name: Restart hostapd
+      ansible.builtin.systemd:
+        name: hostapd
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    # Firewall
+    - name: Reload nftables
+      ansible.builtin.systemd:
+        name: nftables
+        state: reloaded
+      when: ansible_connection != "chroot"
+
+    - name: Restart fail2ban
+      ansible.builtin.systemd:
+        name: fail2ban
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    # Proxy
+    - name: Restart privoxy
+      ansible.builtin.systemd:
+        name: privoxy
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    - name: Restart squid
+      ansible.builtin.systemd:
+        name: squid
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    - name: Restart tor
+      ansible.builtin.systemd:
+        name: tor
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: ansible_connection != "chroot"
+
+    # Network optimization
+    - name: Restart network-optimization
+      ansible.builtin.systemd:
+        name: network-optimization
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    # mDNS
+    - name: Restart avahi-daemon
+      ansible.builtin.systemd:
+        name: avahi-daemon
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    # Pimeleon API
+    - name: Restart pimeleon-api
+      ansible.builtin.systemd:
+        name: pimeleon-api
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    # File sharing
+    - name: Restart smbd
+      ansible.builtin.systemd:
+        name: smbd
+        state: restarted
+      when: ansible_connection != "chroot"
+
+    - name: Reload nfs-exports
+      ansible.builtin.command: exportfs -ra
+      changed_when: false
+      when: ansible_connection != "chroot"

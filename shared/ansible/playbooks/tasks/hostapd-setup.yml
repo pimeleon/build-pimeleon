@@ -1,0 +1,23 @@
+---
+# hostapd configuration
+# Package installed in stage2-customize.sh
+# Bookworm includes hostapd 2.10 with WPA3/SAE support
+
+- name: Create hostapd config directory
+  ansible.builtin.file:
+    path: /etc/hostapd
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when: services_enabled.hostapd | default(true)
+
+- name: Create hostapd systemd service
+  ansible.builtin.template:
+    src: hostapd/hostapd.service.j2
+    dest: /etc/systemd/system/hostapd.service
+    mode: '0644'
+  when: services_enabled.hostapd | default(true)
+  notify:
+    - Reload systemd
+    - Restart hostapd
