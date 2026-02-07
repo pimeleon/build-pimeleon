@@ -268,7 +268,7 @@ boot_delay=0
 EOF
 
 # Configure cmdline
-echo "console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait fsck.mode=force ipv6.disable=0 net.ifnames=0 brcmfmac.txglomsz=32 loglevel=4 logo.nologo vt.global_cursor_default=1" | sudo tee "${MOUNT_POINT}/boot/cmdline.txt" > /dev/null
+echo "console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait fsck.mode=force ipv6.disable=0 net.ifnames=0 brcmfmac.txglomsz=32 loglevel=3 logo.nologo vt.global_cursor_default=0 quiet" | sudo tee "${MOUNT_POINT}/boot/cmdline.txt" > /dev/null
 
 # Basic fstab with tmpfs for /tmp (reduces SD card wear)
 sudo tee "${MOUNT_POINT}/etc/fstab" > /dev/null <<EOF
