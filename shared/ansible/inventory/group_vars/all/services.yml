@@ -1,0 +1,61 @@
+---
+# Service configuration defaults
+
+# Services enabled flags (used by playbook tasks)
+services_enabled:
+  dns_server: true
+  dnscrypt_proxy: true
+  dhcp_server: true
+  wifi_ap: true
+  hostapd: true              # WiFi access point (built from source for WPA3)
+  pihole: true               # DNS filtering via Pi-hole FTL (web UI disabled)
+  tor: false                 # Anonymity network (enable in profile)
+  firewall: true
+  proxy_services: true       # Privoxy transparent HTTP proxy
+  fail2ban: true             # Intrusion prevention
+  network_optimization: true # CAKE QoS bufferbloat mitigation
+  samba: false
+  nfs: false
+
+# Services to enable at boot
+enabled_services:
+  essential:
+    - ssh
+    - systemd-networkd
+    - rsyslog
+  network:
+    - bind9
+    - isc-dhcp-server
+    - pihole-FTL
+    - dnscrypt-proxy
+    - nftables
+    - hostapd
+  security:
+    - fail2ban
+  proxy:
+    - privoxy
+    - tor
+  optimization:
+    - network-optimization
+
+# Services to disable
+disabled_services:
+  - dhcpcd
+  - networking
+  - wpa_supplicant
+  - bluetooth
+  - avahi-daemon
+  - systemd-resolved  # Using bind9 instead
+
+# Service package mapping (packages installed via apt)
+service_packages:
+  dhcp: "isc-dhcp-server"
+  dns: "bind9"
+  dns_utils: "bind9utils dnsutils"
+  dns_encrypt: "dnscrypt-proxy (pre-built binary)"
+  dns_sinkhole: "pihole-FTL (pre-built binary)"
+  wifi_ap: "hostapd"
+  firewall: "nftables"
+  proxy: "privoxy"
+  intrusion_prevention: "fail2ban"
+  # samba/nfs: disabled, not installed

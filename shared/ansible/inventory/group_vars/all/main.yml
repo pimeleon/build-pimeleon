@@ -1,0 +1,62 @@
+---
+# Global defaults for all platforms
+# Override in platform-specific group_vars
+
+# Platform identification (from environment or defaults)
+platform_family: "raspberrypi"
+platform_model: "{{ lookup('env', 'PIMELEON_RPI_MODEL') | default('3B+', true) }}"
+display_name: "Raspberry Pi {{ platform_model }}"
+
+# Debian version (bullseye, bookworm, trixie)
+debian_version: "{{ lookup('env', 'RASPBIAN_VERSION') | default('bookworm', true) }}"
+debian_codename: "{{ debian_version }}"
+
+# System settings (from environment or defaults)
+system_hostname: "{{ lookup('env', 'PIMELEON_HOSTNAME') | default('pimeleon', true) }}"
+system_timezone: "{{ lookup('env', 'PIMELEON_TIMEZONE') | default('Etc/UTC', true) }}"
+system_locale: "{{ lookup('env', 'PIMELEON_LOCALE') | default('en_IE.UTF-8', true) }}"
+
+# User configuration
+pimeleon_user: "pim"
+pimeleon_initial_password: "{{ lookup('env', 'PIMELEON_INITIAL_PASSWORD') | default('netblox', true) }}"
+
+# Hardware specs defaults
+architecture: "armhf"
+cpu_cores: 4
+ram_mb: 1024
+
+# Hardware feature flags
+hardware_features:
+  uart: true
+  spi: true
+  i2c: true
+  gpio: true
+  wifi: true
+  bluetooth: true
+
+# Hardware groups to create
+hardware_groups:
+  - gpio
+  - i2c
+  - spi
+  - video
+  - audio
+  - input
+  - netdev
+  - dialout
+
+# Version-specific configuration
+# Use: version_specific[debian_version].key
+version_specific:
+  bullseye:
+    python_package: "python3"
+    nftables_default: true
+    kernel_suffix: ""
+  bookworm:
+    python_package: "python3"
+    nftables_default: true
+    kernel_suffix: ""
+  trixie:
+    python_package: "python3"
+    nftables_default: true
+    kernel_suffix: ""
