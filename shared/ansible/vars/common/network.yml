@@ -4,46 +4,34 @@
 
 # Interface naming
 wan_interface: "eth0"
+lan_interface: "eth1"
 wifi_interface: "wlan0"
 mgmt_interface: "eth0:0"
 
 # Ethernet availability (override for Zero W)
 ethernet_available: true
 
-# Default network settings (used by all internal interfaces)
-default_ip: "192.168.42.1"
-default_netmask: "255.255.255.0"
-default_netmask_cidr: "24"
-default_subnet: "192.168.42.0/24"
+# LAN network settings
+lan_ip: "192.168.76.1"
+lan_netmask: "255.255.255.0"
+lan_network: "192.168.76.0/24"
 
-# WiFi AP network settings (wlan0 - primary interface)
-wifi_ap_ip: "192.168.42.1"
+# WiFi AP network settings
+wifi_ap_ip: "192.168.77.1"
 wifi_ap_netmask: "255.255.255.0"
-wifi_ap_network: "192.168.42.0/24"
+wifi_ap_network: "192.168.77.0/24"
 
 # Management network
 mgmt_ip: "172.16.0.1"
 mgmt_netmask: "255.255.255.0"
 
 # DHCP configuration
-dhcp_range_start: "192.168.42.100"
-dhcp_range_end: "192.168.42.200"
+dhcp_range_start: "192.168.76.100"
+dhcp_range_end: "192.168.76.200"
 dhcp_lease_time: "12h"
 
-wifi_dhcp_range_start: "192.168.42.100"
-wifi_dhcp_range_end: "192.168.42.200"
-
-# Service ports
-dnscrypt_port: 5054
-pihole_port: 5553
-privoxy_port: 8118
-squid_http_port: 3128
-squid_transparent_port: 3129
-squid_https_port: 31443
-
-# DNS nameservers (for services that need upstream DNS)
-dns_local: "127.0.0.1"
-dns_internal: "{{ default_ip }}"
+wifi_dhcp_range_start: "192.168.77.100"
+wifi_dhcp_range_end: "192.168.77.200"
 
 # WiFi AP configuration
 wifi_ssid: "pimeleon"

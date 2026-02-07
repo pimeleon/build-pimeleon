@@ -19,17 +19,20 @@ device_tree_overlays:
 
 # Network interfaces
 # WAN: eth0 (onboard, connects to upstream router/modem)
+# LAN: eth1 (optional USB dongle for wired clients)
 # WiFi: wlan0 (WiFi AP, wireless clients)
 wan_interface: "eth0"
+lan_interface: "eth1"
 wifi_interface: "wlan0"
 
-# Network performance
+# Network performance (USB 2.0 limited to ~300Mbps)
 ethernet_available: true
 ethernet_max_speed_mbps: 300
 wifi_max_speed_mbps: 100
 
 # CAKE QoS bandwidth limits (from working gw)
 wan_bandwidth: "200mbit"
+lan_bandwidth: "500mbit"
 wifi_bandwidth: "40mbit"
 
 # config.txt parameters
@@ -46,8 +49,6 @@ config_txt:
 # hostapd WiFi capabilities (2.4GHz only for best compatibility)
 wifi_hw_mode: "g"
 wifi_channel: 6
-hostapd_require_ht: true
-hostapd_ht_enabled: false
-hostapd_ht_capab: ""
+hostapd_ht_capab: "[HT40+][HT40-][SHORT-GI-20][SHORT-GI-40][TX-STBC][RX-STBC1]"
 hostapd_vht_enabled: false
 hostapd_max_sta: 10
