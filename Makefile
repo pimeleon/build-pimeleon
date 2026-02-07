@@ -1,7 +1,7 @@
-.PHONY: help build build-ab2p build-app build-all build-local build-docker test clean lint dev shell docs check-deps list-apps version next-version
+.PHONY: help build build-ab2p build-app build-all build-local build-docker test clean lint dev shell docs check-deps list-apps
 
-# Default app (can be overridden: make build TARGET_PLATFORM=rpi4-bookworm)
-TARGET_PLATFORM ?= rpi3-bookworm
+# Default app (can be overridden: make build APP=rpi4-bookworm)
+APP ?= rpi3-bookworm
 PROFILE ?= development
 
 # Default target
@@ -10,14 +10,14 @@ help:
 	@echo "================================="
 	@echo ""
 	@echo "Build targets:"
-	@echo "  make build TARGET_PLATFORM=<app>   - Build specified app (default: $(TARGET_PLATFORM))"
+	@echo "  make build APP=<app>   - Build specified app (default: $(APP))"
 	@echo "  make build-all         - Build all apps"
 	@echo "  make build-prod        - Build with production profile"
 	@echo "  make list-apps         - List available apps"
 	@echo "  make check-deps        - Check local build dependencies"
 	@echo ""
 	@echo "Test targets:"
-	@echo "  make test TARGET_PLATFORM=<app>    - Run all tests for app"
+	@echo "  make test APP=<app>    - Run all tests for app"
 	@echo "  make test-smoke        - Run smoke tests only"
 	@echo ""
 	@echo "Development:"
@@ -32,8 +32,8 @@ help:
 	done
 	@echo ""
 	@echo "Examples:"
-	@echo "  make build TARGET_PLATFORM=rpi3-bookworm"
-	@echo "  make build TARGET_PLATFORM=rpi4-bookworm PROFILE=production"
+	@echo "  make build APP=rpi3-bookworm"
+	@echo "  make build APP=rpi4-bookworm PROFILE=production"
 	@echo ""
 
 # List available apps
@@ -59,14 +59,15 @@ build-ab2p:
 	fi
 
 build-docker: build-ab2p
-	@echo "Building app: $(TARGET_PLATFORM)"
-	@if [ ! -d "apps/$(TARGET_PLATFORM)" ]; then \
-		echo "Error: App '$(TARGET_PLATFORM)' not found"; \
+	@echo "Building app: $(APP)"
+	@if [ ! -d "apps/$(APP)" ]; then \
+		echo "Error: App '$(APP)' not found"; \
 		echo ""; \
 		$(MAKE) list-apps; \
 		exit 1; \
 	fi
-	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PROFILE) docker compose run --rm builder
+	docker compose build builder
+	PIMELEON_APP=$(APP) PIMELEON_PROFILE=$(PROFILE) docker compose run --rm builder
 
 build-all:
 	@echo "Building all apps..."
@@ -77,27 +78,27 @@ build-all:
 		echo "========================================"; \
 		echo "Building $$appname..."; \
 		echo "========================================"; \
-		$(MAKE) build TARGET_PLATFORM=$$appname || exit 1; \
+		$(MAKE) build APP=$$appname || exit 1; \
 	done
 	@echo ""
 	@echo "All apps built successfully!"
 
 build-prod:
-	@echo "Building production image for $(TARGET_PLATFORM)..."
+	@echo "Building production image for $(APP)..."
 	$(MAKE) build PROFILE=production
 
 build-dev:
-	@echo "Building development image for $(TARGET_PLATFORM)..."
+	@echo "Building development image for $(APP)..."
 	$(MAKE) build PROFILE=development
 
 build-nocache: build-ab2p
-	@echo "Building $(TARGET_PLATFORM) (no cache)..."
+	@echo "Building $(APP) (no cache)..."
 	docker compose build --no-cache builder
-	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PROFILE) docker compose run --rm builder
+	PIMELEON_APP=$(APP) PIMELEON_PROFILE=$(PROFILE) docker compose run --rm builder
 
 build-local: check-deps
 	@echo "Building Pimeleon image (local)..."
-	sudo TARGET_PLATFORM=$(TARGET_PLATFORM) ./shared/scripts/build.sh
+	sudo PIMELEON_APP=$(APP) ./shared/scripts/build.sh
 
 check-deps:
 	@echo "Checking local build dependencies..."
@@ -105,24 +106,24 @@ check-deps:
 
 # Test targets
 test: build
-	@echo "Running full test suite for $(TARGET_PLATFORM)..."
+	@echo "Running full test suite for $(APP)..."
 	docker compose build tester
-	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=all tester
+	PIMELEON_APP=$(APP) docker compose run --rm -e TEST_SUITE=all tester
 
 test-smoke:
-	@echo "Running smoke tests for $(TARGET_PLATFORM)..."
+	@echo "Running smoke tests for $(APP)..."
 	docker compose build tester
-	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=smoke tester
+	PIMELEON_APP=$(APP) docker compose run --rm -e TEST_SUITE=smoke tester
 
 test-integration:
-	@echo "Running integration tests for $(TARGET_PLATFORM)..."
+	@echo "Running integration tests for $(APP)..."
 	docker compose build tester
-	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=integration tester
+	PIMELEON_APP=$(APP) docker compose run --rm -e TEST_SUITE=integration tester
 
 test-security:
-	@echo "Running security tests for $(TARGET_PLATFORM)..."
+	@echo "Running security tests for $(APP)..."
 	docker compose build tester
-	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=security tester
+	PIMELEON_APP=$(APP) docker compose run --rm -e TEST_SUITE=security tester
 
 # Development targets
 dev:
@@ -131,8 +132,8 @@ dev:
 	@echo "Development environment is ready. Use 'make shell' to enter."
 
 shell:
-	@echo "Opening shell in builder container for $(TARGET_PLATFORM)..."
-	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm builder bash
+	@echo "Opening shell in builder container for $(APP)..."
+	PIMELEON_APP=$(APP) docker compose run --rm builder bash
 
 # Linting targets
 lint: lint-yaml lint-shell lint-ansible
@@ -185,24 +186,16 @@ ps:
 
 # CI/CD simulation
 ci-local:
-	@echo "Running local CI pipeline for $(TARGET_PLATFORM)..."
+	@echo "Running local CI pipeline for $(APP)..."
 	$(MAKE) lint
-	$(MAKE) build TARGET_PLATFORM=$(TARGET_PLATFORM)
-	$(MAKE) test-smoke TARGET_PLATFORM=$(TARGET_PLATFORM)
+	$(MAKE) build APP=$(APP)
+	$(MAKE) test-smoke APP=$(APP)
 	@echo "Local CI pipeline completed!"
 
 # Version information
 version:
 	@echo "Pimeleon Build System v2.0.0 (Monorepo)"
-	@echo ""
-	@echo "Next image version for $(TARGET_PLATFORM):"
-	@./shared/scripts/get-next-version.sh $(TARGET_PLATFORM)
-	@echo ""
 	@echo "Docker version:"
 	@docker --version
 	@echo "Docker Compose version:"
 	@docker compose version
-
-# Show only the calculated next version (for scripting)
-next-version:
-	@./shared/scripts/get-next-version.sh $(TARGET_PLATFORM)

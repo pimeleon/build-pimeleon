@@ -13,11 +13,8 @@ WORK_DIR=$1
 IMAGE_PATH=$2
 MOUNT_POINT="${WORK_DIR}/mount"
 BOOT_MOUNT="${WORK_DIR}/boot"
-IMAGE_NAME="pimeleon-${TARGET_PLATFORM:-rpi3-bookworm}"
+IMAGE_NAME="pimeleon-${PIMELEON_APP:-rpi3-bookworm}"
 ANSIBLE_LOG_FILE="/output/ansible-${IMAGE_NAME}.log"
-
-# Ansible directory from docker-compose environment
-SHARED_ANSIBLE_DIR="${ANSIBLE_DIR:-/ansible}"
 
 log_info "Starting system customization"
 
@@ -102,11 +99,9 @@ chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
     iproute2 \
     jq \
     less \
-    libevent-dev \
     libnl-3-dev \
     libnl-genl-3-dev \
     libssl-dev \
-    libzstd-dev \
     locales \
     locales-all \
     logrotate \
@@ -210,7 +205,6 @@ log_info "Installing basic networking tools"
 chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
     bridge-utils \
     isc-dhcp-server \
-    rfkill \
     wireless-regdb \
     wpasupplicant
 
@@ -247,28 +241,12 @@ fi
 sudo rm -rf "${HOSTAPD_BUILD_DIR}"
 sudo rm -f "${MOUNT_POINT}/tmp/build-hostapd.sh"
 
-# Build Pi-hole FTL from source (if enabled)
-if is_service_enabled "pihole" 2>/dev/null; then
-    log_info "Building Pi-hole FTL from source"
-    sudo cp /scripts/build-pihole-ftl.sh "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
-    sudo chmod +x "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
-    chroot_run "${MOUNT_POINT}" /tmp/build-pihole-ftl.sh
-    if [[ -x "${MOUNT_POINT}/usr/local/bin/pihole-FTL" ]]; then
-        log_info "Pi-hole FTL compiled and installed successfully"
-        chroot_run "${MOUNT_POINT}" /usr/local/bin/pihole-FTL --version || true
-    else
-        die "Pi-hole FTL compilation failed - binary not found"
-    fi
-    sudo rm -f "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
-else
-    log_info "Pi-hole not enabled in profile, skipping FTL build"
-fi
-
-# Install DNS server packages (dnscrypt-proxy uses pre-built binary, not APT)
+# Install DNS server packages
 log_info "Installing DNS server packages"
 chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
     bind9 \
-    bind9utils
+    bind9utils \
+    dnscrypt-proxy
 
 # Install security packages
 log_info "Installing security packages"
@@ -288,9 +266,11 @@ else
     log_warn "Privoxy filter generator not found, skipping"
 fi
 
-# Mask wpa_supplicant (we use hostapd for AP mode, not client mode)
+# Disable NetworkManager (Bookworm default) in favor of systemd-networkd
 log_info "Configuring systemd-networkd as network manager"
-chroot_run "${MOUNT_POINT}" systemctl mask wpa_supplicant 2>/dev/null || true
+chroot_run "${MOUNT_POINT}" systemctl disable NetworkManager 2>/dev/null || true
+chroot_run "${MOUNT_POINT}" systemctl disable ModemManager 2>/dev/null || true
+chroot_run "${MOUNT_POINT}" systemctl mask NetworkManager 2>/dev/null || true
 
 # Configure system
 log_info "Configuring system"
@@ -313,7 +293,28 @@ sudo chmod 644 "${MOUNT_POINT}/etc/sysctl.d/30-ip-forward.conf"
 sudo mkdir -p "${MOUNT_POINT}/etc/systemd/network"
 sudo chmod 755 "${MOUNT_POINT}/etc/systemd/network"
 
-# Note: Locale generation handled in stage3-optimize.sh to avoid duplication
+# Configure locales (en_IE default, plus common languages)
+log_info "Configuring locales"
+
+# Create locale.alias if missing (prevents warning during locale-gen)
+if [ ! -f "${MOUNT_POINT}/etc/locale.alias" ]; then
+    sudo touch "${MOUNT_POINT}/etc/locale.alias"
+fi
+if [ ! -e "${MOUNT_POINT}/usr/share/locale/locale.alias" ]; then
+    sudo ln -sf /etc/locale.alias "${MOUNT_POINT}/usr/share/locale/locale.alias"
+fi
+
+sudo tee "${MOUNT_POINT}/etc/locale.gen" > /dev/null <<EOF
+en_IE.UTF-8 UTF-8
+en_US.UTF-8 UTF-8
+es_ES.UTF-8 UTF-8
+ru_RU.UTF-8 UTF-8
+uk_UA.UTF-8 UTF-8
+zh_CN.UTF-8 UTF-8
+ko_KR.UTF-8 UTF-8
+EOF
+chroot_run "${MOUNT_POINT}" locale-gen
+chroot_run "${MOUNT_POINT}" update-locale LANG=en_IE.UTF-8
 
 # Configure SSH
 sudo sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' "${MOUNT_POINT}/etc/ssh/sshd_config"
@@ -375,6 +376,7 @@ log_info "Downloading files for chroot installation"
 
 # Version numbers
 DNSCRYPT_VERSION="2.1.15"
+PIHOLE_VERSION="6.3"
 
 # Create download directory in cache (outside image to save space)
 DOWNLOAD_DIR="${CACHE_DIR}/pimeleon-downloads"
@@ -383,13 +385,8 @@ sudo chmod 755 "${DOWNLOAD_DIR}"
 sudo chown "$(id -u):$(id -g)" "${DOWNLOAD_DIR}"
 
 # Download dnscrypt-proxy (ARM binary - no source build needed)
-# Map RPI_ARCH to dnscrypt-proxy release naming: armhf->arm, arm64->arm64
-DNSCRYPT_ARCH="arm"
-if [[ "${RPI_ARCH}" == "arm64" ]]; then
-    DNSCRYPT_ARCH="arm64"
-fi
-log_info "Downloading dnscrypt-proxy ${DNSCRYPT_VERSION} for ${DNSCRYPT_ARCH}"
-DNSCRYPT_URL="https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNSCRYPT_VERSION}/dnscrypt-proxy-linux_${DNSCRYPT_ARCH}-${DNSCRYPT_VERSION}.tar.gz"
+log_info "Downloading dnscrypt-proxy ${DNSCRYPT_VERSION}"
+DNSCRYPT_URL="https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNSCRYPT_VERSION}/dnscrypt-proxy-linux_arm-${DNSCRYPT_VERSION}.tar.gz"
 if ! curl -fsSL -o "${DOWNLOAD_DIR}/dnscrypt-proxy.tar.gz" "${DNSCRYPT_URL}"; then
     if is_service_enabled "dnscrypt_proxy" 2>/dev/null; then
         die "Failed to download dnscrypt-proxy, which is enabled in the current profile."
@@ -398,8 +395,31 @@ if ! curl -fsSL -o "${DOWNLOAD_DIR}/dnscrypt-proxy.tar.gz" "${DNSCRYPT_URL}"; th
     fi
 fi
 
-# Pi-hole FTL is built from source (see build-pihole-ftl.sh)
-# Tor is installed from official Tor Project repository (see tor-setup.yml)
+# Download Pi-hole FTL source and dependencies for compilation
+log_info "Downloading Pi-hole FTL ${PIHOLE_VERSION} source"
+if [ ! -f "${DOWNLOAD_DIR}/pihole-ftl-${PIHOLE_VERSION}.tar.gz" ]; then
+    FTL_URL="https://github.com/pi-hole/pi-hole/archive/refs/tags/v${PIHOLE_VERSION}.tar.gz"
+    if ! curl -fsSL -o "${DOWNLOAD_DIR}/pihole-ftl-${PIHOLE_VERSION}.tar.gz" "${FTL_URL}"; then
+        if is_service_enabled "pihole" 2>/dev/null; then
+            die "Failed to download pihole-FTL source, which is enabled in the current profile."
+        else
+            log_warn "Failed to download pihole-FTL source, but it is not enabled. Continuing."
+        fi
+    fi
+fi
+
+# Extract Pi-hole if downloaded
+SHARED_ANSIBLE_DIR="${WORKSPACE_DIR:-/workspace}/shared/ansible"
+if [ -f "${DOWNLOAD_DIR}/pihole-ftl-${PIHOLE_VERSION}.tar.gz" ]; then
+    log_info "Extracting Pi-hole FTL source"
+    cd "${DOWNLOAD_DIR}"
+    tar -xzf "${DOWNLOAD_DIR}/pihole-ftl-${PIHOLE_VERSION}.tar.gz" 2>&1 || true
+    if [ -d "${DOWNLOAD_DIR}/pi-hole-${PIHOLE_VERSION}" ] && [ ! -d "${SHARED_ANSIBLE_DIR}/playbooks/files/pi-hole-${PIHOLE_VERSION}" ]; then
+        sudo mkdir -p "${SHARED_ANSIBLE_DIR}/playbooks/files/"
+        sudo mv -f "${DOWNLOAD_DIR}/pi-hole-${PIHOLE_VERSION}" "${SHARED_ANSIBLE_DIR}/playbooks/files/pi-hole-${PIHOLE_VERSION}" || true
+    fi
+    cd "$WORK_DIR"
+fi
 
 # Copy downloads into chroot for Ansible to find
 log_info "Copying downloads into chroot"
@@ -428,7 +448,7 @@ if [[ -n "${PIMELEON_UI_BRANCH:-}" ]]; then
     # Use explicitly configured branch
     :
 elif [[ "${PIMELEON_PROFILE:-development}" == "development" ]]; then
-    PIMELEON_UI_BRANCH="staging"
+    PIMELEON_UI_BRANCH="develop"
 else
     PIMELEON_UI_BRANCH="master"
 fi
@@ -449,10 +469,9 @@ fi
 # Clone or update repo
 if [[ -d "${PIMELEON_UI_BUILD_DIR}/.git" ]]; then
     log_info "Updating existing pimeleon-ui clone..."
-    # Fetch specific branch (shallow clones don't have remote tracking refs)
-    git -C "${PIMELEON_UI_BUILD_DIR}" fetch origin "${PIMELEON_UI_BRANCH}"
-    # Create/reset local branch from FETCH_HEAD (origin/branch doesn't exist in shallow clones)
-    git -C "${PIMELEON_UI_BUILD_DIR}" checkout -B "${PIMELEON_UI_BRANCH}" FETCH_HEAD
+    git -C "${PIMELEON_UI_BUILD_DIR}" fetch origin
+    git -C "${PIMELEON_UI_BUILD_DIR}" checkout "${PIMELEON_UI_BRANCH}"
+    git -C "${PIMELEON_UI_BUILD_DIR}" reset --hard "origin/${PIMELEON_UI_BRANCH}"
 else
     log_info "Cloning pimeleon-ui from ${PIMELEON_UI_REPO} (branch: ${PIMELEON_UI_BRANCH})..."
     git clone --depth 1 --branch "${PIMELEON_UI_BRANCH}" "${PIMELEON_UI_REPO_AUTH}" "${PIMELEON_UI_BUILD_DIR}"
@@ -538,7 +557,7 @@ PLAYBOOKS_DIR="${SHARED_ANSIBLE_DIR}/playbooks"
 # Apply Ansible playbooks if available
 if [[ -d "${PLAYBOOKS_DIR}" ]] && [[ -n "$(ls -A ${PLAYBOOKS_DIR}/*.yml 2>/dev/null)" ]]; then
     log_info "Applying Ansible playbooks (Monorepo mode)"
-    log_info "App: ${TARGET_PLATFORM:-not set}"
+    log_info "App: ${PIMELEON_APP:-not set}"
     export ANSIBLE_CONFIG="${SHARED_ANSIBLE_DIR}/ansible.cfg"
     export ANSIBLE_HOST_KEY_CHECKING=False
     export PYTHONUNBUFFERED=1
@@ -580,7 +599,7 @@ EOF
     fi
 
     # Layer 3: Copy app-specific vars (highest priority - overrides shared)
-    APP_VARS_DIR="${WORKSPACE_DIR:-/workspace}/apps/${TARGET_PLATFORM}/vars"
+    APP_VARS_DIR="${WORKSPACE_DIR:-/workspace}/apps/${PIMELEON_APP}/vars"
     if [[ -d "${APP_VARS_DIR}" ]]; then
         log_info "Loading app-specific vars from: ${APP_VARS_DIR}"
         cp -r "${APP_VARS_DIR}/"* "${WORK_DIR}/group_vars/${PLATFORM_GROUP}/" 2>/dev/null || true
@@ -598,10 +617,9 @@ EOF
         sudo -E ansible-playbook -v \
             -i "${WORK_DIR}/inventory" \
             --extra-vars "platform_model=${PIMELEON_RPI_MODEL:-3B+}" \
-            --extra-vars "rpi_arch=${RPI_ARCH:-armhf}" \
             --extra-vars "debian_version=${RASPBIAN_VERSION:-bookworm}" \
             --extra-vars "pimeleon_profile=${PIMELEON_PROFILE:-development}" \
-            --extra-vars "pimeleon_app=${TARGET_PLATFORM:-}" \
+            --extra-vars "pimeleon_app=${PIMELEON_APP:-}" \
             --extra-vars "pimeleon_initial_password=${PIMELEON_INITIAL_PASSWORD:-netblox}" \
             --extra-vars "pimeleon_ap_name=${PIMELEON_AP_NAME:-Pimeleon}" \
             "$playbook" 2>&1 | sudo tee -a "${ANSIBLE_LOG_FILE}" || die "Playbook failed: $playbook. See ${ANSIBLE_LOG_FILE} for details."

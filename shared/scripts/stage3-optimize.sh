@@ -38,7 +38,6 @@ SERVICES_TO_ENABLE=(
     "pimeleon-api"
     "pimeleon-proxy"
     "network-optimization"
-    "pim-setup"
 )
 
 # Optional services - only enable if configured in profile
@@ -53,7 +52,7 @@ if is_service_enabled "squid"; then
     SERVICES_TO_ENABLE+=("squid")
 fi
 if is_service_enabled "tor"; then
-    SERVICES_TO_ENABLE+=("tor")
+    SERVICES_TO_ENABLE+=("tor@default")
 fi
 if is_service_enabled "pihole"; then
     SERVICES_TO_ENABLE+=("pihole-FTL")
@@ -75,36 +74,11 @@ for service in "${SERVICES_TO_ENABLE[@]}"; do
 
     if [[ -n "${SERVICE_FILE}" ]]; then
         log_info "Enabling service: ${service}"
-        # Create symlink using the correct path (convert image path to runtime path)
-        RUNTIME_PATH="${SERVICE_FILE#${MOUNT_POINT}}"
-        sudo ln -sf "${RUNTIME_PATH}" "${MULTI_USER_WANTS}/${service}.service"
+        # Create symlink relative to the image's filesystem
+        sudo ln -sf "/lib/systemd/system/${service}.service" "${MULTI_USER_WANTS}/${service}.service" 2>/dev/null || \
+        sudo ln -sf "/etc/systemd/system/${service}.service" "${MULTI_USER_WANTS}/${service}.service" 2>/dev/null || true
     else
         log_warn "Service not found: ${service}"
-    fi
-done
-
-# Disable/mask conflicting services
-# These services conflict with Pimeleon's AP mode or network management
-log_info "Disabling conflicting services"
-SERVICES_TO_DISABLE=(
-    "wpa_supplicant"      # Conflicts with hostapd AP mode
-    "dhcpcd"              # Conflicts with systemd-networkd
-    "networking"          # Legacy networking, using systemd-networkd
-    "NetworkManager"      # Desktop network manager, not needed
-)
-
-for service in "${SERVICES_TO_DISABLE[@]}"; do
-    SERVICE_FILE=""
-    if [[ -f "${LIB_SYSTEMD}/${service}.service" ]]; then
-        SERVICE_FILE="${LIB_SYSTEMD}/${service}.service"
-    elif [[ -f "${SYSTEMD_DIR}/${service}.service" ]]; then
-        SERVICE_FILE="${SYSTEMD_DIR}/${service}.service"
-    fi
-
-    if [[ -n "${SERVICE_FILE}" ]]; then
-        log_info "Masking service: ${service}"
-        # Mask by linking to /dev/null
-        sudo ln -sf /dev/null "${SYSTEMD_DIR}/${service}.service" 2>/dev/null || true
     fi
 done
 
@@ -204,29 +178,23 @@ sudo tee "${MOUNT_POINT}/usr/local/bin/firstboot.sh" > /dev/null <<'EOF'
 #!/bin/bash
 set -e
 
-# Generate SSH host keys if missing
-if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
-    ssh-keygen -A
-fi
+# Generate SSH host keys
+ssh-keygen -A
 
-# Expand root filesystem to fill SD card
-ROOT_PART=$(findmnt -n -o SOURCE /)
-ROOT_DEV=$(lsblk -no PKNAME "$ROOT_PART" 2>/dev/null | head -1)
-if [ -n "$ROOT_DEV" ]; then
-    # Resize partition to fill disk
-    echo ", +" | sfdisk -N 2 "/dev/$ROOT_DEV" --no-reread 2>/dev/null || true
-    partprobe "/dev/$ROOT_DEV" 2>/dev/null || true
-    # Resize filesystem
-    resize2fs "$ROOT_PART" 2>/dev/null || true
-fi
+# Expand root filesystem
+raspi-config --expand-rootfs
 
-# Generate machine ID if missing
-if [ ! -s /etc/machine-id ]; then
-    systemd-machine-id-setup
-fi
+# Generate machine ID
+systemd-machine-id-setup
 
-# Load firewall rules
-nft -f /etc/nftables.conf 2>/dev/null || true
+# Update package lists
+apt-get update
+
+# Set timezone
+timedatectl set-timezone UTC
+
+# Enable firewall
+nft -f /etc/nftables.conf
 
 echo "First boot setup completed"
 EOF

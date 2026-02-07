@@ -223,7 +223,7 @@ setup_chroot() {
     # Write resolv.conf with real DNS servers (Docker's 127.0.0.11 doesn't work in chroot)
     sudo tee "$chroot_dir/etc/resolv.conf" > /dev/null <<EOF
 # DNS for chroot build environment
-nameserver 192.168.42.1
+nameserver 192.168.76.1
 nameserver 8.8.8.8
 nameserver 1.1.1.1
 EOF
