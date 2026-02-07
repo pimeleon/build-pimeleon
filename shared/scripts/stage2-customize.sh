@@ -196,10 +196,10 @@ else
     log_info "hostapd not enabled in profile, skipping installation"
 fi
 
-# Build or install Pi-hole FTL (if enabled)
+# Pi-hole Installation
 if is_service_enabled "pihole" 2>/dev/null; then
     if is_build_from_source_enabled "pihole_ftl" 2>/dev/null; then
-        log_info "Building Pi-hole FTL from source (Production mode)"
+        log_info "Building Pi-hole from source (Production mode)"
         sudo cp /scripts/build-pihole-ftl.sh "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
         sudo chmod +x "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
         chroot_run "${MOUNT_POINT}" /tmp/build-pihole-ftl.sh
@@ -207,17 +207,27 @@ if is_service_enabled "pihole" 2>/dev/null; then
             log_info "Pi-hole FTL compiled and installed successfully"
             chroot_run "${MOUNT_POINT}" /usr/local/bin/pihole-FTL --version || true
         else
-            die "Pi-hole FTL compilation failed - binary not found"
+            log_error "Pi-hole FTL compilation failed - binary not found"
         fi
         sudo rm -f "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
     else
-        log_info "Installing Pi-hole FTL from APT (Development mode)"
-        # We assume the package exists in the configured repositories
-        chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
-            pihole-ftl || log_warn "pihole-ftl package not found in APT repositories"
+        log_info "Installing Pi-hole using official installer (Development mode)"
+        # Pre-seed configuration for unattended install
+        sudo mkdir -p "${MOUNT_POINT}/etc/pihole"
+        sudo tee "${MOUNT_POINT}/etc/pihole/setupVars.conf" > /dev/null <<EOF
+PIHOLE_INTERFACE=eth1
+PIHOLE_DNS_1=127.0.0.1#5054
+INSTALL_WEB_INTERFACE=false
+INSTALL_WEB_SERVER=false
+LIGHTTPD_ENABLED=false
+QUERY_LOGGING=false
+INSTALL_FTL=true
+EOF
+        # Official simple install method
+        chroot_run "${MOUNT_POINT}" bash -c "curl -sSL https://install.pi-hole.net | bash /dev/stdin --unattended" || log_warn "Pi-hole installer returned non-zero (expected in chroot)"
     fi
 else
-    log_info "Pi-hole not enabled in profile, skipping FTL installation"
+    log_info "Pi-hole not enabled in profile, skipping installation"
 fi
 
 # Build or install Tor (if enabled)

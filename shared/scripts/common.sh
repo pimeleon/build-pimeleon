@@ -105,12 +105,20 @@ cleanup_on_exit() {
     if [[ $exit_code -ne 0 ]] && [[ $exit_code -ne 130 ]] && [[ $exit_code -ne 143 ]]; then
         if [[ -n "${LOG_FILE:-}" ]]; then
             log_error "Failure detected (exit code: $exit_code). Detailed build log: ${LOG_FILE}"
+        else
+            log_info "Failure detected (exit code: $exit_code). Checking for partial image to remove..."
         fi
-        if [[ -n "$CLEANUP_IMAGE_PATH" ]] && [[ -f "$CLEANUP_IMAGE_PATH" ]]; then
-            log_warn "Removing partial image: $CLEANUP_IMAGE_PATH"
-            rm -f "$CLEANUP_IMAGE_PATH" || true
-            rm -f "${CLEANUP_IMAGE_PATH}.xz" || true
-            rm -f "${CLEANUP_IMAGE_PATH}.sha256" || true
+        if [[ -n "${CLEANUP_IMAGE_PATH:-}" ]]; then
+            if [[ -f "$CLEANUP_IMAGE_PATH" ]]; then
+                log_warn "Removing partial image: $CLEANUP_IMAGE_PATH"
+                sudo rm -f "$CLEANUP_IMAGE_PATH" || true
+                sudo rm -f "${CLEANUP_IMAGE_PATH}.xz" || true
+                sudo rm -f "${CLEANUP_IMAGE_PATH}.sha256" || true
+            else
+                log_info "No partial image file found at $CLEANUP_IMAGE_PATH"
+            fi
+        else
+            log_info "CLEANUP_IMAGE_PATH is not set, skipping image removal"
         fi
     fi
 
