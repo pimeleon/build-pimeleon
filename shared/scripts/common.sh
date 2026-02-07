@@ -94,27 +94,26 @@ cleanup_on_exit() {
             cleanup_chroot "$CLEANUP_MOUNT_POINT" || true
         fi
 
-        # Unmount image (processed via stack)
-        log_info "Releasing image resources..."
-        unmount_image "$CLEANUP_MOUNT_POINT" "$CLEANUP_LOOP_DEVICE" || true
+        # Unmount image
+        if [[ -n "$CLEANUP_MOUNT_POINT" ]] && [[ -n "$CLEANUP_LOOP_DEVICE" ]]; then
+            log_info "Unmounting image and detaching loop device..."
+            unmount_image "$CLEANUP_MOUNT_POINT" "$CLEANUP_LOOP_DEVICE" || true
+        fi
     fi
 
-    # On failure (non-zero exit code)
-    if [[ $exit_code -ne 0 ]]; then
-        log_error "Failure detected (exit code: $exit_code)."
+    # On failure (non-zero exit code, excluding successful termination via signal)
+    if [[ $exit_code -ne 0 ]] && [[ $exit_code -ne 130 ]] && [[ $exit_code -ne 143 ]]; then
         if [[ -n "${LOG_FILE:-}" ]]; then
-            log_error "Detailed build log: ${LOG_FILE}"
+            log_error "Failure detected (exit code: $exit_code). Detailed build log: ${LOG_FILE}"
         fi
-
-        if [[ -n "${CLEANUP_IMAGE_PATH:-}" ]]; then
-            if [[ -f "$CLEANUP_IMAGE_PATH" ]]; then
-                log_warn "Removing partial image: $CLEANUP_IMAGE_PATH"
-                safe_rm "$CLEANUP_IMAGE_PATH"
-                safe_rm "${CLEANUP_IMAGE_PATH}.xz"
-                safe_rm "${CLEANUP_IMAGE_PATH}.sha256"
-            fi
+        if [[ -n "$CLEANUP_IMAGE_PATH" ]] && [[ -f "$CLEANUP_IMAGE_PATH" ]]; then
+            log_warn "Removing partial image: $CLEANUP_IMAGE_PATH"
+            rm -f "$CLEANUP_IMAGE_PATH" || true
+            rm -f "${CLEANUP_IMAGE_PATH}.xz" || true
+            rm -f "${CLEANUP_IMAGE_PATH}.sha256" || true
         fi
     fi
+
 
     # Exit with original code
     exit $exit_code
@@ -123,7 +122,8 @@ cleanup_on_exit() {
 # Check if a service is enabled in the current profile
 is_service_enabled() {
     local service_name=$1
-    local profile_path="${ANSIBLE_DIR:-/workspace/shared/ansible}/vars/common/profiles/${PIMELEON_PROFILE:-development}.yml"
+    local ansible_dir="${WORKSPACE_DIR:-/workspace}/shared/ansible"
+    local profile_path="${ansible_dir}/vars/common/profiles/${PIMELEON_PROFILE:-development}.yml"
 
     if [[ ! -f "$profile_path" ]]; then
         log_warn "Profile file not found: $profile_path"
@@ -170,6 +170,32 @@ sys.exit(0 if val == True else 1)
     else
         return 1
     fi
+}
+
+# Check if a service should be built from source in the current profile
+is_build_from_source_enabled() {
+    local service_name=$1
+    local ansible_dir="${WORKSPACE_DIR:-/workspace}/shared/ansible"
+
+    # First check profile override
+    local profile_path="${ansible_dir}/vars/common/profiles/${PIMELEON_PROFILE:-development}.yml"
+    if [[ -f "$profile_path" ]]; then
+        if grep -A 50 "build_from_source:" "$profile_path" 2>/dev/null | grep -q "^\s*${service_name}:\s*true"; then
+            return 0
+        elif grep -A 50 "build_from_source:" "$profile_path" 2>/dev/null | grep -q "^\s*${service_name}:\s*false"; then
+            return 1
+        fi
+    fi
+
+    # Fallback to common versions.yml
+    local versions_path="${ansible_dir}/vars/common/versions.yml"
+    if [[ -f "$versions_path" ]]; then
+        if grep -A 50 "build_from_source:" "$versions_path" 2>/dev/null | grep -q "^\s*${service_name}:\s*true"; then
+            return 0
+        fi
+    fi
+
+    return 1 # Default to false
 }
 
 # Cleanup stale mounts from previous failed builds

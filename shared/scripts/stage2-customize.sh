@@ -153,10 +153,97 @@ chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
     wireless-regdb \
     wpasupplicant
 
-# Install router services (hostapd, pihole, tor)
-install_hostapd "${MOUNT_POINT}"
-install_pihole "${MOUNT_POINT}"
-install_tor "${MOUNT_POINT}" "${SHARED_ANSIBLE_DIR}"
+# Build or install hostapd (if enabled)
+if is_service_enabled "hostapd" 2>/dev/null; then
+    if is_build_from_source_enabled "hostapd" 2>/dev/null; then
+        log_info "Building hostapd from source with WPA3/SAE support (Production mode)"
+        HOSTAPD_VERSION="hostap_2_10"
+        HOSTAPD_BUILD_DIR="${MOUNT_POINT}/tmp/hostapd-build"
+
+        # Clone hostap repository on builder host (has network access)
+        sudo mkdir -p "${HOSTAPD_BUILD_DIR}"
+        if [[ ! -d "${HOSTAPD_BUILD_DIR}/hostap" ]]; then
+            log_info "Cloning hostap repository (${HOSTAPD_VERSION})..."
+            sudo git clone --depth 1 --branch "${HOSTAPD_VERSION}" \
+                https://git.w1.fi/hostap.git "${HOSTAPD_BUILD_DIR}/hostap"
+        fi
+
+        # Copy build script into chroot
+        sudo cp /scripts/build-hostapd.sh "${MOUNT_POINT}/tmp/build-hostapd.sh"
+        sudo chmod +x "${MOUNT_POINT}/tmp/build-hostapd.sh"
+
+        # Build hostapd inside chroot (ARM cross-compilation via QEMU)
+        log_info "Compiling hostapd inside chroot (this may take a while)..."
+        chroot_run "${MOUNT_POINT}" /tmp/build-hostapd.sh
+
+        # Verify hostapd installed
+        if [[ -x "${MOUNT_POINT}/usr/local/bin/hostapd" ]]; then
+            log_info "hostapd compiled and installed successfully"
+            chroot_run "${MOUNT_POINT}" /usr/local/bin/hostapd -v 2>&1 | head -3 || true
+        else
+            die "hostapd compilation failed - binary not found"
+        fi
+
+        # Cleanup build artifacts
+        sudo rm -rf "${HOSTAPD_BUILD_DIR}"
+        sudo rm -f "${MOUNT_POINT}/tmp/build-hostapd.sh"
+    else
+        log_info "Installing hostapd from APT (Development mode)"
+        chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+            hostapd
+    fi
+else
+    log_info "hostapd not enabled in profile, skipping installation"
+fi
+
+# Build or install Pi-hole FTL (if enabled)
+if is_service_enabled "pihole" 2>/dev/null; then
+    if is_build_from_source_enabled "pihole_ftl" 2>/dev/null; then
+        log_info "Building Pi-hole FTL from source (Production mode)"
+        sudo cp /scripts/build-pihole-ftl.sh "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
+        sudo chmod +x "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
+        chroot_run "${MOUNT_POINT}" /tmp/build-pihole-ftl.sh
+        if [[ -x "${MOUNT_POINT}/usr/local/bin/pihole-FTL" ]]; then
+            log_info "Pi-hole FTL compiled and installed successfully"
+            chroot_run "${MOUNT_POINT}" /usr/local/bin/pihole-FTL --version || true
+        else
+            die "Pi-hole FTL compilation failed - binary not found"
+        fi
+        sudo rm -f "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
+    else
+        log_info "Installing Pi-hole FTL from APT (Development mode)"
+        # We assume the package exists in the configured repositories
+        chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+            pihole-ftl || log_warn "pihole-ftl package not found in APT repositories"
+    fi
+else
+    log_info "Pi-hole not enabled in profile, skipping FTL installation"
+fi
+
+# Build or install Tor (if enabled)
+if is_service_enabled "tor" 2>/dev/null; then
+    if is_build_from_source_enabled "tor" 2>/dev/null; then
+        log_info "Building Tor from source (Production mode)"
+        TOR_VERSION_VAL=$(grep "tor:" "${SHARED_ANSIBLE_DIR}/vars/common/versions.yml" | head -1 | awk '{print $2}' | tr -d '"')
+        sudo cp /scripts/build-tor.sh "${MOUNT_POINT}/tmp/build-tor.sh"
+        sudo chmod +x "${MOUNT_POINT}/tmp/build-tor.sh"
+        chroot_run "${MOUNT_POINT}" /tmp/build-tor.sh "${TOR_VERSION_VAL:-0.4.8.13}"
+        if [[ -x "${MOUNT_POINT}/usr/local/bin/tor" ]]; then
+            log_info "Tor compiled and installed successfully"
+            chroot_run "${MOUNT_POINT}" /usr/local/bin/tor --version | head -1 || true
+        else
+            die "Tor compilation failed - binary not found"
+        fi
+        sudo rm -f "${MOUNT_POINT}/tmp/build-tor.sh"
+    else
+        log_info "Installing Tor from APT (Development mode)"
+        chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+            tor tor-geoipdb
+    fi
+else
+    log_info "Tor not enabled in profile, skipping installation"
+fi
+
 
 # Install DNS server packages (dnscrypt-proxy uses pre-built binary, not APT)
 log_info "Installing DNS server packages"
@@ -298,6 +385,20 @@ if ! curl -fsSL -o "${DOWNLOAD_DIR}/dnscrypt-proxy.tar.gz" "${DNSCRYPT_URL}"; th
         log_warn "Failed to download dnscrypt-proxy, but it is not enabled. Continuing."
     fi
 fi
+
+# Download Pi-hole FTL (ARM binary - fallback if not building from source)
+PIHOLE_ARCH="armhf-linux-gnu"
+if [[ "${RPI_ARCH}" == "arm64" ]]; then
+    PIHOLE_ARCH="aarch64-linux-gnu"
+fi
+log_info "Downloading Pi-hole FTL for ${PIHOLE_ARCH}"
+PIHOLE_URL="https://github.com/pi-hole/FTL/releases/latest/download/pihole-FTL-${PIHOLE_ARCH}"
+if ! curl -fsSL -o "${DOWNLOAD_DIR}/pihole-FTL" "${PIHOLE_URL}"; then
+    if is_service_enabled "pihole" 2>/dev/null; then
+        log_warn "Failed to download Pi-hole FTL binary from GitHub."
+    fi
+fi
+
 
 # Pi-hole FTL is built from source (see build-pihole-ftl.sh)
 # Tor is installed from official Tor Project repository (see tor-setup.yml)
