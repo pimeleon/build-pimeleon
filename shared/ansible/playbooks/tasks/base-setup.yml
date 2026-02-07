@@ -33,7 +33,6 @@
       - dhcpcd5
       - dhcpcd-base
       - ifupdown
-      - network-manager
     state: absent
     purge: true
 
@@ -54,9 +53,10 @@
       # IPv4 forwarding
       net.ipv4.ip_forward = 1
 
-      # IPv6 - disable global forwarding, enable per-interface for WiFi only
+      # IPv6 - disable global forwarding, enable per-interface for LAN only
       net.ipv6.conf.all.forwarding = 0
       net.ipv6.conf.default.forwarding = 0
+      net.ipv6.conf.{{ lan_interface | default('eth1') }}.forwarding = 1
       net.ipv6.conf.{{ wifi_interface | default('wlan0') }}.forwarding = 1
 
       # IPv6 - disable on WAN interface (eth0)
@@ -151,45 +151,6 @@
   ansible.builtin.apt:
     name: whiptail
     state: present
-
-# Deploy pim-setup first-boot wizard
-# Default config (if wizard not run): AP on wlan0 + DHCP client on eth0
-- name: Deploy pim-setup first-boot wizard
-  ansible.builtin.copy:
-    src: /configs/scripts/pim-setup
-    dest: /usr/local/bin/pim-setup
-    mode: '0755'
-    owner: root
-    group: root
-
-- name: Create pimeleon directory
-  ansible.builtin.file:
-    path: /var/lib/pimeleon
-    state: directory
-    mode: '0755'
-
-- name: Deploy pim-setup systemd service
-  ansible.builtin.template:
-    src: pimeleon/pim-setup.service.j2
-    dest: /etc/systemd/system/pim-setup.service
-    mode: '0644'
-
-# Note: Service enablement happens in stage3-optimize.sh (outside chroot)
-
-# Configure nano editor system-wide
-- name: Configure nano editor
-  ansible.builtin.copy:
-    dest: /etc/nanorc
-    mode: '0644'
-    content: |
-      # Pimeleon nano configuration
-      set tabsize 2
-      set tabstospaces
-      set linenumbers
-      set constantshow
-
-      # Include default syntax highlighting
-      include "/usr/share/nano/*.nanorc"
 
 # Note: Base packages installed in stage2-customize.sh
 # These tasks are kept for non-chroot deployments (e.g., direct Ansible runs)

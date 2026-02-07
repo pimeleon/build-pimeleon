@@ -49,10 +49,8 @@
           echo ""
           echo "  Welcome to Pimeleon - Your Privacy Gateway"
           echo "  Hostname: $(hostname) | IP: $(hostname -I 2>/dev/null | awk '{print $1}')"
-          # Show hint based on setup state
-          if [[ ! -f /var/lib/pimeleon/.setup-complete ]]; then
-              echo "  Run 'sudo pim-setup' for first-time setup wizard"
-          elif [[ ! -f /var/lib/pimeleon/.pim-config.ran ]]; then
+          # Show hint only if pim-config hasn't been run yet
+          if [[ ! -f /var/lib/pimeleon/.pim-config.ran ]]; then
               echo "  Run 'sudo pim-config' for configuration menu"
           fi
           echo ""

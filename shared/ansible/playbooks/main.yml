@@ -59,7 +59,7 @@
       ansible.builtin.include_tasks: tasks/wifi-setup.yml
       tags: [wifi, network, core]
 
-    - name: Run hostapd setup (built from source with WPA3 support)
+    - name: Run hostapd setup (APT package with WPA3 support)
       ansible.builtin.include_tasks: tasks/hostapd-setup.yml
       tags: [hostapd, wifi, network]
       when: services_enabled.hostapd | default(true)
@@ -115,11 +115,6 @@
       ansible.builtin.include_tasks: tasks/privoxy-setup.yml
       tags: [privoxy, proxy, services]
       when: services_enabled.proxy_services | default(true)
-
-    - name: Run squid setup
-      ansible.builtin.include_tasks: tasks/squid-setup.yml
-      tags: [squid, proxy, services, caching]
-      when: services_enabled.squid | default(false)
 
     - name: Run Tor setup
       ansible.builtin.include_tasks: tasks/tor-setup.yml

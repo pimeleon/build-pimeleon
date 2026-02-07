@@ -7,12 +7,6 @@
     state: directory
     mode: '0755'
 
-- name: Configure WAN interface link (MAC address)
-  ansible.builtin.template:
-    src: network/00-default.link.j2
-    dest: /etc/systemd/network/00-default.link
-    mode: '0644'
-
 - name: Disable default systemd-networkd link policy
   ansible.builtin.file:
     src: /dev/null
@@ -25,6 +19,22 @@
     src: network/10-eth0-wan.network.j2
     dest: /etc/systemd/network/10-eth0-wan.network
     mode: '0644'
+
+- name: Configure LAN interface (eth1)
+  ansible.builtin.template:
+    src: network/10-eth1-lan.network.j2
+    dest: /etc/systemd/network/10-eth1-lan.network
+    mode: '0644'
+  when:
+    - ethernet_available | default(true)
+    - lan_interface_enabled | default(false)
+
+- name: Configure WiFi AP interface (wlan0)
+  ansible.builtin.template:
+    src: network/10-wlan0-wifi.network.j2
+    dest: /etc/systemd/network/10-wlan0-wifi.network
+    mode: '0644'
+  when: services_enabled.wifi_ap | default(true)
 
 - name: Create hostapd configuration directory
   ansible.builtin.file:
