@@ -1,0 +1,26 @@
+[Unit]
+Description=Pimeleon Nitro Proxy Server
+After=network.target pimeleon-api.service
+Wants=pimeleon-api.service
+
+[Service]
+Type=simple
+User=pim-proxy
+Group=pim
+WorkingDirectory=/opt/pimeleon/proxy
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+EnvironmentFile=-/opt/pimeleon/proxy/.env
+ExecStart=/usr/bin/node index.mjs
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/pimeleon
+
+[Install]
+WantedBy=multi-user.target

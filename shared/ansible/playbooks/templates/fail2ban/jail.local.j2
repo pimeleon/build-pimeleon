@@ -10,7 +10,7 @@ findtime = {{ fail2ban_findtime | default(600) }}
 maxretry = {{ fail2ban_maxretry | default(3) }}
 
 # Ignore local networks
-ignoreip = 127.0.0.1/8 {{ default_subnet }}
+ignoreip = 127.0.0.1/8 {{ lan_network }} {{ wifi_ap_network }}
 
 # Backend settings
 backend = auto

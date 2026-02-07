@@ -7,8 +7,8 @@ DHCPDv4_CONF=/etc/dhcp/dhcpd.conf
 # Path to dhcpd's PID file
 DHCPDv4_PID=/var/run/dhcpd.pid
 
-# Interface to serve DHCP on
-INTERFACESv4="{{ wifi_interface | default('wlan0') }}"
+# Interfaces to serve DHCP on (wlan0 always enabled, eth1 optional)
+INTERFACESv4="{{ wifi_interface | default('wlan0') }}{% if lan_interface_enabled | default(false) %} {{ lan_interface }}{% endif %}"
 
 # IPv6 disabled (using link-local only on LAN)
 INTERFACESv6=""
