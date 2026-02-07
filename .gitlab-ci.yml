@@ -81,14 +81,14 @@ warm-cache:
       when: never
     - when: on_success
   cache:
-    key: base-system-${TARGET_PLATFORM:-rpi3-bookworm}
+    key: base-system-${PIMELEON_APP:-rpi3-bookworm}
     paths:
       - cache/
     policy: pull-push
   script:
     - mkdir -p cache
     - |
-      CACHE_FILE="cache/pimeleon-${TARGET_PLATFORM:-rpi3-bookworm}-base.tar.gz"
+      CACHE_FILE="cache/pimeleon-${PIMELEON_APP:-rpi3-bookworm}-base.tar.gz"
       if [ -f "$CACHE_FILE" ]; then
         echo "Cache found: $CACHE_FILE"
         ls -lh "$CACHE_FILE"
@@ -213,8 +213,7 @@ build:containers:
     - when: on_success
   script:
     - docker build --cache-from ${CI_REGISTRY_IMAGE}/builder:latest -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest -f ./shared/containers/builder/Dockerfile .
-    # Tester: no-cache to ensure scripts are always copied fresh
-    - docker build --no-cache -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest ./shared/containers/tester
+    - docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest ./shared/containers/tester
     - docker push $BUILD_IMAGE
     - docker push ${CI_REGISTRY_IMAGE}/builder:latest
     - docker push $TEST_IMAGE
@@ -225,7 +224,7 @@ build:pimeleon:
   stage: build
   needs: ["warm-cache", "build:containers"]
   cache:
-    key: base-system-${TARGET_PLATFORM:-rpi3-bookworm}
+    key: base-system-${PIMELEON_APP:-rpi3-bookworm}
     paths:
       - cache/
     policy: pull
@@ -236,24 +235,19 @@ build:pimeleon:
     # RPi 3B+ builds (release/rpi3-* branches)
     - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi3-/'
       variables:
-        TARGET_PLATFORM: "rpi3-bookworm"
+        PIMELEON_APP: "rpi3-bookworm"
     # RPi 4B builds (release/rpi4-* branches)
     - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi4-/'
       variables:
-        TARGET_PLATFORM: "rpi4-bookworm"
+        PIMELEON_APP: "rpi4-bookworm"
     # Default for develop (use RPi 3B+ as reference build)
     - if: '$CI_COMMIT_BRANCH == "develop"'
       variables:
-        TARGET_PLATFORM: "rpi3-bookworm"
+        PIMELEON_APP: "rpi3-bookworm"
     - when: on_success
   script:
-    - echo "Building Pimeleon app ${TARGET_PLATFORM:-rpi3-bookworm}..."
+    - echo "Building Pimeleon app ${PIMELEON_APP:-rpi3-bookworm}..."
     - mkdir -p output cache
-    - |
-      # Calculate version from conventional commits
-      chmod +x ./shared/scripts/get-next-version.sh
-      PIMELEON_VERSION=$(./shared/scripts/get-next-version.sh "${TARGET_PLATFORM:-rpi3-bookworm}")
-      echo "Building version: ${PIMELEON_VERSION}"
     - |
       # Create container, copy scripts, then start
       CONTAINER_ID=$(docker create \
@@ -266,8 +260,7 @@ build:pimeleon:
         -e WORKSPACE_DIR=/workspace \
         -e CACHE_DIR=/cache \
         -e OUTPUT_DIR=/output \
-        -e TARGET_PLATFORM=${TARGET_PLATFORM:-rpi3-bookworm} \
-        -e PIMELEON_VERSION=${PIMELEON_VERSION} \
+        -e PIMELEON_APP=${PIMELEON_APP:-rpi3-bookworm} \
         -e APT_CACHE_SERVER=${APT_PROXY%:*} \
         -e PIMELEON_UI_BUILD_TOKEN=${PIMELEON_UI_BUILD_TOKEN} \
         $BUILD_IMAGE)
