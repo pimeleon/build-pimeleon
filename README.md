@@ -29,10 +29,10 @@ cd pimeleon-build
 make list-apps
 
 # Build for Raspberry Pi 3B+ (default)
-make build TARGET_PLATFORM=rpi3-bookworm
+make build APP=rpi3-bookworm
 
 # Build for Raspberry Pi 4B
-make build TARGET_PLATFORM=rpi4-bookworm
+make build APP=rpi4-bookworm
 ```
 
 The resulting image will be in `output/pimeleon-{app}-YYYYMMDD-HHMMSS.img`
@@ -79,20 +79,20 @@ The system uses a **2-stage** build process (currently implemented):
 
 ```bash
 # Build operations
-make build TARGET_PLATFORM=<app>    # Build specified app (default: rpi3-bookworm)
+make build APP=<app>    # Build specified app (default: rpi3-bookworm)
 make build-all          # Build all apps
-make build-prod TARGET_PLATFORM=<app>  # Production build
-make build-nocache TARGET_PLATFORM=<app>  # Build without Docker cache
+make build-prod APP=<app>  # Production build
+make build-nocache APP=<app>  # Build without Docker cache
 make list-apps          # List available apps
 make check-deps         # Check local build dependencies
 
 # Testing
-make test TARGET_PLATFORM=<app>     # Run all tests for app
-make test-smoke TARGET_PLATFORM=<app>  # Run smoke tests only
+make test APP=<app>     # Run all tests for app
+make test-smoke APP=<app>  # Run smoke tests only
 
 # Development
 make dev                # Start development environment
-make shell TARGET_PLATFORM=<app>    # Open shell in builder container
+make shell APP=<app>    # Open shell in builder container
 make lint               # Run all linters
 make clean              # Clean build artifacts
 make clean-cache        # Clean build cache
@@ -102,7 +102,7 @@ make clean-all          # Full cleanup (containers, images, cache)
 make logs               # Follow container logs
 make ps                 # Show running containers
 make version            # Show version info
-make ci-local TARGET_PLATFORM=<app> # Run local CI pipeline
+make ci-local APP=<app> # Run local CI pipeline
 ```
 
 ### Docker Commands
@@ -113,14 +113,14 @@ make ci-local TARGET_PLATFORM=<app> # Run local CI pipeline
 
 ```bash
 # RECOMMENDED: Use Makefile targets (auto-handles dependencies)
-make build TARGET_PLATFORM=rpi3-bookworm
-make build-nocache TARGET_PLATFORM=rpi3-bookworm
+make build APP=rpi3-bookworm
+make build-nocache APP=rpi3-bookworm
 
 # Build adblock2privoxy image (done automatically by make build)
 make build-ab2p
 
 # Interactive shell for debugging
-TARGET_PLATFORM=rpi3-bookworm docker compose run --rm builder bash
+PIMELEON_APP=rpi3-bookworm docker compose run --rm builder bash
 
 # View logs
 docker compose logs -f builder
@@ -140,14 +140,14 @@ docker compose down -v --rmi all
 sudo chown -R $USER:$USER output/
 
 # Rebuild Docker image after Dockerfile changes
-make build-nocache TARGET_PLATFORM=rpi3-bookworm
+make build-nocache APP=rpi3-bookworm
 
 # Clean up stuck containers
 docker compose down --remove-orphans
 
 # Remove all build artifacts and start fresh
 make clean-all
-make build TARGET_PLATFORM=rpi3-bookworm
+make build APP=rpi3-bookworm
 ```
 
 ## 📁 Project Structure
@@ -189,7 +189,7 @@ pimeleon-build/
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TARGET_PLATFORM` | `rpi3-bookworm` | App to build (determines device, arch, debian) |
+| `PIMELEON_APP` | `rpi3-bookworm` | App to build (determines device, arch, debian) |
 | `PIMELEON_PROFILE` | `development` | Build profile (`development`, `production`) |
 | `PIMELEON_IMAGE_SIZE` | `4G` | Output image size |
 | `APT_CACHE_SERVER` | - | APT cache server IP (e.g., `192.168.76.5`) |
@@ -212,25 +212,25 @@ pimeleon-build/
 
 ```bash
 # Pi 3B+ development build (default)
-make build TARGET_PLATFORM=rpi3-bookworm
+make build APP=rpi3-bookworm
 
 # Pi 4B development build
-make build TARGET_PLATFORM=rpi4-bookworm
+make build APP=rpi4-bookworm
 
 # Production build (hardened)
-make build-prod TARGET_PLATFORM=rpi3-bookworm
+make build-prod APP=rpi3-bookworm
 
 # Build all apps
 make build-all
 
 # With APT cache for faster builds
-APT_CACHE_SERVER=192.168.76.5 make build TARGET_PLATFORM=rpi3-bookworm
+APT_CACHE_SERVER=192.168.76.5 make build APP=rpi3-bookworm
 
 # Custom image size
-PIMELEON_IMAGE_SIZE=8G make build TARGET_PLATFORM=rpi3-bookworm
+PIMELEON_IMAGE_SIZE=8G make build APP=rpi3-bookworm
 
 # Interactive debugging
-make shell TARGET_PLATFORM=rpi3-bookworm
+make shell APP=rpi3-bookworm
 ```
 
 ### Build Outputs
@@ -351,7 +351,7 @@ You can safely ignore these messages or suppress them by using the updated entry
 
 1. Place files in `configs/network/`, `configs/security/`, etc.
 2. Update `shared/scripts/stage2-customize.sh` or Ansible playbooks
-3. Rebuild: `make build TARGET_PLATFORM=rpi3-bookworm`
+3. Rebuild: `make build APP=rpi3-bookworm`
 
 ### Adding a New Device
 
@@ -359,7 +359,7 @@ You can safely ignore these messages or suppress them by using the updated entry
 2. Copy vars from similar device: `cp apps/rpi3-bookworm/vars/* apps/new-device/vars/`
 3. Update vars for new device in `apps/new-device/vars/main.yml`
 4. Add device case to `shared/scripts/common.sh` in `load_app_config()`
-5. Test: `make build TARGET_PLATFORM=new-device`
+5. Test: `make build APP=new-device`
 
 ### Debugging Builds
 
@@ -368,7 +368,7 @@ You can safely ignore these messages or suppress them by using the updated entry
 tail -f output/build-rpi3-bookworm-*.log
 
 # Interactive debugging
-make shell TARGET_PLATFORM=rpi3-bookworm
+make shell APP=rpi3-bookworm
 # Then manually run: /scripts/build.sh
 ```
 
@@ -428,7 +428,7 @@ qemu-system-arm -M raspi3 -kernel output/pimeleon-*.img
 - **Without APT Cache**: 19:49 (1189 seconds) - Direct downloads
 - **Performance Improvement**: 48.5% faster with APT cache (10 minutes saved)
 
-#### Subsequent Builds (Cached Base System)
+#### Subsequent Builds (Cached Base System)  
 
 - **With APT Cache**: ~5-8 minutes (base system reuse + cached packages)
 - **Cache Hit Rate**: 95%+ on TrueNAS APT cache (192.168.76.5:3142)
