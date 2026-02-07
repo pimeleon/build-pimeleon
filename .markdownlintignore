@@ -1,2 +1,5 @@
-CLAUDE.md
-GEMINI.md
+# External documentation (not maintained by us)
+shared/ansible/playbooks/templates/boot/overlays/README.md
+
+# Downloaded sources
+shared/ansible/playbooks/files/

@@ -107,7 +107,7 @@ jobs:
             -e WORKSPACE_DIR=/workspace \
             -e CACHE_DIR=/cache \
             -e OUTPUT_DIR=/output \
-            -e TARGET_PLATFORM=rpi3-bookworm \
+            -e PIMELEON_APP=rpi3-bookworm \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/builder:latest
 
       - name: Upload build artifacts
