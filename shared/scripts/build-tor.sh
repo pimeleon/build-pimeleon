@@ -14,9 +14,8 @@ mkdir -p "${BUILD_DIR}"
 cd "${BUILD_DIR}"
 
 # Install build dependencies
-# Update package lists
+echo "Installing build dependencies..."
 apt-get update -qq
-apt-get upgrade -qy
 apt-get install -qy --no-install-recommends \
     wget \
     ca-certificates \

@@ -64,6 +64,27 @@ SERVICES_TO_ENABLE=(
     "firstboot"
 )
 
+# Optional services - only enable if configured in profile
+# Uses is_service_enabled function from common.sh
+if is_service_enabled "dnscrypt_proxy"; then
+    SERVICES_TO_ENABLE+=("dnscrypt-proxy")
+fi
+if is_service_enabled "privoxy"; then
+    SERVICES_TO_ENABLE+=("privoxy")
+fi
+if is_service_enabled "squid"; then
+    SERVICES_TO_ENABLE+=("squid")
+fi
+if is_service_enabled "tor"; then
+    SERVICES_TO_ENABLE+=("tor@default")
+fi
+if is_service_enabled "pihole"; then
+    SERVICES_TO_ENABLE+=("pihole-FTL")
+fi
+
+MULTI_USER_WANTS="${MOUNT_POINT}/etc/systemd/system/multi-user.target.wants"
+sudo mkdir -p "${MULTI_USER_WANTS}"
+
 for service in "${SERVICES_TO_ENABLE[@]}"; do
     SERVICE_FILE=""
     SEARCH_NAME="${service}"
