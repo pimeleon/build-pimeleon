@@ -5,19 +5,24 @@
 Description=IEEE 802.11 AP, IEEE 802.1X/WPA/WPA2/WPA3 Authenticator
 Documentation=man:hostapd(8)
 After=network.target
+Wants=network.target
+BindsTo=sys-subsystem-net-devices-{{ wifi_interface | default('wlan0') }}.device
+After=sys-subsystem-net-devices-{{ wifi_interface | default('wlan0') }}.device
 
 [Service]
 Type=forking
 PIDFile=/run/hostapd.pid
-EnvironmentFile=/etc/default/hostapd
-Environment=DAEMON_CONF=/etc/hostapd/hostapd.conf
-Environment=DAEMON_OPTS="-t -f /var/log/hostapd.log"
-ExecStart=/usr/local/bin/hostapd -B -P /run/hostapd.pid $DAEMON_OPTS $DAEMON_CONF
-KillSignal=SIGINT
+ExecStartPre=/usr/local/bin/hostapd -t /etc/hostapd/hostapd.conf
+ExecStart=/usr/local/bin/hostapd -B -P /run/hostapd.pid /etc/hostapd/hostapd.conf
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
-RestartSec=10
-TimeoutStartSec=30
-TimeoutStopSec=30
+RestartSec=5
+
+# Hardening
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
 
 [Install]
 WantedBy=multi-user.target

@@ -3,8 +3,8 @@
 # Primary configuration is in /etc/pihole/pihole.toml
 
 WEBPASSWORD=
-PIHOLE_INTERFACE={{ wifi_interface | default('wlan0') }}
-IPV4_ADDRESS={{ default_ip }}/{{ default_netmask_cidr }}
+PIHOLE_INTERFACE={{ network.lan_interface | default('eth1') }}
+IPV4_ADDRESS={{ wifi_ap_ip | default('192.168.42.1') }}/{{ wifi_ap_netmask_cidr | default('24') }}
 IPV6_ADDRESS=
 QUERY_LOGGING=true
 INSTALL_WEB_SERVER=false
@@ -14,7 +14,7 @@ CACHE_SIZE=10000
 DNS_FQDN_REQUIRED=true
 DNS_BOGUS_PRIV=true
 DNSMASQ_LISTENING=local
-PIHOLE_DNS_1={{ pihole.upstream_dns_1 | default(dns_local ~ '#' ~ dnscrypt_port) }}
+PIHOLE_DNS_1={{ pihole.upstream_dns_1 | default('127.0.0.1#5054') }}
 PIHOLE_DNS_2={{ pihole.upstream_dns_2 | default('') }}
 DNSSEC={{ pihole.dnssec | default(true) | lower }}
 REV_SERVER={{ pihole.rev_server | default(false) | lower }}

@@ -33,15 +33,43 @@ allow unknown-clients;
 
 # DNS zones for DDNS
 zone {{ dns_domain | default('pimeleon.local') }}. {
-    primary {{ dns_local | default('127.0.0.1') }};
+    primary 127.0.0.1;
     key rndc-key;
 }
 
+{% if lan_interface_enabled | default(false) %}
+zone {{ lan_network | regex_replace('^(\\d+)\\.(\\d+)\\.(\\d+)\\..*', '\\3.\\2.\\1') }}.in-addr.arpa. {
+    primary 127.0.0.1;
+    key rndc-key;
+}
+{% endif %}
+
+{% if wifi_interface is defined %}
 zone {{ wifi_ap_network | regex_replace('^(\\d+)\\.(\\d+)\\.(\\d+)\\..*', '\\3.\\2.\\1') }}.in-addr.arpa. {
-    primary {{ dns_local | default('127.0.0.1') }};
+    primary 127.0.0.1;
     key rndc-key;
 }
+{% endif %}
 
+{% if lan_interface_enabled | default(false) %}
+# LAN subnet ({{ lan_interface }})
+subnet {{ lan_network | regex_replace('/\\d+$', '') | regex_replace('\\.\\d+$', '.0') }} netmask {{ lan_netmask }} {
+    option routers {{ lan_ip }};
+    option domain-name-servers {{ lan_ip }};
+    option netbios-name-servers {{ lan_ip }};
+    option subnet-mask {{ lan_netmask }};
+    option ntp-servers {{ ntp_servers | default(['0.pool.ntp.org', '1.pool.ntp.org']) | join(', ') }};
+    range {{ dhcp_range_start }} {{ dhcp_range_end }};
+    interface {{ lan_interface }};
+{% if wifi_interface is defined %}
+    # Static route to WiFi subnet
+    option rfc3442-classless-static-routes 24, {{ wifi_ap_network | regex_replace('/\\d+$', '') | regex_replace('(\\d+)\\.(\\d+)\\.(\\d+)\\.\\d+', '\\1, \\2, \\3') }}, {{ lan_ip | regex_replace('(\\d+)\\.(\\d+)\\.(\\d+)\\.\\d+', '\\1, \\2, \\3, \\4') }};
+    option ms-classless-static-routes 24, {{ wifi_ap_network | regex_replace('/\\d+$', '') | regex_replace('(\\d+)\\.(\\d+)\\.(\\d+)\\.\\d+', '\\1, \\2, \\3') }}, {{ lan_ip | regex_replace('(\\d+)\\.(\\d+)\\.(\\d+)\\.\\d+', '\\1, \\2, \\3, \\4') }};
+{% endif %}
+}
+{% endif %}
+
+{% if wifi_interface is defined %}
 # WiFi subnet ({{ wifi_interface }})
 subnet {{ wifi_ap_network | regex_replace('/\\d+$', '') | regex_replace('\\.\\d+$', '.0') }} netmask {{ wifi_ap_netmask }} {
     option routers {{ wifi_ap_ip }};
@@ -49,16 +77,22 @@ subnet {{ wifi_ap_network | regex_replace('/\\d+$', '') | regex_replace('\\.\\d+
     option netbios-name-servers {{ wifi_ap_ip }};
     option subnet-mask {{ wifi_ap_netmask }};
     option ntp-servers {{ ntp_servers | default(['0.pool.ntp.org', '1.pool.ntp.org']) | join(', ') }};
-    range {{ wifi_dhcp_range_start | default(dhcp_range_start) }} {{ wifi_dhcp_range_end | default(dhcp_range_end) }};
+    range {{ wifi_dhcp_range_start }} {{ wifi_dhcp_range_end }};
     interface {{ wifi_interface }};
     # Shorter lease for WiFi clients
     default-lease-time {{ wifi_dhcp_lease | default(900) }};
+{% if lan_interface_enabled | default(false) %}
+    # Static route to LAN subnet
+    option rfc3442-classless-static-routes 24, {{ lan_network | regex_replace('/\\d+$', '') | regex_replace('(\\d+)\\.(\\d+)\\.(\\d+)\\.\\d+', '\\1, \\2, \\3') }}, {{ wifi_ap_ip | regex_replace('(\\d+)\\.(\\d+)\\.(\\d+)\\.\\d+', '\\1, \\2, \\3, \\4') }};
+    option ms-classless-static-routes 24, {{ lan_network | regex_replace('/\\d+$', '') | regex_replace('(\\d+)\\.(\\d+)\\.(\\d+)\\.\\d+', '\\1, \\2, \\3') }}, {{ wifi_ap_ip | regex_replace('(\\d+)\\.(\\d+)\\.(\\d+)\\.\\d+', '\\1, \\2, \\3, \\4') }};
+{% endif %}
 }
+{% endif %}
 
 # Static host reservations can be added below
 # group {
 #     host example {
 #         hardware ethernet AA:BB:CC:DD:EE:FF;
-#         fixed-address 192.168.42.10;
+#         fixed-address 192.168.77.10;
 #     }
 # }

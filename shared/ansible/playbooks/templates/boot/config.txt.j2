@@ -14,8 +14,8 @@
 # and your display can output without overscan
 #disable_overscan=1
 
-# GPU memory (64MB for HDMI console, 16MB would be headless only)
-gpu_mem={{ config_txt.gpu_mem | default(64) }}
+# GPU memory (16MB minimum for headless, 64MB if HDMI debugging needed)
+gpu_mem={{ config_txt.gpu_mem | default(16) }}
 
 # uncomment the following to adjust overscan. Use positive numbers if console
 # goes off screen, and negative if there is too much border
