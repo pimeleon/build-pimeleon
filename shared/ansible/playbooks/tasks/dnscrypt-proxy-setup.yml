@@ -57,7 +57,7 @@
 
 - name: Install dnscrypt-proxy binary
   ansible.builtin.copy:
-    src: "/tmp/pimeleon-downloads/linux-{{ 'arm64' if rpi_arch == 'arm64' else 'arm' }}/dnscrypt-proxy"
+    src: /tmp/pimeleon-downloads/linux-arm/dnscrypt-proxy
     dest: /usr/local/bin/dnscrypt-proxy
     remote_src: true
     owner: root

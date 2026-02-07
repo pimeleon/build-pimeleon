@@ -1,0 +1,43 @@
+---
+# Proxy Setup Task
+# Configures Privoxy, Squid, and Tor (based on profile)
+# Note: privoxy installed in stage2-customize.sh
+
+# Privoxy - Privacy enhancing proxy
+- name: Configure Privoxy
+  ansible.builtin.template:
+    src: privoxy/config.j2
+    dest: /etc/privoxy/config
+    mode: '0644'
+  when: services_enabled.privoxy | default(true)
+  notify: Restart privoxy
+
+# Note: Privoxy service enablement happens in stage3-optimize.sh (outside chroot)
+
+# Squid - Caching proxy (development only)
+- name: Install Squid
+  ansible.builtin.apt:
+    name: squid
+    state: present
+  when: services_enabled.squid | default(false)
+
+- name: Configure Squid
+  ansible.builtin.template:
+    src: squid/squid.conf.j2
+    dest: /etc/squid/squid.conf
+    mode: '0644'
+  when: services_enabled.squid | default(false)
+  notify: Restart squid
+
+- name: Create Squid cache directory
+  ansible.builtin.file:
+    path: /var/spool/squid
+    state: directory
+    owner: proxy
+    group: proxy
+    mode: '0755'
+  when: services_enabled.squid | default(false)
+
+# Note: Squid service enablement happens in stage3-optimize.sh (outside chroot)
+
+# Tor is now installed from source - see tasks/tor-setup.yml

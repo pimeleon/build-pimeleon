@@ -75,8 +75,8 @@
                   86400 ) ; Negative Cache TTL
       ;
       @       IN  NS  ns1.{{ dns_domain | default('pimeleon.local') }}.
-      ns1     IN  A   {{ default_ip }}
-      router  IN  A   {{ default_ip }}
+      ns1     IN  A   {{ lan_ip }}
+      router  IN  A   {{ lan_ip }}
     dest: /var/lib/bind/{{ dns_domain | default('pimeleon.local') }}.zone
     owner: bind
     group: bind
