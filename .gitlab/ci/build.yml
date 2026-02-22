@@ -148,6 +148,8 @@ build:pimeleon:
   extends: .build-pimeleon
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      variables:
+        BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:latest
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
         BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:latest

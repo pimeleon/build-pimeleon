@@ -4,8 +4,7 @@
 #
 # TARGET_PLATFORM is injected from setup:platform via dotenv artifact.
 # Jobs run on release/* branch pushes and on MRs targeting release/* branches.
-# MR pipelines use builder:latest / tester:latest since branch-tagged images
-# are only built on direct release/* pushes.
+# Both use tester:latest — branch-specific images are not guaranteed to exist.
 
 # Smoke test — quick sanity check of the built image
 test:smoke:
@@ -19,6 +18,8 @@ test:smoke:
     - linux
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      variables:
+        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
         TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
@@ -53,6 +54,8 @@ test:integration:
     - linux
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      variables:
+        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
         TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
