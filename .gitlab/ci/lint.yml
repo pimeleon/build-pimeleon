@@ -7,10 +7,6 @@ lint:yaml:
   image: python:3.11-slim
   tags:
     - python
-  rules:
-    - if: '$CI_COMMIT_TAG'
-      when: never
-    - when: on_success
   before_script:
     - pip install --quiet yamllint
   script:
@@ -22,10 +18,6 @@ lint:ansible:
   image: python:3.11-slim
   tags:
     - python
-  rules:
-    - if: '$CI_COMMIT_TAG'
-      when: never
-    - when: on_success
   before_script:
     - pip install --quiet ansible-lint
   script:
@@ -37,10 +29,6 @@ lint:shell:
   image: koalaman/shellcheck-alpine:latest
   tags:
     - linux
-  rules:
-    - if: '$CI_COMMIT_TAG'
-      when: never
-    - when: on_success
   script:
     - find . -name "*.sh" -type f -exec shellcheck {} \;
   allow_failure: true

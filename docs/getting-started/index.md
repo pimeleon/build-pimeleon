@@ -84,7 +84,7 @@ Run the builder to create a Pimeleon image:
 
     ```bash
     export DOCKER_BUILDKIT=1
-    export APT_CACHE_SERVER=192.168.42.5  # Your cache server IP
+    export APT_CACHE_SERVER=192.168.76.5  # Your cache server IP
     export RASPBIAN_MIRROR=http://archive.raspbian.org/raspbian/
 
     docker compose run --rm builder
@@ -257,7 +257,7 @@ export PIMELEON_RPI_MODEL=3B+               # Pi model (3B+, 4, Zero W)
 export PIMELEON_IMAGE_SIZE=4G               # Image size (4G, 8G)
 
 # Network optimization
-export APT_CACHE_SERVER=192.168.42.5        # APT cache proxy
+export APT_CACHE_SERVER=192.168.76.5        # APT cache proxy
 export APT_CACHE_PORT=3142                  # Cache port
 export RASPBIAN_MIRROR=http://mirrordirector.raspbian.org/raspbian/
 

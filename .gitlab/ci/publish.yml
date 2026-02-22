@@ -2,36 +2,48 @@
 # GitLab CI/CD - Publishing
 # Image registry, GitLab Pages, and Documentation Previews
 
+# Upload platform image to the Generic Packages registry.
+# Version is computed from conventional commits using apps/{platform}/VERSION as baseline.
 publish:image:
   stage: publish
   tags:
     - lightweight
-  needs: ["build:pimeleon", "test:smoke"]
+  needs:
+    - job: setup:platform
+      artifacts: true
+    - job: test:smoke
+      artifacts: false
   rules:
-    # Publish on platform release branches
-    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
-    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
   script:
-    - cd output
     - |
+      chmod +x ./shared/scripts/get-next-version.sh
+      VERSION=$(./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+      echo "Publishing version ${VERSION} for ${TARGET_PLATFORM}"
+      cd output
       for file in pimeleon-*.img.xz pimeleon-*.tar.gz; do
         if [ -f "$file" ]; then
           curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
             --upload-file "$file" \
-            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pimeleon/${CI_COMMIT_TAG:-latest}/$(basename $file)"
+            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pimeleon/${TARGET_PLATFORM}-v${VERSION}/$(basename $file)"
         fi
       done
 
+# Build MkDocs site and publish to GitLab Pages (release branches only)
 publish:pages:
   stage: publish
   image: python:3.11-slim
   tags:
     - lightweight
-  needs: ["build:pimeleon", "test:smoke"]
+  needs:
+    - job: setup:platform
+      artifacts: true
+    - job: test:smoke
+      artifacts: false
   rules:
-    # Publish docs from develop or release branches
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+  before_script:
+    - echo "Acquire::http::Proxy \"http://${APT_PROXY}\";" > /etc/apt/apt.conf.d/01proxy
   script:
     - apt-get -qy update && apt-get -q install -y --no-install-recommends git
     - pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin
@@ -46,9 +58,11 @@ publish:docs-preview:
   image: python:3.11-slim
   tags:
     - lightweight
-  needs: ["build:pimeleon", "test:smoke"]
+  needs: ["lint:yaml"]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  before_script:
+    - echo "Acquire::http::Proxy \"http://${APT_PROXY}\";" > /etc/apt/apt.conf.d/01proxy
   script:
     - apt-get -qy update && apt-get -q install -y --no-install-recommends git
     - pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin

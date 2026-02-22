@@ -207,11 +207,23 @@ check_root() {
     fi
 }
 
+# Get the QEMU static binary name for the target architecture
+get_qemu_binary() {
+    case "${RPI_ARCH:-armhf}" in
+        arm64|aarch64) echo "qemu-aarch64-static" ;;
+        armhf|arm)     echo "qemu-arm-static" ;;
+        *)             die "Unsupported architecture: ${RPI_ARCH}" ;;
+    esac
+}
+
 # Check prerequisites
 check_prerequisites() {
+    local qemu_binary
+    qemu_binary=$(get_qemu_binary)
+
     local required_commands=(
         "debootstrap"
-        "qemu-arm-static"
+        "${qemu_binary}"
         "parted"
         "kpartx"
         "mkfs.vfat"
@@ -226,8 +238,8 @@ check_prerequisites() {
     done
 
     # Check for qemu-user-static
-    if [[ ! -f /usr/bin/qemu-arm-static ]]; then
-        die "qemu-arm-static not found. Please install qemu-user-static package."
+    if [[ ! -f "/usr/bin/${qemu_binary}" ]]; then
+        die "${qemu_binary} not found. Please install qemu-user-static package."
     fi
 
     # Check binfmt support
@@ -320,8 +332,10 @@ setup_chroot() {
 
     log_info "Setting up chroot environment"
 
-    # Copy qemu static binary
-    sudo cp /usr/bin/qemu-arm-static "$chroot_dir/usr/bin/"
+    # Copy qemu static binary for target architecture
+    local qemu_binary
+    qemu_binary=$(get_qemu_binary)
+    sudo cp "/usr/bin/${qemu_binary}" "$chroot_dir/usr/bin/"
 
     # Mount special filesystems
     sudo mount -t proc proc "$chroot_dir/proc"
@@ -381,7 +395,9 @@ cleanup_chroot() {
     sudo umount "$chroot_dir/proc" 2>/dev/null || true
 
     # Remove qemu static binary
-    sudo rm -f "$chroot_dir/usr/bin/qemu-arm-static"
+    local qemu_binary
+    qemu_binary=$(get_qemu_binary)
+    sudo rm -f "$chroot_dir/usr/bin/${qemu_binary}"
 
     # Clear chroot tracking
     CLEANUP_CHROOT_ACTIVE=false

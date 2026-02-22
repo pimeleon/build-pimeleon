@@ -9,6 +9,15 @@
     update_cache: false
   when: services_enabled.hostapd | default(true)
 
+- name: Create hostapd compatibility symlink for APT install
+  ansible.builtin.file:
+    src: /usr/sbin/hostapd
+    dest: /usr/local/bin/hostapd
+    state: link
+  when:
+    - services_enabled.hostapd | default(true)
+    - not (build_from_source | default({})).hostapd | default(false)
+
 - name: Create hostapd config directory
   ansible.builtin.file:
     path: /etc/hostapd

@@ -2,27 +2,50 @@
 # GitLab CI/CD - Build
 # Cache warming, Containers, and Pimeleon Image
 
-# Cache status check - pull existing cache for build:pimeleon
-# Note: No docker-in-docker here; cache creation happens in build:pimeleon
-warm-cache:
+# Detect platform from release branch name and export as dotenv artifact.
+# Downstream jobs use TARGET_PLATFORM via: needs: [job: setup:platform, artifacts: true]
+setup:platform:
   stage: .pre
   image: alpine:latest
   tags:
-    - linux
+    - lightweight
   rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
-      when: never
-    - when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+  script:
+    - |
+      if [ -n "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]; then
+        PLATFORM=$(echo "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" | sed 's|^release/||')
+      else
+        PLATFORM=$(echo "$CI_COMMIT_BRANCH" | sed 's|^release/||')
+      fi
+      echo "TARGET_PLATFORM=$PLATFORM" > platform.env
+      echo "Platform detected: $PLATFORM"
+  artifacts:
+    reports:
+      dotenv: platform.env
+
+# Pull (or seed) the base image cache for the detected platform
+warm-cache:
+  stage: build
+  image: alpine:latest
+  tags:
+    - linux
+  needs:
+    - job: setup:platform
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
   cache:
-    # Harden cache key by including a hash of the base build script logic
-    key: "base-system-${TARGET_PLATFORM:-rpi3-bookworm}"
+    key: "base-system-${TARGET_PLATFORM}"
     paths:
       - cache/
     policy: pull-push
   script:
     - mkdir -p cache
     - |
-      CACHE_FILE="cache/pimeleon-${TARGET_PLATFORM:-rpi3-bookworm}-base.tar.gz"
+      CACHE_FILE="cache/pimeleon-${TARGET_PLATFORM}-base.tar.gz"
       if [ -f "$CACHE_FILE" ]; then
         echo "Cache found: $CACHE_FILE"
         ls -lh "$CACHE_FILE"
@@ -30,64 +53,56 @@ warm-cache:
         echo "Cache not found, will be created by build:pimeleon"
       fi
 
+# Build builder and tester Docker images when container sources change
 build:containers:
   extends: .docker-job
   stage: build
   rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
-      when: never
-    - when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      changes:
+        - shared/containers/**/*
+        - .gitlab/ci/build.yml
+        - .gitlab-ci.yml
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: always
+    - when: never
   script:
-    - docker build --cache-from ${CI_REGISTRY_IMAGE}/builder:latest -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest -f ./shared/containers/builder/Dockerfile .
-    - docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest ./shared/containers/tester
+    - docker build --cache-from ${CI_REGISTRY_IMAGE}/builder:latest --build-arg APT_CACHE_SERVER=${APT_PROXY%:*} -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest -f ./shared/containers/builder/Dockerfile .
+    - docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest --build-arg APT_CACHE_SERVER=${APT_PROXY%:*} -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest ./shared/containers/tester
     - docker push $BUILD_IMAGE
     - docker push ${CI_REGISTRY_IMAGE}/builder:latest
     - docker push $TEST_IMAGE
     - docker push ${CI_REGISTRY_IMAGE}/tester:latest
 
-build:pimeleon:
+# Hidden template — shared build logic for all platform jobs
+.build-pimeleon:
   extends: .docker-job
   stage: build
-  needs: ["warm-cache", "build:containers"]
+  needs:
+    - job: setup:platform
+      artifacts: true
+    - job: warm-cache
+    - job: build:containers
+      optional: true
   cache:
-    key: base-system-${TARGET_PLATFORM:-rpi3-bookworm}
+    key: "base-system-${TARGET_PLATFORM}"
     paths:
       - cache/
     policy: pull
-  rules:
-    # Skip on feature branches
-    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
-      when: never
-    # RPi 3B+ builds (release\/rpi3-* branches)
-    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi3-/'
-      variables:
-        TARGET_PLATFORM: "rpi3-bookworm"
-        PIMELEON_ENVIRONMENT: "production"
-    # RPi 4B builds (release\/rpi4-* branches)
-    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi4-/'
-      variables:
-        TARGET_PLATFORM: "rpi4-bookworm"
-        PIMELEON_ENVIRONMENT: "production"
-    # Default for primary branches (use RPi 3B+ as reference build)
-    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
-      variables:
-        TARGET_PLATFORM: "rpi3-bookworm"
-        PIMELEON_ENVIRONMENT: "development"
-    - when: on_success
-      variables:
-        PIMELEON_ENVIRONMENT: "development"
-  environment:
-    name: $PIMELEON_ENVIRONMENT
   script:
-    - echo "Building Pimeleon app ${TARGET_PLATFORM:-rpi3-bookworm}..."
+    - set -e
+    - echo "Building Pimeleon image for ${TARGET_PLATFORM}..."
     - mkdir -p output cache
-    - chown -R 1001:999 output cache  # 1001:999 matches builder user/group
     - |
-      # Create container, copy scripts, then start
+      # Calculate version from conventional commits (uses apps/${TARGET_PLATFORM}/VERSION as baseline)
+      chmod +x ./shared/scripts/get-next-version.sh
+      BASE_VERSION=$(./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+      PIMELEON_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
+      echo "Building version: ${PIMELEON_VERSION}"
+    - |
       CONTAINER_ID=$(docker create \
         --privileged \
         -v /dev:/dev:rw \
-        -v "$CI_PROJECT_DIR/output":/output \
         -v "$CI_PROJECT_DIR/cache":/cache \
         -v "$CI_PROJECT_DIR/configs":/configs \
         -v "$CI_PROJECT_DIR/shared/ansible":/ansible:ro \
@@ -95,18 +110,28 @@ build:pimeleon:
         -e WORKSPACE_DIR=/workspace \
         -e CACHE_DIR=/cache \
         -e OUTPUT_DIR=/output \
-        -e TARGET_PLATFORM="${TARGET_PLATFORM:-rpi3-bookworm}" \
+        -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
+        -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
         -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
         "$BUILD_IMAGE")
-      # Copy scripts into container
       docker cp shared/scripts/. "$CONTAINER_ID":/scripts/
-      # Start container and wait for completion
       docker start -a "$CONTAINER_ID"
-      # Cleanup
+      EXIT_CODE=$(docker inspect "$CONTAINER_ID" --format='{{.State.ExitCode}}')
+      echo "Container exit code: ${EXIT_CODE}"
+      if [ "${EXIT_CODE}" -ne 0 ]; then
+        echo "Error: Build container failed with exit code ${EXIT_CODE}"
+        docker cp "$CONTAINER_ID":/output/. output/ || true
+        docker rm "$CONTAINER_ID"
+        exit 1
+      fi
+      echo "Extracting artifacts from container..."
+      docker cp "$CONTAINER_ID":/output/. output/
       docker rm "$CONTAINER_ID" || true
     - echo "Build output:"
-    - ls -la output/ || true
+    - ls -la output/
+    # Ensure artifacts were actually produced
+    - '[ "$(ls -A output/*.img 2>/dev/null)" ] || (echo "Error: No image artifacts found in output/" && exit 1)'
     - chown -R "$(id -u):$(id -g)" output/ || true
   artifacts:
     paths:
@@ -116,3 +141,83 @@ build:pimeleon:
       - output/*.log
       - output/pi-initial-password.txt
     expire_in: 1 week
+
+# Platform build — triggered by push to any release/* branch or MR targeting one
+build:pimeleon:
+  extends: .build-pimeleon
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+      variables:
+        BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:latest
+  environment:
+    name: build/${TARGET_PLATFORM}
+
+# Custom build — manually triggered via Web/API with configurable variables
+build:custom:
+  extends: .docker-job
+  stage: build
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: manual
+  variables:
+    # Defaults that can be overridden in the GitLab UI
+    TARGET_PLATFORM: "rpi3-bookworm"
+    PIMELEON_IMAGE_SIZE: "4G"
+    PIMELEON_PROFILE: "development"
+    DEBUG: "0"
+  needs:
+    - job: build:containers
+      optional: true
+  cache:
+    key: "base-system-${TARGET_PLATFORM}"
+    paths:
+      - cache/
+    policy: pull-push
+  script:
+    - set -e
+    - echo "Custom build for ${TARGET_PLATFORM}..."
+    - mkdir -p output cache
+    - |
+      chmod +x ./shared/scripts/get-next-version.sh
+      BASE_VERSION=$(./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+      PIMELEON_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
+      echo "Building version: ${PIMELEON_VERSION}"
+    - |
+      CONTAINER_ID=$(docker create \
+        --privileged \
+        -v /dev:/dev:rw \
+        -v "$CI_PROJECT_DIR/cache":/cache \
+        -v "$CI_PROJECT_DIR/configs":/configs \
+        -v "$CI_PROJECT_DIR/shared/ansible":/ansible:ro \
+        -e CI=true \
+        -e WORKSPACE_DIR=/workspace \
+        -e CACHE_DIR=/cache \
+        -e OUTPUT_DIR=/output \
+        -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
+        -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
+        -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
+        -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
+        "$BUILD_IMAGE")
+      docker cp shared/scripts/. "$CONTAINER_ID":/scripts/
+      docker start -a "$CONTAINER_ID"
+      EXIT_CODE=$(docker inspect "$CONTAINER_ID" --format='{{.State.ExitCode}}')
+      if [ "${EXIT_CODE}" -ne 0 ]; then
+        docker cp "$CONTAINER_ID":/output/. output/ || true
+        docker rm "$CONTAINER_ID"
+        exit 1
+      fi
+      docker cp "$CONTAINER_ID":/output/. output/
+      docker rm "$CONTAINER_ID" || true
+    - ls -la output/
+    - '[ "$(ls -A output/*.img 2>/dev/null)" ] || (echo "Error: No image artifacts found in output/" && exit 1)'
+    - chown -R "$(id -u):$(id -g)" output/ || true
+  artifacts:
+    paths:
+      - output/*.img
+      - output/*.img.xz
+      - output/*.img.metadata.json
+      - output/*.log
+      - output/pi-initial-password.txt
+    expire_in: 1 week
+  allow_failure: true

@@ -949,6 +949,7 @@ contributing without ongoing maintenance commitment. The community may adopt it 
 
 - [Multi-Platform Strategy](../architecture/multi-platform-strategy.md)
 - [Hardware Profiles Schema](../architecture/hardware-profiles.md)
+- [CI/CD Infrastructure](../architecture/cicd.md)
 - [Migration Roadmap](../architecture/migration-roadmap.md)
 
 ## Revision History

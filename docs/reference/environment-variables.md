@@ -37,8 +37,21 @@ Complete reference for all configuration environment variables.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `APT_CACHE_SERVER` | *(none)* | APT cache server IP (e.g., `192.168.42.5`) |
+| `APT_CACHE_SERVER` | *(none)* | APT cache server IP (e.g., `192.168.76.5`) |
 | `APT_CACHE_PORT` | `3142` | APT cache port (apt-cacher-ng default) |
+
+## CI/CD Variables
+
+These variables are primarily used in the GitLab and GitHub automated pipelines.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TARGET_PLATFORM` | *(none)* | Combined platform/version slug (e.g., `rpi3-bookworm`) |
+| `PIMELEON_VERSION` | `v1.0.0` | Semantic version of the image being built |
+| `PIMELEON_ENVIRONMENT` | `development` | Build target environment (`development`, `production`) |
+| `BUILD_IMAGE` | *(none)* | Full tag for the builder Docker image |
+| `TEST_IMAGE` | *(none)* | Full tag for the tester Docker image |
+| `APT_PROXY` | *(none)* | Combined APT cache IP:PORT (e.g., `192.168.76.5:3142`) |
 
 ## Usage Examples
 
@@ -59,7 +72,7 @@ PIMELEON_RPI_MODEL=4B RASPBIAN_VERSION=bookworm docker compose run --rm builder
 ```bash
 PIMELEON_RPI_MODEL=3B+ \
 RASPBIAN_VERSION=bullseye \
-APT_CACHE_SERVER=192.168.42.5 \
+APT_CACHE_SERVER=192.168.76.5 \
 docker compose run --rm builder
 ```
 
@@ -71,7 +84,7 @@ PIMELEON_RPI_MODEL=4B \
 PIMELEON_IMAGE_SIZE=8G \
 PIMELEON_INITIAL_PASSWORD=mysecurepass \
 RASPBIAN_VERSION=bookworm \
-APT_CACHE_SERVER=192.168.42.5 \
+APT_CACHE_SERVER=192.168.76.5 \
 docker compose run --rm builder
 ```
 
