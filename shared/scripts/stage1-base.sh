@@ -91,12 +91,25 @@ if cache_exists "${RASPBIAN_CACHE_KEY}"; then
     cache_get "${RASPBIAN_CACHE_KEY}" "${WORK_DIR}/raspbian-base.tar.gz"
     sudo tar -xzf "${WORK_DIR}/raspbian-base.tar.gz" -C "${MOUNT_POINT}"
 else
-    log_info "Bootstrapping Raspbian ${RASPBIAN_VERSION}"
+    # Determine architecture-specific settings
+    DEBOOTSTRAP_ARCH="${RPI_ARCH:-armhf}"
+    if [[ "${DEBOOTSTRAP_ARCH}" == "arm64" ]]; then
+        # arm64 uses standard Debian repos (Raspbian is armhf-only)
+        DEBOOTSTRAP_MIRROR="http://deb.debian.org/debian"
+        log_info "Bootstrapping Debian ${RASPBIAN_VERSION} (${DEBOOTSTRAP_ARCH})"
+    else
+        # armhf uses Raspbian repos
+        DEBOOTSTRAP_MIRROR="${RASPBIAN_MIRROR}"
+        log_info "Bootstrapping Raspbian ${RASPBIAN_VERSION} (${DEBOOTSTRAP_ARCH})"
+    fi
 
     # First stage debootstrap with keyring handling
-    # For Raspbian, disable GPG verification as keyring is not readily available in Debian
-    KEYRING_OPT="--no-check-gpg"
-    log_warn "Disabling GPG verification for Raspbian bootstrap"
+    KEYRING_OPT=""
+    if [[ "${DEBOOTSTRAP_ARCH}" != "arm64" ]]; then
+        # For Raspbian, disable GPG verification as keyring is not readily available in Debian
+        KEYRING_OPT="--no-check-gpg"
+        log_warn "Disabling GPG verification for Raspbian bootstrap"
+    fi
 
     # ARM binary format registration handled by host system
     # Host should have: sudo apt install binfmt-support qemu-user-static
@@ -112,11 +125,11 @@ else
     # Bootstrap base system without Pi-specific packages first
     # Include python3-minimal for Ansible compatibility
     # Exclude DHCP packages since systemd handles networking
-    sudo env "${DEBOOTSTRAP_ENV}" debootstrap --foreign --arch=armhf \
+    sudo env "${DEBOOTSTRAP_ENV}" debootstrap --foreign --arch="${DEBOOTSTRAP_ARCH}" \
         --include=python3-minimal \
         --exclude=isc-dhcp-common,isc-dhcp-client \
         ${KEYRING_OPT} \
-        "${RASPBIAN_VERSION}" "${MOUNT_POINT}" "${RASPBIAN_MIRROR}"
+        "${RASPBIAN_VERSION}" "${MOUNT_POINT}" "${DEBOOTSTRAP_MIRROR}"
 
     # Setup chroot for second stage
     setup_chroot "${MOUNT_POINT}"
@@ -130,11 +143,21 @@ else
     # Remove temporary proxy config
     remove_chroot_apt_proxy "${MOUNT_POINT}"
 
-    # Configure apt sources with all required components
-    sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
+    # Configure apt sources based on architecture
+    if [[ "${DEBOOTSTRAP_ARCH}" == "arm64" ]]; then
+        # arm64: standard Debian repos + non-free-firmware for bookworm+
+        sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
+deb http://deb.debian.org/debian ${RASPBIAN_VERSION} main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian-security ${RASPBIAN_VERSION}-security main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian ${RASPBIAN_VERSION}-updates main contrib non-free non-free-firmware
+EOF
+    else
+        # armhf: Raspbian repos
+        sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
 deb ${RASPBIAN_MIRROR} ${RASPBIAN_VERSION} main contrib non-free rpi
 deb-src ${RASPBIAN_MIRROR} ${RASPBIAN_VERSION} main contrib non-free rpi
 EOF
+    fi
 
     # Add Raspberry Pi Foundation GPG key (modern method - no apt-key)
     sudo mkdir -p "${MOUNT_POINT}/etc/apt/keyrings"
@@ -224,7 +247,7 @@ boot_delay=0
 EOF
 
 # Configure cmdline
-echo "console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait fsck.mode=force ipv6.disable=0 net.ifnames=0 brcmfmac.txglomsz=32 loglevel=3 logo.nologo vt.global_cursor_default=0 quiet" | sudo tee "${MOUNT_POINT}/boot/cmdline.txt" > /dev/null
+echo "console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait fsck.mode=force ipv6.disable=0 net.ifnames=0 brcmfmac.txglomsz=32 loglevel=4 logo.nologo vt.global_cursor_default=1" | sudo tee "${MOUNT_POINT}/boot/cmdline.txt" > /dev/null
 
 # Basic fstab with tmpfs for /tmp (reduces SD card wear)
 sudo tee "${MOUNT_POINT}/etc/fstab" > /dev/null <<EOF

@@ -28,10 +28,7 @@ user-manual /usr/share/doc/privoxy/user-manual
 
 # Listen on localhost and LAN interfaces
 listen-address 127.0.0.1:{{ privoxy_port | default(8118) }}
-listen-address {{ lan_ip }}:{{ privoxy_port | default(8118) }}
-{% if services_enabled.wifi_ap | default(true) %}
-listen-address {{ wifi_ip | default(wifi_ap_ip) }}:{{ privoxy_port | default(8118) }}
-{% endif %}
+listen-address {{ wifi_ap_ip }}:{{ privoxy_port | default(8118) }}
 
 toggle 1
 

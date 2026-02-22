@@ -35,26 +35,6 @@ load_app_config "${TARGET_PLATFORM}"
 WORK_DIR="/tmp/build"
 BUILD_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 
-# Get version for image naming
-# - CI/Release builds: use PIMELEON_VERSION or git tag -> pimeleon-{device}-{version}-{os}.img
-# - Local builds: use commit hash -> pimeleon-{device}-{os}-{commit}.img
-get_version() {
-    # Check for explicit version override (CI release builds)
-    if [ -n "${PIMELEON_VERSION:-}" ]; then
-        echo "$PIMELEON_VERSION"
-        return 0
-    fi
-
-    # On exact tag - use tag (strip v prefix)
-    if version=$(git describe --tags --exact-match HEAD 2>/dev/null); then
-        echo "${version#v}"
-        return 0
-    fi
-
-    # Local builds - return empty (will use commit hash in different position)
-    return 1
-}
-
 # Split TARGET_PLATFORM (e.g., rpi3-bookworm) into device and os
 DEVICE_NAME="${TARGET_PLATFORM%%-*}"
 OS_NAME="${TARGET_PLATFORM##*-}"
@@ -62,8 +42,22 @@ OS_NAME="${TARGET_PLATFORM##*-}"
 # Determine image name based on build type
 COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "dev")
 
-if IMAGE_VERSION=$(get_version); then
-    # Release build: pimeleon-{device}-{version}-{os}.img
+# Helper to get version from git tag
+get_git_tag_version() {
+    # On exact tag - use tag (strip v prefix)
+    if version=$(git describe --tags --exact-match HEAD 2>/dev/null); then
+        echo "${version#v}"
+        return 0
+    fi
+    return 1
+}
+
+if [ -n "${PIMELEON_VERSION:-}" ]; then
+    IMAGE_VERSION="${PIMELEON_VERSION}"
+    # Release build (or tagged CI build): pimeleon-{device}-{version}-{os}.img
+    IMAGE_NAME="pimeleon-${DEVICE_NAME}-${IMAGE_VERSION}-${OS_NAME}.img"
+elif IMAGE_VERSION=$(get_git_tag_version); then
+    # Git tag build: pimeleon-{device}-{version}-{os}.img
     IMAGE_NAME="pimeleon-${DEVICE_NAME}-${IMAGE_VERSION}-${OS_NAME}.img"
 else
     # Development build: pimeleon-{device}-{version}-{os}-{commit}.img

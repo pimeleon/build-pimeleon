@@ -489,9 +489,11 @@ EOF
     mkdir -p "${WORK_DIR}/group_vars/${PLATFORM_GROUP}"
 
     # Layer 1: Copy shared common vars (lowest priority)
+    # Exclude profiles/ dir — only the selected profile should be loaded (copied at line 512)
     if [[ -d "${SHARED_VARS_DIR}/common" ]]; then
         log_info "Loading shared common vars from: ${SHARED_VARS_DIR}/common"
-        cp -R "${SHARED_VARS_DIR}/common/"* "${WORK_DIR}/group_vars/all/" 2>/dev/null || true
+        find "${SHARED_VARS_DIR}/common" -maxdepth 1 -not -name profiles -not -path "${SHARED_VARS_DIR}/common" \
+            -exec cp -R {} "${WORK_DIR}/group_vars/all/" \; 2>/dev/null || true
     fi
 
     # Layer 2: Copy platform vars (raspberrypi family)

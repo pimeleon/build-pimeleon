@@ -159,6 +159,7 @@ nav:
       - Network Design: architecture/networking.md
       - Multi-Platform Strategy: architecture/multi-platform-strategy.md
       - Hardware Profiles: architecture/hardware-profiles.md
+      - CI/CD Infrastructure: architecture/cicd.md
       - Migration Roadmap: architecture/migration-roadmap.md
 
   - Platforms:

@@ -114,7 +114,7 @@ graph LR
 ```bash title="Build a Pimeleon Image"
 # Build with APT cache support
 export DOCKER_BUILDKIT=1
-export APT_CACHE_SERVER=192.168.42.5
+export APT_CACHE_SERVER=192.168.76.5
 
 docker compose run --rm builder
 ```
