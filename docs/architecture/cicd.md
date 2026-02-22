@@ -38,6 +38,20 @@ base system root filesystems:
 A dedicated `warm-cache` stage in `.pre` ensures that build jobs start with a populated
 cache when possible, reducing build times by up to 10 minutes.
 
+### Branch-Local Overrides
+
+To allow for platform-specific divergence while maintaining a clean monorepo, the CI/CD pipeline
+prioritizes branch-local configuration files over shared ones. If these files exist in the branch
+root, they will be used instead of the defaults in `shared/`:
+
+- **Dockerfiles**: `./containers/{builder,tester}/Dockerfile` (falls back to `shared/containers/`)
+- **Ansible Playbooks**: `./ansible/playbooks/main.yml` (trigger for using the root `./ansible` directory)
+- **Service Configs**: `./configs/network/` (trigger for using the root `./configs` directory)
+- **Build Scripts**: `./scripts/build.sh` (trigger for using the root `./scripts` directory)
+
+This mechanism ensures that `develop` and other standard branches use the verified `shared/` logic,
+while release branches (e.g., `release/rpi4-bookworm`) can customize their build process as needed.
+
 ### Environment Handling
 
 All builds in the Pimeleon CI/CD pipeline are executed in **Production Mode**. This ensures that

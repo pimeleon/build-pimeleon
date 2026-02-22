@@ -17,8 +17,10 @@ publish:image:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
   script:
     - |
-      chmod +x ./shared/scripts/get-next-version.sh
-      VERSION=$(./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+      SCRIPTS_DIR="./shared/scripts"
+      [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
+      chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
+      VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
       echo "Publishing version ${VERSION} for ${TARGET_PLATFORM}"
       cd output
       for file in pimeleon-*.img.xz pimeleon-*.tar.gz; do
