@@ -2,90 +2,32 @@
 # GitLab CI/CD - Docs Triggers
 # External documentation site triggers
 
-# Build MkDocs site and provide artifact preview (internal to project)
-publish-project-docs:
-  stage: docs
-  image: python:3.11-slim
-  tags:
-    - lightweight
-  needs:
-    - job: "lint:yaml"
-    - job: "publish:image"
-      optional: true
-    - job: "test:smoke"
-      optional: true
-    - job: "test:integration"
-      optional: true
-
-  rules:
-    # Run on release branch push (merge to release/*) or version tags
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_COMMIT_TAG'
-    # Run on MRs targeting release/* or develop to verify documentation
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
-  before_script:
-    - chmod +x .gitlab/scripts/setup-apt-proxy.sh
-    - .gitlab/scripts/setup-apt-proxy.sh
-  script:
-    - apt-get -qy update && apt-get -q install -y --no-install-recommends git
-    - pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin
-    - mkdocs build -d public
-  artifacts:
-    paths:
-      - public
-    expire_in: 1 week
-
-# Trigger preview site build on downstream repository
 trigger-docs-preview:
   stage: docs
-  needs:
-    - job: "lint:yaml"
-    - job: "publish:image"
-      optional: true
-    - job: "test:smoke"
-      optional: true
-    - job: "test:integration"
-      optional: true
   trigger:
     project: pirouter/pimeleon-site
     branch: preview
   variables:
     TRIGGERED_BY: pimeleon-build
+    BUILD_VERSION: $CI_COMMIT_TAG
     SOURCE_BRANCH: $CI_COMMIT_BRANCH
     SOURCE_COMMIT: $CI_COMMIT_SHA
-  environment:
-    name: documentation/preview
-    url: https://preview.pimeleon-docs.pages.dev
   rules:
-    # Trigger on tags
-    - if: '$CI_COMMIT_TAG'
-    # Trigger on MRs targeting release/* or develop for preview
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
+    - if: '$CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+-(rc|alpha|beta)\d+(-(rpi3|rpi4).*)?$/'
 
-# Trigger production site build on downstream repository
 trigger-docs-production:
   stage: docs
-  needs:
-    - job: "lint:yaml"
-    - job: "trigger:github"
-      optional: true
-    - job: "publish:image"
-      optional: true
-    - job: "test:smoke"
-      optional: true
-    - job: "test:integration"
-      optional: true
   trigger:
     project: pirouter/pimeleon-site
-    branch: master
+    branch: main
   variables:
     TRIGGERED_BY: pimeleon-build
+    BUILD_VERSION: $CI_COMMIT_TAG
     SOURCE_BRANCH: $CI_COMMIT_BRANCH
     SOURCE_COMMIT: $CI_COMMIT_SHA
-  environment:
-    name: documentation/production
-    url: https://pimeleon.org
   rules:
-    # Trigger on any release branch push (merge to release/*) or version tags
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_COMMIT_TAG'
+    # Trigger on platform release branches
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
+    # Trigger on platform-specific release tags
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-(rpi3|rpi4)-/'

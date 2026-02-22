@@ -120,7 +120,7 @@ make build-nocache APP=rpi3-bookworm
 make build-ab2p
 
 # Interactive shell for debugging
-PIMELEON_APP=rpi3-bookworm docker compose run --rm builder bash
+TARGET_PLATFORM=rpi3-bookworm docker compose run --rm builder bash
 
 # View logs
 docker compose logs -f builder
@@ -189,7 +189,7 @@ pimeleon-build/
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PIMELEON_APP` | `rpi3-bookworm` | App to build (determines device, arch, debian) |
+| `TARGET_PLATFORM=` | `rpi3-bookworm` | App to build (determines device, arch, debian) |
 | `PIMELEON_PROFILE` | `development` | Build profile (`development`, `production`) |
 | `PIMELEON_IMAGE_SIZE` | `4G` | Output image size |
 | `APT_CACHE_SERVER` | - | APT cache server IP (e.g., `192.168.76.5`) |
@@ -428,7 +428,7 @@ qemu-system-arm -M raspi3 -kernel output/pimeleon-*.img
 - **Without APT Cache**: 19:49 (1189 seconds) - Direct downloads
 - **Performance Improvement**: 48.5% faster with APT cache (10 minutes saved)
 
-#### Subsequent Builds (Cached Base System)  
+#### Subsequent Builds (Cached Base System)
 
 - **With APT Cache**: ~5-8 minutes (base system reuse + cached packages)
 - **Cache Hit Rate**: 95%+ on TrueNAS APT cache (192.168.76.5:3142)

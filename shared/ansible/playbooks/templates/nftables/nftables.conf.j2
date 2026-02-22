@@ -39,10 +39,7 @@ table inet pimeleon {
         # SSH access control (managed by pim-config, before blanket accepts)
         include "/etc/nftables.d/ssh-access.nft"
 
-        # LAN interface - full trust (except blocked ports above)
-        iifname "{{ lan_interface }}" counter accept
 {% if services_enabled.wifi_ap | default(true) %}
-
         # WiFi interface - full trust
         iifname "{{ wifi_interface }}" counter accept
 {% endif %}
@@ -71,10 +68,7 @@ table inet pimeleon {
         # TCP sanity checks
         meta l4proto tcp jump tcp_checks
 
-        # LAN forwarding
-        iifname "{{ lan_interface }}" jump lan_forward
 {% if services_enabled.wifi_ap | default(true) %}
-
         # WiFi forwarding
         iifname "{{ wifi_interface }}" jump wifi_forward
 {% endif %}
@@ -102,18 +96,9 @@ table inet pimeleon {
         counter accept
     }
 
-    # LAN can reach WiFi and WAN
-    chain lan_forward {
 {% if services_enabled.wifi_ap | default(true) %}
-        oifname "{{ wifi_interface }}" counter accept
-{% endif %}
-        oifname "{{ wan_interface }}" counter accept
-    }
-
-{% if services_enabled.wifi_ap | default(true) %}
-    # WiFi can reach LAN and WAN
+    # WiFi can reach WAN
     chain wifi_forward {
-        oifname "{{ lan_interface }}" counter accept
         oifname "{{ wan_interface }}" counter accept
     }
 {% endif %}
@@ -145,11 +130,6 @@ table ip nat {
 {% if services_enabled.proxy_services | default(true) %}
 
         # Transparent HTTP proxy via Privoxy
-        iifname "{{ lan_interface }}" tcp dport 80 \
-            ip saddr {{ lan_network }} \
-            ip daddr != {{ lan_network }} \
-            counter redirect to :{{ privoxy_port | default(8118) }} \
-            comment "Privoxy redirect from LAN"
 {% if services_enabled.wifi_ap | default(true) %}
 
         iifname "{{ wifi_interface }}" tcp dport 80 \

@@ -12,8 +12,8 @@ services:
         APT_CACHE_PORT: ${APT_CACHE_PORT:-3142}
     container_name: pimeleon-builder
     init: true
-    stop_signal: SIGKILL
-    stop_grace_period: 3s
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
     volumes:
       - ./output:/output
       - ./cache:/cache
@@ -40,7 +40,7 @@ services:
       - ANSIBLE_CONFIG=/ansible/ansible.cfg
       - DEBIAN_FRONTEND=noninteractive
       # App selection (required for monorepo builds)
-      - PIMELEON_APP=${PIMELEON_APP:-rpi3-bookworm}
+      - TARGET_PLATFORM=${TARGET_PLATFORM:-rpi3-bookworm}
       # Raspberry Pi configuration (can override app defaults)
       - PIMELEON_RPI_MODEL=${PIMELEON_RPI_MODEL:-}
       - RPI_ARCH=${RPI_ARCH:-}
@@ -123,7 +123,7 @@ services:
       - LIBVIRT_DEFAULT_URI=qemu:///system
       - TEST_IMAGE_DIR=/images
       - TEST_RESULTS_DIR=/tests/results
-      - PIMELEON_APP=${PIMELEON_APP:-rpi3-bookworm}
+      - TARGET_PLATFORM=${TARGET_PLATFORM:-rpi3-bookworm}
       - TEST_TIMEOUT=${TEST_TIMEOUT:-3600}
       - TEST_CLIENT_COUNT=${TEST_CLIENT_COUNT:-5}
       - TEST_STRESS_CLIENTS=${TEST_STRESS_CLIENTS:-50}
@@ -161,7 +161,7 @@ services:
       - BUILD_CACHE_DIR=/cache
       - OUTPUT_DIR=/output
       - WORKSPACE_DIR=/workspace
-      - PIMELEON_APP=${PIMELEON_APP:-rpi3-bookworm}
+      - TARGET_PLATFORM=${TARGET_PLATFORM:-rpi3-bookworm}
     working_dir: /workspace
     command: /bin/bash
     stdin_open: true

@@ -4,8 +4,8 @@
 [Unit]
 Description=Pi-hole FTL DNS resolver
 Documentation=https://docs.pi-hole.net/
-After=network.target
-Wants=network.target
+After=network-online.target dnscrypt-proxy.service
+Wants=network-online.target dnscrypt-proxy.service
 
 [Service]
 Type=simple

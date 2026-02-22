@@ -19,11 +19,3 @@ zone "{{ wifi_ap_network | regex_replace('^(\\d+)\\.(\\d+)\\.(\\d+)\\..*', '\\3.
     allow-update { key rndc-key; };
     check-names ignore;
 };
-
-// Reverse zone for LAN (eth1 - secondary, 192.168.43.x)
-zone "{{ lan_network | regex_replace('^(\\d+)\\.(\\d+)\\.(\\d+)\\..*', '\\3.\\2.\\1') }}.in-addr.arpa" {
-    type master;
-    file "/var/lib/bind/{{ lan_network | regex_replace('^(\\d+)\\.(\\d+)\\.(\\d+)\\..*', '\\3.\\2.\\1') }}.rev";
-    allow-update { key rndc-key; };
-    check-names ignore;
-};

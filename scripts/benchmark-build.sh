@@ -78,11 +78,11 @@ collect_system_info() {
     else
         # Auto-detect or use provided APT cache server
         if [[ -z "${APT_CACHE_SERVER:-}" ]]; then
-            # Try to auto-detect TrueNAS APT cache
-            if ping -c1 192.168.42.5 &>/dev/null; then
-                export APT_CACHE_SERVER=192.168.42.5
+            # Try to auto-detect TrueNAS APT cache (TCP check)
+            if timeout 1 bash -c "cat < /dev/null > /dev/tcp/192.168.76.5/3142" 2>/dev/null; then
+                export APT_CACHE_SERVER=192.168.76.5
                 export APT_CACHE_PORT=3142
-                apt_cache_server="192.168.42.5:3142"
+                apt_cache_server="192.168.76.5:3142"
                 apt_cache_available="true"
                 echo -e "${GREEN}[BENCHMARK]${NC} Auto-detected TrueNAS APT cache: $apt_cache_server"
             else
@@ -92,7 +92,7 @@ collect_system_info() {
             fi
         else
             apt_cache_server="${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
-            if ping -c1 "${APT_CACHE_SERVER}" &>/dev/null; then
+            if timeout 1 bash -c "cat < /dev/null > /dev/tcp/${APT_CACHE_SERVER}/${APT_CACHE_PORT:-3142}" 2>/dev/null; then
                 apt_cache_available="true"
                 echo -e "${GREEN}[BENCHMARK]${NC} Using APT cache: $apt_cache_server"
             else

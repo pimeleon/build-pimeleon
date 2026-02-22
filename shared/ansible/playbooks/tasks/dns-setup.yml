@@ -97,27 +97,7 @@
       ;
       @       IN  NS  ns1.{{ dns_domain | default('pimeleon.local') }}.
       1       IN  PTR router.{{ dns_domain | default('pimeleon.local') }}.
-    dest: /var/lib/bind/76.168.192.rev
-    owner: bind
-    group: bind
-    mode: '0644'
-    force: false
-  when: services_enabled.dns_server | default(true)
-
-- name: Create WiFi reverse zone file
-  ansible.builtin.copy:
-    content: |
-      $TTL 86400
-      @   IN  SOA ns1.{{ dns_domain }}. admin.{{ dns_domain }}. (
-                  1       ; Serial
-                  604800  ; Refresh
-                  86400   ; Retry
-                  2419200 ; Expire
-                  86400 ) ; Negative Cache TTL
-      ;
-      @       IN  NS  ns1.{{ dns_domain | default('pimeleon.local') }}.
-      1       IN  PTR router.{{ dns_domain | default('pimeleon.local') }}.
-    dest: /var/lib/bind/77.168.192.rev
+    dest: "/var/lib/bind/{{ lan_network | regex_replace('^(\\d+)\\.(\\d+)\\.(\\d+)\\..*', '\\3.\\2.\\1') }}.rev"
     owner: bind
     group: bind
     mode: '0644'
@@ -177,3 +157,26 @@
   ansible.builtin.debug:
     var: bind9_service_files.stdout_lines
   when: services_enabled.dns_server | default(true)
+
+# Systemd override to ensure BIND9 starts after Pi-hole
+- name: Create bind9 systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/bind9.service.d
+    state: directory
+    mode: '0755'
+  when: services_enabled.dns_server | default(true)
+
+- name: Configure bind9 to start after pihole-FTL
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/bind9.service.d/override.conf
+    content: |
+      [Unit]
+      After=network-online.target pihole-FTL.service
+      Wants=network-online.target pihole-FTL.service
+    mode: '0644'
+  when:
+    - services_enabled.dns_server | default(true)
+    - services_enabled.pihole | default(true)
+  notify:
+    - Reload systemd
+    - Restart bind9

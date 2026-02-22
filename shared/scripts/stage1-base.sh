@@ -4,10 +4,12 @@ set -euo pipefail
 # Stage 1: Create base system
 # Creates the base Raspbian image with partitions
 
+# shellcheck disable=SC1091
+# shellcheck disable=SC1091
 source /scripts/common.sh
 
 # Setup cleanup trap for error handling
-trap cleanup_on_exit EXIT ERR INT
+trap 'cleanup_on_exit' EXIT ERR INT TERM
 
 WORK_DIR=$1
 IMAGE_PATH=$2
@@ -32,7 +34,7 @@ log_info "Creating ${SIZE_MB}MB image file"
 
 # Ensure output directory exists and has proper permissions
 mkdir -p "$(dirname "${IMAGE_PATH}")"
-sudo chown builder:docker "$(dirname "${IMAGE_PATH}")"
+sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "$(dirname "${IMAGE_PATH}")"
 
 # Create sparse image file
 if ! truncate -s "${IMAGE_SIZE}" "${IMAGE_PATH}"; then
@@ -67,8 +69,8 @@ CLEANUP_LOOP_DEVICE="${LOOP_DEVICE}"
 sudo kpartx -av "${LOOP_DEVICE}"
 sleep 2
 
-BOOT_PART="/dev/mapper/$(basename ${LOOP_DEVICE})p1"
-ROOT_PART="/dev/mapper/$(basename ${LOOP_DEVICE})p2"
+BOOT_PART="/dev/mapper/$(basename "${LOOP_DEVICE}")p1"
+ROOT_PART="/dev/mapper/$(basename "${LOOP_DEVICE}")p2"
 
 log_info "Formatting partitions"
 sudo mkfs.vfat -F 32 -n BOOT "${BOOT_PART}"
@@ -110,7 +112,7 @@ else
     # Bootstrap base system without Pi-specific packages first
     # Include python3-minimal for Ansible compatibility
     # Exclude DHCP packages since systemd handles networking
-    sudo env ${DEBOOTSTRAP_ENV} debootstrap --foreign --arch=armhf \
+    sudo env "${DEBOOTSTRAP_ENV}" debootstrap --foreign --arch=armhf \
         --include=python3-minimal \
         --exclude=isc-dhcp-common,isc-dhcp-client \
         ${KEYRING_OPT} \
@@ -120,24 +122,13 @@ else
     setup_chroot "${MOUNT_POINT}"
 
     # Configure proxy for second stage debootstrap if available
-    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
-        sudo mkdir -p "${MOUNT_POINT}/etc/apt/apt.conf.d"
-        sudo tee "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy-temp" > /dev/null <<EOF
-# Temporary APT proxy for debootstrap second stage
-Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
-Acquire::http::Timeout "120";
-Acquire::https::Timeout "120";
-Acquire::Retries "3";
-EOF
-    fi
+    configure_chroot_apt_proxy "${MOUNT_POINT}"
 
     # Second stage debootstrap
     chroot_run "${MOUNT_POINT}" /debootstrap/debootstrap --second-stage
 
     # Remove temporary proxy config
-    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
-        sudo rm -f "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy-temp"
-    fi
+    remove_chroot_apt_proxy "${MOUNT_POINT}"
 
     # Configure apt sources with all required components
     sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
@@ -159,33 +150,10 @@ deb [signed-by=/etc/apt/keyrings/raspberrypi-archive-keyring.gpg] http://archive
 EOF
 
     # Configure APT cache for chroot if available
-    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
-        log_info "Configuring APT cache for chroot environment"
-        sudo mkdir -p "${MOUNT_POINT}/etc/apt/apt.conf.d"
-        sudo tee "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy" > /dev/null <<EOF
-# APT Cache Configuration for Build Process
-Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
-# Longer timeouts for slow cache/upstream responses
-Acquire::http::Timeout "120";
-Acquire::https::Timeout "120";
-Acquire::Retries "3";
-EOF
-    fi
+    configure_chroot_apt_proxy "${MOUNT_POINT}"
 
     # Migrate legacy APT keyring to modern format (prevents deprecation warnings)
-    if [ -f "${MOUNT_POINT}/etc/apt/trusted.gpg" ]; then
-        log_info "Migrating legacy APT keyring to modern format"
-        sudo mkdir -p "${MOUNT_POINT}/etc/apt/trusted.gpg.d"
-        sudo gpg --no-default-keyring \
-            --keyring "${MOUNT_POINT}/etc/apt/trusted.gpg" \
-            --export 2>/dev/null | \
-            sudo gpg --no-default-keyring \
-                --keyring "gnupg-ring:${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" \
-                --import 2>/dev/null || true
-        sudo chmod 644 "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" 2>/dev/null || true
-        sudo rm -f "${MOUNT_POINT}/etc/apt/trusted.gpg"
-        log_info "Legacy keyring migrated and removed"
-    fi
+    migrate_apt_keyring "${MOUNT_POINT}"
 
     # Cache the base system
     log_info "Caching base system for future builds"
@@ -226,41 +194,30 @@ disable_splash=1
 # uncomment if hdmi display is not detected and composite is being output
 hdmi_force_hotplug=1
 
-# uncomment to force a specific HDMI mode (this will force VGA)
-#hdmi_group=1
-#hdmi_mode=4
-
-# uncomment to force a HDMI mode rather than DVI. This can make audio work in
-# DMT (computer monitor) modes
+# force a HDMI mode rather than DVI for better monitor compatibility
 hdmi_drive=2
 
-# uncomment to increase signal to HDMI, if you have interference, blanking, or
-# no display
+# increase signal to HDMI to prevent blanking
 config_hdmi_boost=4
 
-#uncomment to overclock the arm. 700 MHz is the default.
+# Optimized performance settings
 arm_freq=1000
 over_voltage=2
 
-# Uncomment some or all of these to enable the optional hardware interfaces
+# Essential hardware interfaces
 dtparam=i2c_arm=on
-#dtparam=i2s=on
 dtparam=spi=on
 
-# Uncomment this to enable the lirc-rpi module
-#dtoverlay=lirc-rpi
-
-# Additional overlays and parameters are documented /boot/overlays/README
-
-# Enable KMS driver for GPU acceleration
+# Enable KMS driver for GPU acceleration (required for some displays)
 dtoverlay=vc4-fkms-v3d
 
-# Enable audio (loads snd_bcm2835)
+# Disable all multimedia and camera features
 dtparam=audio=off
 start_x=0
 
+# System constraints
 enable_uart=0
-gpu_mem=256
+gpu_mem=128
 max_usb_current=1
 
 # Boot timing
@@ -281,6 +238,9 @@ EOF
 # Set hostname
 echo "pimeleon" | sudo tee "${MOUNT_POINT}/etc/hostname" > /dev/null
 
+# Verify stage completion
+verify_stage 1 "${MOUNT_POINT}"
+
 # Unmount
 sudo umount "${MOUNT_POINT}/boot"
 sudo umount "${MOUNT_POINT}"
@@ -288,7 +248,9 @@ sudo kpartx -d "${LOOP_DEVICE}"
 sudo losetup -d "${LOOP_DEVICE}"
 
 # Clear cleanup tracking (successful unmount)
+# shellcheck disable=SC2034
 CLEANUP_MOUNT_POINT=""
+# shellcheck disable=SC2034
 CLEANUP_LOOP_DEVICE=""
 
 log_info "Stage 1 completed successfully"

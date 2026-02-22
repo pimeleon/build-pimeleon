@@ -17,9 +17,9 @@ echo "Building Pi-hole FTL from source..."
 mkdir -p "${BUILD_DIR}"
 cd "${BUILD_DIR}"
 
-# Install build dependencies
-echo "Installing build dependencies..."
+# Update package lists
 apt-get update -qq
+apt-get upgrade -qy
 apt-get install -qy --no-install-recommends \
     git \
     wget \
@@ -32,7 +32,8 @@ apt-get install -qy --no-install-recommends \
     libunistring-dev \
     libreadline-dev \
     xxd \
-    pkg-config
+    pkg-config \
+    libcap-dev
 
 # Build libnettle (required for DNSSEC)
 echo "Building libnettle ${NETTLE_VERSION}..."
@@ -42,7 +43,7 @@ tar -xzf "nettle-${NETTLE_VERSION}.tar.gz"
 cd "nettle-${NETTLE_VERSION}"
 ./configure --enable-static --disable-shared --disable-documentation \
     --libdir=/usr/local/lib
-make -j${NPROC}
+make -j"${NPROC}"
 make install
 ldconfig
 
@@ -61,7 +62,7 @@ cmake -DCMAKE_INSTALL_PREFIX=/usr/local \
     -DENABLE_PROGRAMS=OFF \
     -DCMAKE_BUILD_TYPE=Release \
     ..
-make -j${NPROC}
+make -j"${NPROC}"
 make install
 ldconfig
 
@@ -76,12 +77,13 @@ echo "Building FTL..."
 mkdir -p build && cd build
 cmake -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
     -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_DNSMASQ=OFF \
     ..
-make -j${NPROC}
+make -j"${NPROC}"
 
 # Install binary
 echo "Installing FTL..."
-install -m 755 pihole-FTL "${INSTALL_PREFIX}/bin/pihole-FTL"
+install -m 755 src/pihole-FTL "${INSTALL_PREFIX}/bin/pihole-FTL"
 
 # Create symlink for pihole CLI
 ln -sf "${INSTALL_PREFIX}/bin/pihole-FTL" "${INSTALL_PREFIX}/bin/pihole"
