@@ -21,7 +21,7 @@ trigger-docs-production:
   stage: docs
   trigger:
     project: pirouter/pimeleon-site
-    branch: main
+    branch: develop
   variables:
     TRIGGERED_BY: pimeleon-build
     SOURCE_BRANCH: $CI_COMMIT_BRANCH

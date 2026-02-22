@@ -40,8 +40,9 @@ cache when possible, reducing build times by up to 10 minutes.
 
 ### Environment Handling
 
-- **Development**: Builds on `develop` or feature branches use the development environment.
-- **Production**: Builds triggered by version tags (e.g., `v1.2.3`) use the production environment.
+All builds in the Pimeleon CI/CD pipeline are executed in **Production Mode**. This ensures that
+all images, regardless of the branch, follow strict security hardening and service optimization
+standards.
 
 ### Custom Builds
 
@@ -52,7 +53,7 @@ the pipeline code, a `build:custom` job is available.
 - **Variables**:
   - `TARGET_PLATFORM`: Any valid combination (e.g., `rpi3-bullseye`).
   - `PIMELEON_IMAGE_SIZE`: Customize the output image size.
-  - `PIMELEON_PROFILE`: Switch between `development` and `production` service profiles.
+  - `PIMELEON_PROFILE`: Defaults to `production`.
   - `DEBUG`: Set to `1` for verbose build logs.
 
 ## GitHub Actions
