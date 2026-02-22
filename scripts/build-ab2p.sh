@@ -17,6 +17,14 @@ docker build \
 echo ""
 echo "✅ adblock2privoxy image built successfully"
 echo "   Image: pimeleon-adblock2privoxy:latest"
+
+# Cache the image as a tarball for persistence across Docker prunes
+CACHE_DIR="$(dirname "$0")/../cache"
+CACHE_FILE="${CACHE_DIR}/pimeleon-adblock2privoxy.tar.gz"
+mkdir -p "${CACHE_DIR}"
+echo "📦 Exporting image to cache: ${CACHE_FILE}..."
+docker save pimeleon-adblock2privoxy:latest | gzip > "${CACHE_FILE}"
+echo "✅ Image cached successfully"
 echo ""
 echo "This image will be reused by subsequent builder builds."
 echo "Only re-run this script if you need to update adblock2privoxy."

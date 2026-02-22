@@ -4,9 +4,9 @@
 [Unit]
 Description=DNSCrypt-proxy client
 Documentation=https://github.com/DNSCrypt/dnscrypt-proxy/wiki
-After=network.target
+After=network-online.target
+Wants=network-online.target
 Before=nss-lookup.target
-Wants=nss-lookup.target
 
 [Service]
 Type=simple

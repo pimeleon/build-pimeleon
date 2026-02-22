@@ -13,7 +13,6 @@ plugins=(
     sudo
     history
     colored-man-pages
-    command-not-found
 )
 
 # Oh-my-zsh auto-update settings
@@ -108,15 +107,17 @@ sysinfo() {
 # Cursor Configuration
 # ============================================================================
 
-# Set blinking underscore cursor
-# Cursor styles: 1=blinking block, 2=steady block, 3=blinking underscore,
-#                4=steady underscore, 5=blinking bar, 6=steady bar
-echo -ne '\e[3 q'
+# Ensure cursor is visible and set to steady underscore
+# \e[?25h  - Show cursor
+# \e[4 q   - Steady underscore (use 3 for blinking)
+echo -ne '\e[?25h\e[4 q'
 
-# Ensure cursor resets after each command (zle hook)
-_reset_cursor() {
-    echo -ne '\e[3 q'
+# Ensure cursor settings persist after commands and line editing
+_fix_cursor() {
+    echo -ne '\e[?25h\e[4 q'
 }
-precmd_functions+=(_reset_cursor)
+precmd_functions+=(_fix_cursor)
+zle_line_init_functions+=(_fix_cursor)
+
 
 # Banner is displayed via /etc/profile.d/pimeleon-motd.sh for all shells

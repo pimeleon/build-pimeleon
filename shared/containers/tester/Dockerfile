@@ -14,12 +14,10 @@ RUN if [ -n "$APT_CACHE_SERVER" ]; then \
     echo "Using APT cache at ${APT_CACHE_SERVER}:${APT_CACHE_PORT}"; \
     fi
 
-# Install base dependencies and testing tools with cache mount
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
+# Install base dependencies and testing tools
+RUN rm -f /etc/apt/apt.conf.d/docker-clean && \
     echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache && \
-    apt-get update && apt-get install -y --no-install-recommends \
+    apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     qemu-system-arm \
     qemu-utils \
     qemu-efi-aarch64 \

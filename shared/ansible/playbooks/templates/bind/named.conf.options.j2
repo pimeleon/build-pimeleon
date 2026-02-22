@@ -3,7 +3,6 @@
 
 acl "trusted" {
     127.0.0.0/8;
-    {{ lan_network }};
     {{ wifi_ap_network }};
     ::1;
 };
@@ -39,7 +38,7 @@ options {
 
     // Forward all queries to Pi-hole FTL
     forwarders {
-        127.0.0.1 port {{ bind9_upstream_port | default(5553) }};
+        127.0.0.1 port {{ pihole_port | default(5553) }};
     };
     forward only;
 
@@ -49,7 +48,6 @@ options {
     // Listen only on internal interfaces
     listen-on {
         127.0.0.1;
-        {{ lan_ip }};
         {{ wifi_ap_ip }};
     };
 

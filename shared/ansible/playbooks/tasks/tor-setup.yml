@@ -3,6 +3,11 @@
 # Provides anonymity network routing
 # Uses Debian's maintained Tor package for reliability
 
+- name: Check if Tor is already installed (built from source)
+  ansible.builtin.stat:
+    path: /usr/local/bin/tor
+  register: tor_source_bin
+
 - name: Install Tor from APT
   ansible.builtin.apt:
     name:
@@ -10,7 +15,9 @@
       - tor-geoipdb
     state: present
     update_cache: false
-  when: services_enabled.tor | default(false)
+  when:
+    - services_enabled.tor | default(false)
+    - not (tor_source_bin.stat.exists | default(false))
 
 - name: Create tor directories
   ansible.builtin.file:

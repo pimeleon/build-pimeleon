@@ -15,6 +15,10 @@
     url: https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
     dest: /tmp/install-ohmyzsh.sh
     mode: '0755'
+  environment:
+    http_proxy: "{{ http_proxy | default('') }}"
+    https_proxy: "{{ https_proxy | default('') }}"
+    no_proxy: "{{ no_proxy | default('') }}"
 
 - name: Install oh-my-zsh for pim user
   ansible.builtin.shell: |
@@ -49,8 +53,15 @@
           echo ""
           echo "  Welcome to Pimeleon - Your Privacy Gateway"
           echo "  Hostname: $(hostname) | IP: $(hostname -I 2>/dev/null | awk '{print $1}')"
-          # Show hint only if pim-config hasn't been run yet
-          if [[ ! -f /var/lib/pimeleon/.pim-config.ran ]]; then
+
+          # Auto-run setup wizard if not completed
+          if [[ ! -f /var/lib/pimeleon/.setup-complete ]]; then
+              echo ""
+              echo "  Configuring system. Please wait..."
+              echo "  Starting first-time setup wizard..."
+              sleep 2
+              sudo /usr/local/bin/pim-setup
+          elif [[ ! -f /var/lib/pimeleon/.pim-config.ran ]]; then
               echo "  Run 'sudo pim-config' for configuration menu"
           fi
           echo ""
@@ -68,6 +79,12 @@
     owner: pim
     group: pim
     mode: '0644'
+
+- name: Ensure zshrc sources /etc/profile for MOTD support
+  ansible.builtin.lineinfile:
+    path: /home/pim/.zshrc
+    line: "[[ -f /etc/profile ]] && source /etc/profile"
+    insertbefore: BOF
 
 - name: Set zsh as default shell for pim user
   ansible.builtin.user:

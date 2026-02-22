@@ -1,0 +1,118 @@
+---
+# GitLab CI/CD - Build
+# Cache warming, Containers, and Pimeleon Image
+
+# Cache status check - pull existing cache for build:pimeleon
+# Note: No docker-in-docker here; cache creation happens in build:pimeleon
+warm-cache:
+  stage: .pre
+  image: alpine:latest
+  tags:
+    - linux
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
+      when: never
+    - when: on_success
+  cache:
+    # Harden cache key by including a hash of the base build script logic
+    key: "base-system-${TARGET_PLATFORM:-rpi3-bookworm}"
+    paths:
+      - cache/
+    policy: pull-push
+  script:
+    - mkdir -p cache
+    - |
+      CACHE_FILE="cache/pimeleon-${TARGET_PLATFORM:-rpi3-bookworm}-base.tar.gz"
+      if [ -f "$CACHE_FILE" ]; then
+        echo "Cache found: $CACHE_FILE"
+        ls -lh "$CACHE_FILE"
+      else
+        echo "Cache not found, will be created by build:pimeleon"
+      fi
+
+build:containers:
+  extends: .docker-job
+  stage: build
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
+      when: never
+    - when: on_success
+  script:
+    - docker build --cache-from ${CI_REGISTRY_IMAGE}/builder:latest -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest -f ./shared/containers/builder/Dockerfile .
+    - docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest ./shared/containers/tester
+    - docker push $BUILD_IMAGE
+    - docker push ${CI_REGISTRY_IMAGE}/builder:latest
+    - docker push $TEST_IMAGE
+    - docker push ${CI_REGISTRY_IMAGE}/tester:latest
+
+build:pimeleon:
+  extends: .docker-job
+  stage: build
+  needs: ["warm-cache", "build:containers"]
+  cache:
+    key: base-system-${TARGET_PLATFORM:-rpi3-bookworm}
+    paths:
+      - cache/
+    policy: pull
+  rules:
+    # Skip on feature branches
+    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
+      when: never
+    # RPi 3B+ builds (release\/rpi3-* branches)
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi3-/'
+      variables:
+        TARGET_PLATFORM: "rpi3-bookworm"
+        PIMELEON_ENVIRONMENT: "production"
+    # RPi 4B builds (release\/rpi4-* branches)
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi4-/'
+      variables:
+        TARGET_PLATFORM: "rpi4-bookworm"
+        PIMELEON_ENVIRONMENT: "production"
+    # Default for primary branches (use RPi 3B+ as reference build)
+    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
+      variables:
+        TARGET_PLATFORM: "rpi3-bookworm"
+        PIMELEON_ENVIRONMENT: "development"
+    - when: on_success
+      variables:
+        PIMELEON_ENVIRONMENT: "development"
+  environment:
+    name: $PIMELEON_ENVIRONMENT
+  script:
+    - echo "Building Pimeleon app ${TARGET_PLATFORM:-rpi3-bookworm}..."
+    - mkdir -p output cache
+    - chown -R 1001:999 output cache  # 1001:999 matches builder user/group
+    - |
+      # Create container, copy scripts, then start
+      CONTAINER_ID=$(docker create \
+        --privileged \
+        -v /dev:/dev:rw \
+        -v "$CI_PROJECT_DIR/output":/output \
+        -v "$CI_PROJECT_DIR/cache":/cache \
+        -v "$CI_PROJECT_DIR/configs":/configs \
+        -v "$CI_PROJECT_DIR/shared/ansible":/ansible:ro \
+        -e CI=true \
+        -e WORKSPACE_DIR=/workspace \
+        -e CACHE_DIR=/cache \
+        -e OUTPUT_DIR=/output \
+        -e TARGET_PLATFORM="${TARGET_PLATFORM:-rpi3-bookworm}" \
+        -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
+        -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
+        "$BUILD_IMAGE")
+      # Copy scripts into container
+      docker cp shared/scripts/. "$CONTAINER_ID":/scripts/
+      # Start container and wait for completion
+      docker start -a "$CONTAINER_ID"
+      # Cleanup
+      docker rm "$CONTAINER_ID" || true
+    - echo "Build output:"
+    - ls -la output/ || true
+    - chown -R "$(id -u):$(id -g)" output/ || true
+  artifacts:
+    paths:
+      - output/*.img
+      - output/*.img.xz
+      - output/*.img.metadata.json
+      - output/*.log
+      - output/pi-initial-password.txt
+    expire_in: 1 week

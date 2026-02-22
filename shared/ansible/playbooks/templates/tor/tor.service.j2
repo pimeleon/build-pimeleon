@@ -5,7 +5,7 @@
 Description=Anonymizing overlay network for TCP
 Documentation=man:tor(1) https://www.torproject.org/docs/documentation.html
 After=network-online.target nss-lookup.target
-Wants=network-online.target
+Wants=network-online.target nss-lookup.target
 PartOf=tor-master.service
 ReloadPropagatedFrom=tor-master.service
 

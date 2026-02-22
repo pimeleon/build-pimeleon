@@ -200,7 +200,23 @@
   loop:
     - bluetooth
     - avahi-daemon
+  when:
+    - ansible_connection != "chroot"  # Skip in chroot where systemctl logic is unreliable
+  register: service_status
   failed_when: false
+
+- name: Mask unnecessary services in chroot
+  ansible.builtin.file:
+    src: /dev/null
+    dest: "/etc/systemd/system/{{ item }}.service"
+    state: link
+    force: true
+  loop:
+    - bluetooth
+    - avahi-daemon
+  when:
+    - ansible_connection == "chroot"
+  tags: [security, chroot]
 
 - name: Create security report script
   ansible.builtin.copy:

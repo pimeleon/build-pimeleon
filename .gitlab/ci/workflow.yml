@@ -1,0 +1,56 @@
+---
+# GitLab CI/CD Pipeline - Global Configuration
+# Stages, Variables, Defaults, and Workflow Rules
+
+stages:
+  - .pre
+  - scan
+  - lint
+  - build
+  - test
+  - publish
+  - release
+  - docs
+
+variables:
+  DOCKER_BUILDKIT: 1
+  BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:${CI_COMMIT_REF_SLUG}
+  TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:${CI_COMMIT_REF_SLUG}
+  APT_PROXY: "192.168.76.5:3142"
+  GIT_DEPTH: 0
+
+# Global defaults for all jobs
+default:
+  tags:
+    - linux
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - scheduler_failure
+  interruptible: true
+
+# Workflow rules - smart pipeline triggering
+workflow:
+  rules:
+    # Run on main and develop (primary branches)
+    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
+      when: always
+    # Run on all Merge Request events targeting primary branches
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(main|develop)$/'
+      when: always
+    # Run on platform release branches
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
+      when: always
+    # Run on all tags
+    - if: '$CI_COMMIT_TAG'
+      when: always
+    # Manual workflow dispatch
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: always
+    # Run security checks on conventional commit branches
+    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
+      when: always
+    # Skip for all other cases
+    - when: never
