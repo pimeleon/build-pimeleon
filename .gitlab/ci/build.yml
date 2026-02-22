@@ -105,42 +105,44 @@ build:containers:
     - echo "Building Pimeleon image for ${TARGET_PLATFORM}..."
     - mkdir -p output cache
     - |
-      # Compute mount paths - prioritize branch-local directories
-      ANSIBLE_DIR="./ansible"
-      CONFIGS_DIR="./configs"
-      SCRIPTS_DIR="./scripts"
-      [ -d "$ANSIBLE_DIR" ] || ANSIBLE_DIR="./shared/ansible"
-      [ -d "$CONFIGS_DIR" ] || CONFIGS_DIR="./shared/configs"
-      [ -d "$SCRIPTS_DIR" ] || SCRIPTS_DIR="./shared/scripts"
+      # Compute mount paths - prioritize shared as baseline, allow branch-local overrides
+      # if they contain the expected entry points.
+      ANSIBLE_DIR="./shared/ansible"
+      CONFIGS_DIR="./shared/configs"
+      SCRIPTS_DIR="./shared/scripts"
+
+      [ ! -f "./ansible/playbooks/main.yml" ] || ANSIBLE_DIR="./ansible"
+      [ ! -d "./configs/network" ] || CONFIGS_DIR="./configs"
+      [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
 
       echo "Using ansible from: ${ANSIBLE_DIR}"
       echo "Using configs from: ${CONFIGS_DIR}"
       echo "Using scripts from: ${SCRIPTS_DIR}"
 
-      # Calculate version from conventional commits (uses apps/${TARGET_PLATFORM}/VERSION as baseline)
-      chmod +x ./shared/scripts/get-next-version.sh
-      BASE_VERSION=$(./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+      # Use the detected scripts directory for versioning as well
+      chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
+      BASE_VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
       PIMELEON_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
       echo "Building version: ${PIMELEON_VERSION}"
-    - |
-      CONTAINER_ID=$(docker create \
-        --privileged \
-        -v /dev:/dev:rw \
-        -v "$CI_PROJECT_DIR/cache":/cache \
-        -v "$CI_PROJECT_DIR/${CONFIGS_DIR#./}":/configs \
-        -v "$CI_PROJECT_DIR/${ANSIBLE_DIR#./}":/ansible:ro \
-        -e CI=true \
-        -e WORKSPACE_DIR=/workspace \
-        -e CACHE_DIR=/cache \
-        -e OUTPUT_DIR=/output \
-        -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
-        -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
-        -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
-        -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
-        "$BUILD_IMAGE")
-      docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/
-      docker start -a "$CONTAINER_ID"
-      EXIT_CODE=$(docker inspect "$CONTAINER_ID" --format='{{.State.ExitCode}}')
+          echo "Building version: ${PIMELEON_VERSION}"
+        - |
+          CONTAINER_ID=$(docker create \
+            --privileged \
+            -v /dev:/dev:rw \
+            -v "$CI_PROJECT_DIR/cache":/cache \
+            -v "$CI_PROJECT_DIR/${CONFIGS_DIR#./}":/configs \
+            -v "$CI_PROJECT_DIR/${ANSIBLE_DIR#./}":/ansible:ro \
+            -e CI=true \
+            -e WORKSPACE_DIR=/workspace \
+            -e CACHE_DIR=/cache \
+            -e OUTPUT_DIR=/output \
+            -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
+            -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
+            -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
+            -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
+            "$BUILD_IMAGE")
+          docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/
+          docker start -a "$CONTAINER_ID"      EXIT_CODE=$(docker inspect "$CONTAINER_ID" --format='{{.State.ExitCode}}')
       echo "Container exit code: ${EXIT_CODE}"
       if [ "${EXIT_CODE}" -ne 0 ]; then
         echo "Error: Build container failed with exit code ${EXIT_CODE}"
@@ -203,16 +205,18 @@ build:custom:
     - echo "Custom build for ${TARGET_PLATFORM}..."
     - mkdir -p output cache
     - |
-      # Compute mount paths - prioritize branch-local directories
-      ANSIBLE_DIR="./ansible"
-      CONFIGS_DIR="./configs"
-      SCRIPTS_DIR="./scripts"
-      [ -d "$ANSIBLE_DIR" ] || ANSIBLE_DIR="./shared/ansible"
-      [ -d "$CONFIGS_DIR" ] || CONFIGS_DIR="./shared/configs"
-      [ -d "$SCRIPTS_DIR" ] || SCRIPTS_DIR="./shared/scripts"
+      # Compute mount paths - prioritize shared as baseline, allow branch-local overrides
+      # if they contain the expected entry points.
+      ANSIBLE_DIR="./shared/ansible"
+      CONFIGS_DIR="./shared/configs"
+      SCRIPTS_DIR="./shared/scripts"
 
-      chmod +x ./shared/scripts/get-next-version.sh
-      BASE_VERSION=$(./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+      [ ! -f "./ansible/playbooks/main.yml" ] || ANSIBLE_DIR="./ansible"
+      [ ! -d "./configs/network" ] || CONFIGS_DIR="./configs"
+      [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
+
+      chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
+      BASE_VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
       PIMELEON_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
       echo "Building version: ${PIMELEON_VERSION}"
     - |
