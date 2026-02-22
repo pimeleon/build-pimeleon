@@ -16,6 +16,10 @@ trigger-docs-preview:
     url: https://preview.pimeleon-docs.pages.dev
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
+        - .gitlab/ci/docs.yml
 
 trigger-docs-production:
   stage: docs
@@ -30,5 +34,9 @@ trigger-docs-production:
     name: documentation/production
     url: https://pimeleon.org
   rules:
-    # Trigger on any release branch push
+    # Trigger on any release branch push if documentation changed
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
+        - .gitlab/ci/docs.yml
