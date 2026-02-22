@@ -4,3 +4,6 @@
 # Note: Conventional GitLab Releases are tag-bound.
 # Since this project follows a tagless, branch-based release model,
 # this file is currently a placeholder for future non-tag-based release logic.
+
+variables:
+  RELEASE_MODEL: "branch-based"
