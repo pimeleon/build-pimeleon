@@ -1,15 +1,28 @@
 ---
 # Service configuration defaults
 
-# Services to enable
+# Services enabled flags (used by playbook tasks)
+services_enabled:
+  dns_server: true
+  dnscrypt_proxy: true
+  dhcp_server: true
+  wifi_ap: true
+  pihole: true   # DNS filtering via Pi-hole FTL (web UI disabled)
+  firewall: true
+  proxy_services: true
+  filesharing: false
+
+# Services to enable at boot
 enabled_services:
   essential:
     - ssh
     - systemd-networkd
-    - systemd-resolved
     - rsyslog
   network:
+    - bind9
     - isc-dhcp-server
+    - pihole-FTL
+    - dnscrypt-proxy
     - nftables
   optional:
     - hostapd
@@ -21,10 +34,13 @@ disabled_services:
   - wpa_supplicant
   - bluetooth
   - avahi-daemon
+  - systemd-resolved  # Using bind9 instead
 
 # Service package mapping
 service_packages:
   dhcp: "isc-dhcp-server"
-  dns: "dnsmasq"
+  dns: "bind9"
+  dns_utils: "bind9utils dnsutils"
+  dns_encrypt: "dnscrypt-proxy"
   wifi_ap: "hostapd"
   firewall: "nftables"
