@@ -157,6 +157,8 @@ services:
       - .:/workspace
       - ./output:/output
       - ./cache:/cache
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     environment:
       - BUILD_CACHE_DIR=/cache
       - OUTPUT_DIR=/output

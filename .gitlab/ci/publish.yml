@@ -1,6 +1,6 @@
 ---
 # GitLab CI/CD - Publishing
-# Image registry, GitLab Pages, and Review Apps
+# Image registry, GitLab Pages, and Documentation Previews
 
 publish:image:
   stage: publish
@@ -27,14 +27,11 @@ publish:pages:
   image: python:3.11-slim
   tags:
     - lightweight
-  needs: ["test:integration", "test:smoke"]
+  needs: ["build:pimeleon", "test:smoke"]
   rules:
-    # Publish docs from primary or release branches
-    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
+    # Publish docs from develop or release branches
+    - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
-  environment:
-    name: documentation/production
-    url: https://docs.pimeleon.dev/
   script:
     - apt-get -qy update && apt-get -q install -y --no-install-recommends git
     - pip install "mkdocs>=1.5.3,<2.0" mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin
@@ -43,19 +40,15 @@ publish:pages:
     paths:
       - public
 
-# Review App for Documentation (Merge Requests)
+# Documentation preview for Merge Requests (artifact-based, no review environment)
 publish:docs-preview:
   stage: publish
   image: python:3.11-slim
   tags:
     - lightweight
-  needs: ["test:integration", "test:smoke"]  # Faster feedback loop for previews
+  needs: ["build:pimeleon", "test:smoke"]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  environment:
-    name: documentation/review/$CI_COMMIT_REF_SLUG
-    url: https://$CI_PROJECT_NAMESPACE.gitlab.io/-/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/public/index.html
-    on_stop: stop:docs-preview
   script:
     - apt-get -qy update && apt-get -q install -y --no-install-recommends git
     - pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin
@@ -64,14 +57,3 @@ publish:docs-preview:
     paths:
       - public
     expire_in: 1 week
-
-stop:docs-preview:
-  stage: publish
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: manual
-  environment:
-    name: documentation/review/$CI_COMMIT_REF_SLUG
-    action: stop
-  script:
-    - echo "Stopping review app for $CI_COMMIT_REF_SLUG"
