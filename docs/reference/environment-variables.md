@@ -31,7 +31,7 @@ Complete reference for all configuration environment variables.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DOCKER_BUILDKIT` | `1` | Enable Docker BuildKit (required) |
-| `RASPBIAN_MIRROR` | `http://archive.raspbian.org/raspbian/` | APT mirror URL |
+| `RASPBIAN_MIRROR` | `http://mirrordirector.raspbian.org/raspbian/` | APT mirror URL |
 
 ## Caching Configuration
 

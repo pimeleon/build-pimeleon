@@ -1,0 +1,18 @@
+# Pimeleon Test Dependencies
+
+# Core testing framework
+pytest>=7.4.0
+pytest-testinfra>=10.0.0
+
+# SSH connectivity for VM tests
+paramiko>=3.3.0
+
+# Additional pytest plugins
+pytest-timeout>=2.2.0
+pytest-html>=4.1.0
+
+# For parsing configuration files
+pyyaml>=6.0
+
+# For image manipulation
+python-magic>=0.4.27

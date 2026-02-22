@@ -4,6 +4,7 @@
 
 trigger-docs-preview:
   stage: docs
+  needs: ["build:pimeleon"]
   trigger:
     project: pimeleon/pimeleon-site
     branch: preview
@@ -12,22 +13,29 @@ trigger-docs-preview:
     BUILD_VERSION: $CI_COMMIT_TAG
     SOURCE_BRANCH: $CI_COMMIT_BRANCH
     SOURCE_COMMIT: $CI_COMMIT_SHA
+  environment:
+    name: documentation/preview
+    url: https://preview.pimeleon-docs.pages.dev
   rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
-    - if: '$CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+-(rc|alpha|beta)\d+(-(rpi3|rpi4).*)?$/'
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+-(rc|alpha|beta)\d+(-(rpi3|rpi4).*)?$/
 
 trigger-docs-production:
   stage: docs
+  needs: ["build:pimeleon"]
   trigger:
     project: pimeleon/pimeleon-site
-    branch: main
+    branch: master
   variables:
     TRIGGERED_BY: pimeleon-build
     BUILD_VERSION: $CI_COMMIT_TAG
     SOURCE_BRANCH: $CI_COMMIT_BRANCH
     SOURCE_COMMIT: $CI_COMMIT_SHA
+  environment:
+    name: documentation/production
+    url: https://pimeleon.org
   rules:
     # Trigger on platform release branches
-    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
+    - if: $CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/
     # Trigger on platform-specific release tags
-    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-(rpi3|rpi4)-/'
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-(rpi3|rpi4)-/

@@ -56,13 +56,17 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean && \
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install \
     pytest \
+    pytest-testinfra \
     pytest-timeout \
     pytest-xdist \
+    pytest-html \
     paramiko \
     requests \
     pexpect \
     netaddr \
-    scapy
+    scapy \
+    pyyaml \
+    python-magic
 
 # Configure libvirt
 RUN mkdir -p /var/run/libvirt && \

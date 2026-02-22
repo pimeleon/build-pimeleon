@@ -46,21 +46,21 @@ Install ARM binary format support on your Linux host:
 ```bash
 sudo apt update
 sudo apt install binfmt-support qemu-user-static
-```
+```text
 
 Verify ARM emulation is working:
 
 ```bash
 ls -la /proc/sys/fs/binfmt_misc/qemu-arm
 # Should show a file exists
-```
+```text
 
 ### Step 2: Clone the Repository
 
 ```bash
 git clone https://github.com/yourusername/pimeleon.git
 cd pimeleon
-```
+```text
 
 ### Step 3: Build Containers
 
@@ -69,7 +69,7 @@ Build the Docker containers (one-time setup):
 ```bash
 export DOCKER_BUILDKIT=1
 docker compose build
-```
+```text
 
 !!! info "Build time"
     First container build takes 5-10 minutes. Subsequent builds use Docker layer cache.
@@ -98,7 +98,7 @@ Run the builder to create a Pimeleon image:
 
     ```bash
     export DOCKER_BUILDKIT=1
-    export RASPBIAN_MIRROR=http://archive.raspbian.org/raspbian/
+    export RASPBIAN_MIRROR=http://mirrordirector.raspbian.org/raspbian/
 
     docker compose run --rm builder
     ```
@@ -121,16 +121,16 @@ Your built image will be in the `output/` directory:
 
 ```bash
 ls -lh output/
-```
+```text
 
 You'll see:
 
-```
+```text
 pimeleon-20241102-103045.img      # 4GB bootable image
 pimeleon-20241102-103045.img.sha256  # Checksum
 build-20241102-103045.log          # Build log
 pi-initial-password.txt            # Generated password for 'pi' user
-```
+```text
 
 ### Step 6: Flash to SD Card
 
@@ -259,11 +259,11 @@ export PIMELEON_IMAGE_SIZE=4G               # Image size (4G, 8G)
 # Network optimization
 export APT_CACHE_SERVER=192.168.42.5        # APT cache proxy
 export APT_CACHE_PORT=3142                  # Cache port
-export RASPBIAN_MIRROR=http://archive.raspbian.org/raspbian/
+export RASPBIAN_MIRROR=http://mirrordirector.raspbian.org/raspbian/
 
 # Customization
 export PIMELEON_INITIAL_PASSWORD=mypassword  # Custom password
-```
+```text
 
 See [Environment Variables Reference](../reference/environment-variables.md) for complete list.
 
@@ -278,7 +278,7 @@ make test               # Run test suite
 make test-smoke         # Quick smoke test
 make clean              # Clean build artifacts
 make shell              # Open builder shell for debugging
-```
+```text
 
 See [CLI Commands](../reference/cli-commands.md) for complete reference.
 

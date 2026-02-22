@@ -20,7 +20,7 @@ If you haven't already:
 ```bash
 git clone https://github.com/yourusername/pimeleon.git
 cd pimeleon
-```
+```text
 
 ### 2. Review Project Structure
 
@@ -28,9 +28,9 @@ Take a quick look at the project layout:
 
 ```bash
 tree -L 2
-```
+```text
 
-```
+```text
 pimeleon/
 ├── docker-compose.yml          # Container orchestration
 ├── Makefile                    # Build automation
@@ -46,7 +46,7 @@ pimeleon/
 ├── scripts/                    # Utility scripts
 ├── output/                     # Build output (created)
 └── cache/                      # Build cache (created)
-```
+```text
 
 ### 3. Build Docker Containers
 
@@ -55,7 +55,7 @@ First, build the Docker containers. This is a one-time setup (unless you modify 
 ```bash
 export DOCKER_BUILDKIT=1
 docker compose build
-```
+```text
 
 !!! info "What's happening?"
     Docker is building three containers:
@@ -69,6 +69,7 @@ docker compose build
 **Expected output:**
 
 ```
+
 [+] Building 324.5s (45/45) FINISHED
  => [builder internal] load build definition
  => [builder] installing ARM emulation support
@@ -76,7 +77,8 @@ docker compose build
  => [builder] installing Ansible
  => exporting to image
 Successfully tagged pimeleon-builder:latest
-```
+
+```text
 
 ### 4. Run Your First Build
 
@@ -136,7 +138,7 @@ You'll see output organized by stages:
 
 #### Stage 1: Base System Bootstrap
 
-```
+```text
 ═══════════════════════════════════════════════════════════
   STAGE 1: Creating Base Raspbian System
 ═══════════════════════════════════════════════════════════
@@ -151,7 +153,7 @@ You'll see output organized by stages:
 [INFO] Installing kernel...
 [INFO] Creating base system cache...
 [SUCCESS] Stage 1 complete! (cache/pimeleon-rpi3-bullseye-base-v1.tar.gz)
-```
+```text
 
 !!! tip "Build Time: Stage 1"
     - **First run**: 10-15 minutes (downloading ~500MB of packages)
@@ -160,7 +162,7 @@ You'll see output organized by stages:
 
 #### Stage 2: System Customization
 
-```
+```text
 ═══════════════════════════════════════════════════════════
   STAGE 2: Customizing System
 ═══════════════════════════════════════════════════════════
@@ -186,17 +188,17 @@ PLAY RECAP *********************************************************
 pimeleon : ok=42   changed=38   unreachable=0    failed=0
 
 [SUCCESS] Stage 2 complete!
-```
+```text
 
 !!! tip "Build Time: Stage 2"
     - 3-5 minutes (package installation and configuration)
 
 #### Stages 3 & 4 (Currently Disabled)
 
-```
+```text
 [INFO] Skipping Stage 3 (optimization) - disabled for rapid iteration
 [INFO] Skipping Stage 4 (packaging) - disabled for rapid iteration
-```
+```text
 
 !!! info "Why disabled?"
     Stages 3 and 4 are implemented but disabled in `build.sh` to speed up development.
@@ -204,7 +206,7 @@ pimeleon : ok=42   changed=38   unreachable=0    failed=0
 
 #### Build Complete
 
-```
+```text
 ═══════════════════════════════════════════════════════════
   BUILD COMPLETE!
 ═══════════════════════════════════════════════════════════
@@ -213,7 +215,7 @@ Output: /output/pimeleon-20241102-103045.img
 Size: 4.0GB
 Build time: 12m 34s
 Log: /output/build-20241102-103045.log
-```
+```text
 
 ### 6. Verify Your Build
 
@@ -221,16 +223,16 @@ Check the output directory:
 
 ```bash
 ls -lh output/
-```
+```text
 
 You should see:
 
-```
+```text
 -rw-r--r-- 1 builder builder 4.0G Nov  2 10:30 pimeleon-20241102-103045.img
 -rw-r--r-- 1 builder builder  256 Nov  2 10:30 pimeleon-20241102-103045.img.sha256
 -rw-r--r-- 1 builder builder 1.2M Nov  2 10:30 build-20241102-103045.log
 -rw-r--r-- 1 builder builder   32 Nov  2 10:30 pi-initial-password.txt
-```
+```text
 
 #### Verify the Image
 
@@ -241,16 +243,16 @@ file output/pimeleon-*.img
 
 # View partition table
 fdisk -l output/pimeleon-*.img
-```
+```text
 
 Expected output:
 
-```
+```text
 Disk output/pimeleon-20241102-103045.img: 4 GiB
 Device                                Boot  Start     End Sectors  Size Id Type
 output/pimeleon-20241102-103045.img1 *      8192  532479  524288  256M  c W95 FAT32 (LBA)
 output/pimeleon-20241102-103045.img2      532480 8388607 7856128  3.8G 83 Linux
-```
+```text
 
 #### Check Build Log
 
@@ -263,7 +265,7 @@ grep -i error output/build-*.log
 
 # View summary
 tail -50 output/build-*.log
-```
+```text
 
 ### 7. Understand What Was Built
 
@@ -278,7 +280,7 @@ graph LR
 
     B --> D[bootcode.bin<br/>start.elf<br/>kernel*.img<br/>config.txt]
     C --> E[Raspbian Bullseye<br/>Networking<br/>Security<br/>Services]
-```
+```text
 
 #### Installed Packages
 
@@ -318,7 +320,7 @@ sudo dd if=output/pimeleon-*.img of=/dev/sdX bs=4M status=progress conv=fsync
 
 # Sync
 sync
-```
+```text
 
 !!! danger "Double Check Device"
     Make absolutely sure `/dev/sdX` is your SD card and not your system drive!
@@ -367,7 +369,7 @@ sudo nft list ruleset
 systemctl status systemd-networkd
 systemctl status isc-dhcp-server
 systemctl status ssh
-```
+```text
 
 ## Build Performance
 
@@ -392,7 +394,7 @@ docker system prune -a
 
 # Check space
 df -h /var/lib/docker
-```
+```text
 
 ### "exec format error" when running ARM binaries
 
@@ -402,7 +404,7 @@ sudo apt install --reinstall binfmt-support qemu-user-static
 
 # Restart Docker
 sudo systemctl restart docker
-```
+```text
 
 ### APT cache connection refused
 
@@ -413,7 +415,7 @@ curl http://192.168.42.5:3142
 # If not working, build without cache:
 unset APT_CACHE_SERVER
 docker compose run --rm builder
-```
+```text
 
 ### Build hangs during debootstrap
 
