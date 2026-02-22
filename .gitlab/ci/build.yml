@@ -60,6 +60,7 @@ build:containers:
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       changes:
+        - containers/**/*
         - shared/containers/**/*
         - .gitlab/ci/build.yml
         - .gitlab-ci.yml
@@ -67,8 +68,18 @@ build:containers:
       when: always
     - when: never
   script:
-    - docker build --cache-from ${CI_REGISTRY_IMAGE}/builder:latest --build-arg APT_CACHE_SERVER=${APT_PROXY%:*} -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest -f ./shared/containers/builder/Dockerfile .
-    - docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest --build-arg APT_CACHE_SERVER=${APT_PROXY%:*} -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest ./shared/containers/tester
+    - |
+      # Prioritize local Dockerfiles if they exist in the branch root
+      BUILDER_DF="./containers/builder/Dockerfile"
+      TESTER_DF="./containers/tester/Dockerfile"
+      [ -f "$BUILDER_DF" ] || BUILDER_DF="./shared/containers/builder/Dockerfile"
+      [ -f "$TESTER_DF" ] || TESTER_DF="./shared/containers/tester/Dockerfile"
+
+      echo "Using builder Dockerfile: ${BUILDER_DF}"
+      echo "Using tester Dockerfile: ${TESTER_DF}"
+
+      docker build --cache-from ${CI_REGISTRY_IMAGE}/builder:latest --build-arg APT_CACHE_SERVER=${APT_PROXY%:*} -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest -f "$BUILDER_DF" .
+      docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest --build-arg APT_CACHE_SERVER=${APT_PROXY%:*} -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest -f "$TESTER_DF" .
     - docker push $BUILD_IMAGE
     - docker push ${CI_REGISTRY_IMAGE}/builder:latest
     - docker push $TEST_IMAGE
@@ -94,6 +105,18 @@ build:containers:
     - echo "Building Pimeleon image for ${TARGET_PLATFORM}..."
     - mkdir -p output cache
     - |
+      # Compute mount paths - prioritize branch-local directories
+      ANSIBLE_DIR="./ansible"
+      CONFIGS_DIR="./configs"
+      SCRIPTS_DIR="./scripts"
+      [ -d "$ANSIBLE_DIR" ] || ANSIBLE_DIR="./shared/ansible"
+      [ -d "$CONFIGS_DIR" ] || CONFIGS_DIR="./shared/configs"
+      [ -d "$SCRIPTS_DIR" ] || SCRIPTS_DIR="./shared/scripts"
+
+      echo "Using ansible from: ${ANSIBLE_DIR}"
+      echo "Using configs from: ${CONFIGS_DIR}"
+      echo "Using scripts from: ${SCRIPTS_DIR}"
+
       # Calculate version from conventional commits (uses apps/${TARGET_PLATFORM}/VERSION as baseline)
       chmod +x ./shared/scripts/get-next-version.sh
       BASE_VERSION=$(./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
@@ -104,8 +127,8 @@ build:containers:
         --privileged \
         -v /dev:/dev:rw \
         -v "$CI_PROJECT_DIR/cache":/cache \
-        -v "$CI_PROJECT_DIR/configs":/configs \
-        -v "$CI_PROJECT_DIR/shared/ansible":/ansible:ro \
+        -v "$CI_PROJECT_DIR/${CONFIGS_DIR#./}":/configs \
+        -v "$CI_PROJECT_DIR/${ANSIBLE_DIR#./}":/ansible:ro \
         -e CI=true \
         -e WORKSPACE_DIR=/workspace \
         -e CACHE_DIR=/cache \
@@ -115,7 +138,7 @@ build:containers:
         -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
         "$BUILD_IMAGE")
-      docker cp shared/scripts/. "$CONTAINER_ID":/scripts/
+      docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/
       docker start -a "$CONTAINER_ID"
       EXIT_CODE=$(docker inspect "$CONTAINER_ID" --format='{{.State.ExitCode}}')
       echo "Container exit code: ${EXIT_CODE}"
@@ -152,8 +175,6 @@ build:pimeleon:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
         BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:latest
-  environment:
-    name: build/${TARGET_PLATFORM}
 
 # Custom build — manually triggered via Web/API with configurable variables
 build:custom:
@@ -166,7 +187,7 @@ build:custom:
     # Defaults that can be overridden in the GitLab UI
     TARGET_PLATFORM: "rpi3-bookworm"
     PIMELEON_IMAGE_SIZE: "4G"
-    PIMELEON_PROFILE: "development"
+    PIMELEON_PROFILE: "production"
     DEBUG: "0"
   needs:
     - job: build:containers
@@ -181,6 +202,14 @@ build:custom:
     - echo "Custom build for ${TARGET_PLATFORM}..."
     - mkdir -p output cache
     - |
+      # Compute mount paths - prioritize branch-local directories
+      ANSIBLE_DIR="./ansible"
+      CONFIGS_DIR="./configs"
+      SCRIPTS_DIR="./scripts"
+      [ -d "$ANSIBLE_DIR" ] || ANSIBLE_DIR="./shared/ansible"
+      [ -d "$CONFIGS_DIR" ] || CONFIGS_DIR="./shared/configs"
+      [ -d "$SCRIPTS_DIR" ] || SCRIPTS_DIR="./shared/scripts"
+
       chmod +x ./shared/scripts/get-next-version.sh
       BASE_VERSION=$(./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
       PIMELEON_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
@@ -190,8 +219,8 @@ build:custom:
         --privileged \
         -v /dev:/dev:rw \
         -v "$CI_PROJECT_DIR/cache":/cache \
-        -v "$CI_PROJECT_DIR/configs":/configs \
-        -v "$CI_PROJECT_DIR/shared/ansible":/ansible:ro \
+        -v "$CI_PROJECT_DIR/${CONFIGS_DIR#./}":/configs \
+        -v "$CI_PROJECT_DIR/${ANSIBLE_DIR#./}":/ansible:ro \
         -e CI=true \
         -e WORKSPACE_DIR=/workspace \
         -e CACHE_DIR=/cache \
@@ -201,7 +230,7 @@ build:custom:
         -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
         "$BUILD_IMAGE")
-      docker cp shared/scripts/. "$CONTAINER_ID":/scripts/
+      docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/
       docker start -a "$CONTAINER_ID"
       EXIT_CODE=$(docker inspect "$CONTAINER_ID" --format='{{.State.ExitCode}}')
       if [ "${EXIT_CODE}" -ne 0 ]; then

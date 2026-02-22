@@ -1,56 +1,6 @@
 ---
 # GitLab CI/CD - Release
-# Auto-creates a versioned git tag and GitLab Release from a release/* branch push.
-# Version is computed from conventional commits using apps/{platform}/VERSION as baseline.
-# Developers do not create tags manually; this job handles tagging.
 #
-# Note: release-cli is called directly in script (not via the release: YAML block)
-# because TAG_NAME and VERSION are computed at runtime and not available as
-# static GitLab CI variables at YAML-parse time.
-
-release:pimeleon:
-  stage: release
-  image: registry.gitlab.com/gitlab-org/release-cli:latest
-  tags:
-    - lightweight
-  needs:
-    - job: setup:platform
-      artifacts: true
-    - job: publish:image
-      artifacts: false
-  rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-  before_script:
-    - apk add --no-cache git
-  script:
-    - |
-      # Compute version from conventional commits
-      chmod +x ./shared/scripts/get-next-version.sh
-      VERSION=$(./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
-      TAG_NAME="v${VERSION}-${TARGET_PLATFORM}"
-      echo "Creating release: ${TAG_NAME}"
-
-      # Configure git for CI push
-      git config user.email "ci@gitlab"
-      git config user.name "GitLab CI"
-      git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
-
-      # Create and push tag only if it does not already exist
-      if git ls-remote --tags origin | grep -q "refs/tags/${TAG_NAME}$"; then
-        echo "Tag ${TAG_NAME} already exists, skipping tag creation"
-      else
-        git tag "${TAG_NAME}"
-        git push origin "${TAG_NAME}"
-      fi
-
-      # Create GitLab Release against the tag
-      DESCRIPTION="Pimeleon OS image for ${TARGET_PLATFORM} v${VERSION}. Built from ${CI_COMMIT_BRANCH} at ${CI_COMMIT_SHORT_SHA}."
-      ASSET_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pimeleon/${TARGET_PLATFORM}-v${VERSION}/pimeleon-${TARGET_PLATFORM}-v${VERSION}.img.xz"
-      ASSET_JSON="{\"name\":\"Pimeleon image (${TARGET_PLATFORM})\",\"url\":\"${ASSET_URL}\",\"link_type\":\"package\"}"
-
-      release-cli create \
-        --name "Pimeleon ${TARGET_PLATFORM} v${VERSION}" \
-        --tag-name "${TAG_NAME}" \
-        --ref "${CI_COMMIT_SHA}" \
-        --description "${DESCRIPTION}" \
-        --assets-link "${ASSET_JSON}"
+# Note: Conventional GitLab Releases are tag-bound.
+# Since this project follows a tagless, branch-based release model,
+# this file is currently a placeholder for future non-tag-based release logic.

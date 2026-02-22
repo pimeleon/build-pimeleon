@@ -48,7 +48,6 @@ These variables are primarily used in the GitLab and GitHub automated pipelines.
 |----------|---------|-------------|
 | `TARGET_PLATFORM` | *(none)* | Combined platform/version slug (e.g., `rpi3-bookworm`) |
 | `PIMELEON_VERSION` | `v1.0.0` | Semantic version of the image being built |
-| `PIMELEON_ENVIRONMENT` | `development` | Build target environment (`development`, `production`) |
 | `BUILD_IMAGE` | *(none)* | Full tag for the builder Docker image |
 | `TEST_IMAGE` | *(none)* | Full tag for the tester Docker image |
 | `APT_PROXY` | *(none)* | Combined APT cache IP:PORT (e.g., `192.168.76.5:3142`) |
