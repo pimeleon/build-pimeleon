@@ -1368,6 +1368,7 @@ gantt
 
 - [Multi-Platform Strategy](multi-platform-strategy.md) - Overall architecture
 - [Hardware Profiles](hardware-profiles.md) - Profile schema reference
+- [CI/CD Infrastructure](cicd.md) - Automated pipelines
 - [Contributing Platforms](../contributing/adding-platforms.md) - Community guide
 
 ## Revision History

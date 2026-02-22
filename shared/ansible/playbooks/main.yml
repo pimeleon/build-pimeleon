@@ -32,9 +32,7 @@
 
     - name: Load profile configuration
       ansible.builtin.include_vars:
-        file: >-
-          {{ playbook_dir }}/../inventory/group_vars/all/profiles/{{
-          pimeleon_profile | default('development') }}.yml
+        file: "{{ playbook_dir }}/../inventory/group_vars/all/profile.yml"
       failed_when: false
 
   tasks:

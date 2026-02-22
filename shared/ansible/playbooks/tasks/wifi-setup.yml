@@ -29,14 +29,7 @@
 
 # Note: Service unmask and enablement happens in stage3-optimize.sh (outside chroot)
 
-# Configure wlan0 interface via systemd-networkd
-- name: Configure WiFi interface network
-  ansible.builtin.template:
-    src: network/10-wlan0-wifi.network.j2
-    dest: /etc/systemd/network/30-wlan0.network
-    mode: '0644'
-  when: services_enabled.hostapd | default(true)
-  notify: Restart systemd-networkd
+# Note: wlan0 network config is deployed by network-setup.yml (10-wlan0.network)
 
 # Regulatory domain configuration (wireless-regdb installed in stage2)
 - name: Set WiFi regulatory domain

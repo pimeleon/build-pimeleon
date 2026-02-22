@@ -2,15 +2,22 @@
 # Resolve the current version for a specific platform with Auto-Bump logic
 # Usage: get-next-version.sh [platform]
 #
+# Version baseline resolution order:
+#   1. Git tag matching *-{platform} or any tag (legacy)
+#   2. apps/{platform}/VERSION file (used when no git tags exist)
+#   3. 0.1.0 (fallback when nothing else is found)
+#
 # POSIX sh compatible - works in Alpine/BusyBox environments
 
 set -eu
 
 get_next_version() {
     platform="${1:-}"
-    current_tag=""
+    base_version=""
+    git_range=""
 
-    # Find latest tag for this platform (or any tag if no platform)
+    # 1. Try git tags first (legacy behavior)
+    current_tag=""
     if [ -n "$platform" ]; then
         current_tag=$(git tag -l "*-${platform}" --sort=-v:refname 2>/dev/null | head -1) || current_tag=""
     fi
@@ -22,15 +29,37 @@ get_next_version() {
         current_tag=$(git describe --tags --abbrev=0 2>/dev/null) || current_tag=""
     fi
 
-    if [ -z "$current_tag" ]; then
-        echo "0.1.0"
-        return
-    fi
+    if [ -n "$current_tag" ]; then
+        # Extract version from tag
+        base_version=$(echo "$current_tag" | sed 's/^v//')
+        if [ -n "$platform" ]; then
+            base_version=$(echo "$base_version" | sed "s/-${platform}\$//")
+        fi
+        git_range="${current_tag}..HEAD"
+    else
+        # 2. Fall back to VERSION file
+        version_file=""
+        if [ -n "$platform" ]; then
+            version_file="apps/${platform}/VERSION"
+        fi
 
-    # Strip v prefix and platform suffix for parsing
-    base_version=$(echo "$current_tag" | sed 's/^v//')
-    if [ -n "$platform" ]; then
-        base_version=$(echo "$base_version" | sed "s/-${platform}\$//")
+        if [ -n "$version_file" ] && [ -f "$version_file" ]; then
+            base_version=$(tr -d '[:space:]' < "$version_file")
+
+            # Find the last commit that changed the VERSION file to use as range start
+            last_file_commit=$(git log --oneline -- "$version_file" 2>/dev/null | head -1 | awk '{print $1}')
+            if [ -n "$last_file_commit" ]; then
+                git_range="${last_file_commit}..HEAD"
+            else
+                # VERSION file exists but was never committed - no commits to analyze
+                echo "$base_version"
+                return
+            fi
+        else
+            # 3. Final fallback
+            echo "0.1.0"
+            return
+        fi
     fi
 
     major=$(echo "$base_version" | cut -d. -f1)
@@ -42,13 +71,10 @@ get_next_version() {
     minor="${minor:-0}"
     patch="${patch:-0}"
 
-    # Analyze commits since last tag
-    has_breaking=false
-    has_feat=false
-    has_fix=false
-
+    # Analyze commits in range to determine version bump type
     # Use pipe instead of process substitution for POSIX compatibility
-    git log "$current_tag"..HEAD --format=%s 2>/dev/null | while IFS= read -r msg; do
+    # shellcheck disable=SC2086
+    git log $git_range --format=%s 2>/dev/null | while IFS= read -r msg; do
         [ -z "$msg" ] && continue
         if echo "$msg" | grep -qE "^[a-z]+(\(.+\))?!:"; then
             echo "BREAKING"
@@ -58,16 +84,18 @@ get_next_version() {
             echo "FIX"
         fi
     done | {
-        # Read commit types from pipe
+        has_breaking=false
+        has_feat=false
+        has_fix=false
+
         while IFS= read -r commit_type; do
             case "$commit_type" in
                 BREAKING) has_breaking=true ;;
-                FEAT) has_feat=true ;;
-                FIX) has_fix=true ;;
+                FEAT)     has_feat=true ;;
+                FIX)      has_fix=true ;;
             esac
         done
 
-        # Bump version based on conventional commits
         if [ "$has_breaking" = true ]; then
             major=$((major + 1))
             minor=0
@@ -78,7 +106,7 @@ get_next_version() {
         elif [ "$has_fix" = true ]; then
             patch=$((patch + 1))
         else
-            # No releasable commits - use current + dev suffix
+            # No releasable commits since last version change
             echo "${major}.${minor}.${patch}-dev"
             return
         fi

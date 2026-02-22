@@ -7,6 +7,12 @@
     state: directory
     mode: '0755'
 
+- name: Deploy default link configuration
+  ansible.builtin.template:
+    src: network/00-default.link.j2
+    dest: /etc/systemd/network/00-default.link
+    mode: '0644'
+
 - name: Disable default systemd-networkd link policy
   ansible.builtin.file:
     src: /dev/null
@@ -17,37 +23,17 @@
 - name: Configure WAN interface (eth0)
   ansible.builtin.template:
     src: network/10-eth0-wan.network.j2
-    dest: /etc/systemd/network/10-eth0-wan.network
+    dest: /etc/systemd/network/10-eth0.network
     mode: '0644'
 
 - name: Configure WiFi AP interface (wlan0)
   ansible.builtin.template:
     src: network/10-wlan0-wifi.network.j2
-    dest: /etc/systemd/network/10-wlan0-wifi.network
+    dest: /etc/systemd/network/10-wlan0.network
     mode: '0644'
   when: services_enabled.wifi_ap | default(true)
 
-- name: Create hostapd configuration directory
-  ansible.builtin.file:
-    path: /etc/hostapd
-    state: directory
-    mode: '0755'
-  when: services_enabled.wifi_ap | default(true)
-
-- name: Configure hostapd for WiFi AP
-  ansible.builtin.template:
-    src: hostapd/hostapd.conf.j2
-    dest: /etc/hostapd/hostapd.conf
-    mode: '0600'
-  when: services_enabled.wifi_ap | default(true)
-
-- name: Enable hostapd daemon config
-  ansible.builtin.copy:
-    dest: /etc/default/hostapd
-    content: |
-      DAEMON_CONF="/etc/hostapd/hostapd.conf"
-    mode: '0644'
-  when: services_enabled.wifi_ap | default(true)
+# Note: hostapd configuration handled by wifi-setup.yml
 
 - name: Configure nftables firewall
   ansible.builtin.template:

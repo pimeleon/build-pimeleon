@@ -3,7 +3,6 @@
 # Stages, Variables, Defaults, and Workflow Rules
 
 stages:
-  - .pre
   - scan
   - lint
   - build
@@ -43,23 +42,20 @@ default:
 # Workflow rules - smart pipeline triggering
 workflow:
   rules:
-    # Run on main and develop (primary branches)
-    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
+    # Full pipeline on release branches (one branch per platform)
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       when: always
-    # Run on all Merge Request events targeting primary branches
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(main|develop)$/'
+    # Lint + scan only on develop
+    - if: '$CI_COMMIT_BRANCH == "develop"'
       when: always
-    # Run on platform release branches
-    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
+    # MR events targeting develop or release branches
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
       when: always
-    # Run on all tags
-    - if: '$CI_COMMIT_TAG'
-      when: always
-    # Manual workflow dispatch
-    - if: '$CI_PIPELINE_SOURCE == "web"'
-      when: always
-    # Run security checks on conventional commit branches
+    # Lint + scan on conventional commit feature branches
     - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
+      when: always
+    # Manual pipeline dispatch
+    - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
     # Skip for all other cases
     - when: never

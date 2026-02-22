@@ -25,6 +25,45 @@ LOOP_DEVICE="${CLEANUP_LOOP_DEVICE}"
 # This runs after Ansible has installed and configured all services
 log_info "Enabling services"
 
+MULTI_USER_WANTS="${MOUNT_POINT}/etc/systemd/system/multi-user.target.wants"
+sudo mkdir -p "${MULTI_USER_WANTS}"
+
+# Services list matching the working reference build
+SERVICES_TO_ENABLE=(
+    # Core infrastructure
+    "ssh"
+    "systemd-networkd"
+    "nftables"
+    "rsyslog"
+    "cron"
+    "fake-hwclock"
+    "e2scrub_reap"
+    "unattended-upgrades"
+    "atd"
+    "zramswap"
+    "sysstat"
+    "smartmontools"
+    "vnstat"
+    "atop"
+    "atopacct"
+    # Network services
+    "hostapd"
+    "named"
+    "fail2ban"
+    "wpa_supplicant"
+    "avahi-daemon"
+    "network-optimization"
+    # Proxy services
+    "privoxy"
+    "squid"
+    "tor"
+    # Pimeleon application
+    "pimeleon-api"
+    "pimeleon-proxy"
+    "pim-setup"
+    "firstboot"
+)
+
 for service in "${SERVICES_TO_ENABLE[@]}"; do
     SERVICE_FILE=""
     SEARCH_NAME="${service}"
@@ -95,6 +134,9 @@ safe_rm "${MOUNT_POINT}/var/tmp/*"
 safe_rm "${MOUNT_POINT}/var/cache/apt/archives/*.deb"
 safe_rm "${MOUNT_POINT}/var/lib/apt/lists/*"
 
+# Remove swap file created during build (will be recreated on first boot if needed)
+safe_rm "${MOUNT_POINT}/swap"
+
 # Remove documentation and localizations
 log_info "Removing documentation and unused locales"
 safe_rm "${MOUNT_POINT}/usr/share/doc/*"
@@ -124,6 +166,17 @@ EOF
 chroot_run "${MOUNT_POINT}" locale-gen
 chroot_run "${MOUNT_POINT}" update-locale LANG=en_IE.UTF-8
 
+# Clean up /etc/hosts from build-time artifacts (Docker hostnames, GitHub IPs)
+log_info "Restoring clean /etc/hosts"
+sudo tee "${MOUNT_POINT}/etc/hosts" > /dev/null <<EOF
+127.0.0.1	localhost
+::1		localhost ip6-localhost ip6-loopback
+ff02::1		ip6-allnodes
+ff02::2		ip6-allrouters
+
+127.0.1.1 pimeleon
+EOF
+
 # Create first boot script
 log_info "Creating first boot script"
 sudo tee "${MOUNT_POINT}/etc/systemd/system/firstboot.service" > /dev/null <<EOF
@@ -146,31 +199,29 @@ sudo tee "${MOUNT_POINT}/usr/local/bin/firstboot.sh" > /dev/null <<'EOF'
 #!/bin/bash
 set -e
 
-# Generate SSH host keys
-ssh-keygen -A
-
-# Expand root filesystem (manual replacement for raspi-config)
-if [[ -b /dev/mmcblk0 ]]; then
-    # Expand partition 2 to fill the disk
-    parted /dev/mmcblk0 resizepart 2 100%
-    # Inform kernel of partition change
-    partprobe /dev/mmcblk0
-    # Resize filesystem
-    resize2fs /dev/mmcblk0p2
+# Generate SSH host keys if missing
+if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
+    ssh-keygen -A
 fi
 
-# Generate machine ID
-systemd-machine-id-setup
+# Expand root filesystem to fill SD card
+ROOT_PART=$(findmnt -n -o SOURCE /)
+ROOT_DEV=$(lsblk -no PKNAME "$ROOT_PART" 2>/dev/null | head -1)
+if [ -n "$ROOT_DEV" ]; then
+    # Resize partition to fill disk
+    echo ", +" | sfdisk -N 2 "/dev/$ROOT_DEV" --no-reread 2>/dev/null || true
+    partprobe "/dev/$ROOT_DEV" 2>/dev/null || true
+    # Resize filesystem
+    resize2fs "$ROOT_PART" 2>/dev/null || true
+fi
 
-# Update package lists
-apt-get update
-apt-get -qy upgrade
+# Generate machine ID if missing
+if [ ! -s /etc/machine-id ]; then
+    systemd-machine-id-setup
+fi
 
-# Set timezone
-timedatectl set-timezone UTC
-
-# Enable firewall
-nft -f /etc/nftables.conf
+# Load firewall rules
+nft -f /etc/nftables.conf 2>/dev/null || true
 
 echo "First boot setup completed"
 EOF
@@ -217,18 +268,28 @@ log_info "Checking if image can be shrunk"
 
     ROOT_PART="/dev/mapper/$(basename "${LOOP_DEV}")p2"
     if [[ -b "${ROOT_PART}" ]]; then
-        log_info "Running filesystem check on root partition"
+        log_info "Running filesystem check on root partition: ${ROOT_PART}"
         # -f: force check even if clean
         # -y: assume yes to all questions (required for non-interactive)
         sudo e2fsck -fy "${ROOT_PART}" || log_warn "e2fsck returned non-zero (may be OK)"
 
         log_info "Shrinking root filesystem to minimum size"
-        sudo resize2fs -M "${ROOT_PART}" || log_warn "resize2fs failed - image not shrunk"
+        # Get minimum size for informational purposes
+        MIN_SIZE=$(sudo resize2fs -P "${ROOT_PART}" 2>/dev/null | cut -d: -f2 | xargs || echo "unknown")
+        log_info "Estimated minimum size in blocks: ${MIN_SIZE}"
+
+        if sudo resize2fs -M "${ROOT_PART}"; then
+            log_info "Filesystem shrunk successfully"
+        else
+            log_warn "resize2fs failed - image not shrunk"
+        fi
 
         log_info "Final filesystem check and repair"
         sudo e2fsck -fy "${ROOT_PART}" || log_warn "Final e2fsck returned non-zero (may be OK)"
     else
         log_warn "Partition mapping not found: ${ROOT_PART} - skipping shrink"
+        log_info "Available mappings:"
+        ls -la /dev/mapper/ || true
     fi
 )
 

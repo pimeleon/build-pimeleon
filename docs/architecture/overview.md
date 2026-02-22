@@ -37,7 +37,7 @@ graph TB
     end
 
     subgraph "External Resources"
-        R[APT Cache<br/>192.168.42.5:3142]
+        R[APT Cache<br/>192.168.76.5:3142]
         S[Raspbian Archive<br/>archive.raspbian.org]
         T[Pi Foundation<br/>archive.raspberrypi.org]
     end
@@ -197,7 +197,7 @@ sequenceDiagram
 flowchart TD
     A[Builder Script] --> B{APT Cache<br/>Configured?}
 
-    B -->|Yes| C[Check APT Cache<br/>192.168.42.5:3142]
+    B -->|Yes| C[Check APT Cache<br/>192.168.76.5:3142]
     B -->|No| D[Direct Download]
 
     C --> E{Package<br/>in Cache?}
@@ -476,5 +476,11 @@ graph TB
     Network architecture, interfaces, and routing configuration
 
     [:octicons-arrow-right-24: Network Design](networking.md)
+
+- **CI/CD Infrastructure**
+
+    Automated build, test, and release pipelines
+
+    [:octicons-arrow-right-24: CI/CD Infrastructure](cicd.md)
 
 </div>

@@ -14,8 +14,8 @@
 # and your display can output without overscan
 #disable_overscan=1
 
-# GPU memory (16MB minimum for headless, 64MB if HDMI debugging needed)
-gpu_mem={{ config_txt.gpu_mem | default(16) }}
+# GPU memory (64MB for HDMI console, 16MB would be headless only)
+gpu_mem={{ config_txt.gpu_mem | default(64) }}
 
 # uncomment the following to adjust overscan. Use positive numbers if console
 # goes off screen, and negative if there is too much border
@@ -32,14 +32,23 @@ overscan_right=16
 # uncomment if hdmi display is not detected and composite is being output
 hdmi_force_hotplug=1
 
-# force a HDMI mode rather than DVI for better monitor compatibility
+# uncomment to force a specific HDMI mode (this will force VGA)
+#hdmi_group=1
+#hdmi_mode=4
+
+# uncomment to force a HDMI mode rather than DVI. This can make audio work in
+# DMT (computer monitor) modes
 hdmi_drive=2
 
-# increase signal to HDMI to prevent blanking
-config_hdmi_boost=4
+# uncomment to increase signal to HDMI, if you have interference, blanking, or
+# no display
+#config_hdmi_boost=4
+
+# uncomment for composite PAL
+#sdtv_mode=2
 
 # CPU frequency
-arm_freq={{ config_txt.arm_freq | default(1200) }}
+arm_freq={{ config_txt.arm_freq | default(1000) }}
 {% if config_txt.over_voltage is defined %}
 over_voltage={{ config_txt.over_voltage }}
 {% endif %}
@@ -47,20 +56,24 @@ over_voltage={{ config_txt.over_voltage }}
 # UART for serial console debugging
 enable_uart={{ config_txt.enable_uart | default(1) }}
 
-# Essential hardware interfaces
-dtparam=i2c_arm={{ config_txt.dtparam_i2c | default('on') }}
-dtparam=spi=o{{ config_txt.dtparam_spi | default('on') }}
+# Uncomment some or all of these to enable the optional hardware interfaces
+#dtparam=i2c_arm={{ config_txt.dtparam_i2c | default('on') }}
+#dtparam=i2s={{ config_txt.dtparam_i2s | default('on') }}
+#dtparam=spi={{ config_txt.dtparam_spi | default('on') }}
+
+# USB power configuration
+{% if config_txt.max_usb_current is defined %}
+max_usb_current={{ config_txt.max_usb_current }}
+{% endif %}
 
 # Additional overlays
 {% for overlay in device_tree_overlays | default([]) %}
 dtoverlay={{ overlay | regex_replace('\.dtbo$', '') }}
 {% endfor %}
 
-# Disable all multimedia and camera features
-dtparam=audio=off
-start_x=0
+# Additional overlays and parameters are documented /boot/overlays/README
 
-# USB power configuration
-{% if config_txt.max_usb_current is defined %}
-max_usb_current={{ config_txt.max_usb_current }}
-{% endif %}
+# Disable audio (loads snd_bcm2835 when enabled)
+dtparam=audio=off
+# Start with graphical environment disabled
+start_x=0

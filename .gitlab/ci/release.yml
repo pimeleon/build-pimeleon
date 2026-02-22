@@ -1,141 +1,56 @@
 ---
 # GitLab CI/CD - Release
-# Automated versioning and tagging
+# Auto-creates a versioned git tag and GitLab Release from a release/* branch push.
+# Version is computed from conventional commits using apps/{platform}/VERSION as baseline.
+# Developers do not create tags manually; this job handles tagging.
+#
+# Note: release-cli is called directly in script (not via the release: YAML block)
+# because TAG_NAME and VERSION are computed at runtime and not available as
+# static GitLab CI variables at YAML-parse time.
 
-# Platform-specific release: RPi 3B+ Bookworm
-release:rpi3-bookworm:
+release:pimeleon:
   stage: release
-  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
   tags:
     - lightweight
-  cache: {}
   needs:
-    - job: build:pimeleon
+    - job: setup:platform
+      artifacts: true
+    - job: publish:image
       artifacts: false
   rules:
-    - if: '$CI_COMMIT_TAG'
-      when: never
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "release/rpi3-bookworm"'
-      when: on_success
-    - when: never
-  variables:
-    GIT_SSL_NO_VERIFY: "1"
-    GITLAB_URL: "https://192.168.76.5:8443/api/v4"
-    GSG_TOKEN: $GITLAB_TOKEN
-    GSG_RELEASE_BRANCHES: "release/rpi3-bookworm"
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+  before_script:
+    - apk add --no-cache git
   script:
-    - echo "Calculating next version for RPi 3B+ Bookworm..."
     - |
-      # Detect if this is a merge from develop
-      IS_MERGE_FROM_DEVELOP=false
-      if git log -1 --format=%s | grep -qE "^Merge branch 'develop'"; then
-        IS_MERGE_FROM_DEVELOP=true
-        echo "Detected merge from develop - full semver rules apply"
+      # Compute version from conventional commits
+      chmod +x ./shared/scripts/get-next-version.sh
+      VERSION=$(./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+      TAG_NAME="v${VERSION}-${TARGET_PLATFORM}"
+      echo "Creating release: ${TAG_NAME}"
+
+      # Configure git for CI push
+      git config user.email "ci@gitlab"
+      git config user.name "GitLab CI"
+      git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+
+      # Create and push tag only if it does not already exist
+      if git ls-remote --tags origin | grep -q "refs/tags/${TAG_NAME}$"; then
+        echo "Tag ${TAG_NAME} already exists, skipping tag creation"
       else
-        echo "Direct commit (hotfix) - patch-only mode"
-      fi
-    - |
-      # Calculate next version based on merge type
-      if [ "$IS_MERGE_FROM_DEVELOP" = "true" ]; then
-        # Full semver: feat=minor, fix=patch, breaking=major
-        NEXT_VERSION=$(release --skip-ssl-verify next-version --allow-current)
-      else
-        # Hotfix mode: force patch increment only
-        CURRENT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-        if [ -z "$CURRENT_TAG" ]; then
-          NEXT_VERSION="0.0.1-rpi3-bookworm"
-        else
-          # Extract version parts and increment patch
-          BASE=$(echo "$CURRENT_TAG" | sed 's/^v//' | sed 's/-rpi3-bookworm$//')
-          MAJOR=$(echo "$BASE" | cut -d. -f1)
-          MINOR=$(echo "$BASE" | cut -d. -f2)
-          PATCH=$(echo "$BASE" | cut -d. -f3)
-          NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-rpi3-bookworm"
-        fi
-      fi
-    - echo "Next version - ${NEXT_VERSION}"
-    - |
-      if [ -n "$NEXT_VERSION" ]; then
-        echo "Creating tag v${NEXT_VERSION}..."
-        if ! release --skip-ssl-verify tag 2>&1 | tee /tmp/release.log; then
-          if grep -q "no changes found" /tmp/release.log; then
-            echo "No releasable changes - skipping tag"
-          else
-            cat /tmp/release.log
-            exit 1
-          fi
-        fi
-      else
-        echo "No version bump needed"
+        git tag "${TAG_NAME}"
+        git push origin "${TAG_NAME}"
       fi
 
-# Platform-specific release: RPi 4B Bookworm
-release:rpi4-bookworm:
-  stage: release
-  image: registry.gitlab.com/juhani/go-semrel-gitlab:v0.21.1
-  tags:
-    - lightweight
-  cache: {}
-  needs:
-    - job: build:pimeleon
-      artifacts: false
-  rules:
-    - if: '$CI_COMMIT_TAG'
-      when: never
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH == "release/rpi4-bookworm"'
-      when: on_success
-    - when: never
-  variables:
-    GIT_SSL_NO_VERIFY: "1"
-    GITLAB_URL: "https://192.168.76.5:8443/api/v4"
-    GSG_TOKEN: $GITLAB_TOKEN
-    GSG_RELEASE_BRANCHES: "release/rpi4-bookworm"
-  script:
-    - echo "Calculating next version for RPi 4B Bookworm..."
-    - |
-      # Detect if this is a merge from develop
-      IS_MERGE_FROM_DEVELOP=false
-      if git log -1 --format=%s | grep -qE "^Merge branch 'develop'"; then
-        IS_MERGE_FROM_DEVELOP=true
-        echo "Detected merge from develop - full semver rules apply"
-      else
-        echo "Direct commit (hotfix) - patch-only mode"
-      fi
-    - |
-      # Calculate next version based on merge type
-      if [ "$IS_MERGE_FROM_DEVELOP" = "true" ]; then
-        # Full semver: feat=minor, fix=patch, breaking=major
-        NEXT_VERSION=$(release --skip-ssl-verify next-version --allow-current)
-      else
-        # Hotfix mode: force patch increment only
-        CURRENT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-        if [ -z "$CURRENT_TAG" ]; then
-          NEXT_VERSION="0.0.1-rpi4-bookworm"
-        else
-          # Extract version parts and increment patch
-          BASE=$(echo "$CURRENT_TAG" | sed 's/^v//' | sed 's/-rpi4-bookworm$//')
-          MAJOR=$(echo "$BASE" | cut -d. -f1)
-          MINOR=$(echo "$BASE" | cut -d. -f2)
-          PATCH=$(echo "$BASE" | cut -d. -f3)
-          NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-rpi4-bookworm"
-        fi
-      fi
-    - echo "Next version - ${NEXT_VERSION}"
-    - |
-      if [ -n "$NEXT_VERSION" ]; then
-        echo "Creating tag v${NEXT_VERSION}..."
-        if ! release --skip-ssl-verify tag 2>&1 | tee /tmp/release.log; then
-          if grep -q "no changes found" /tmp/release.log; then
-            echo "No releasable changes - skipping tag"
-          else
-            cat /tmp/release.log
-            exit 1
-          fi
-        fi
-      else
-        echo "No version bump needed"
-      fi
+      # Create GitLab Release against the tag
+      DESCRIPTION="Pimeleon OS image for ${TARGET_PLATFORM} v${VERSION}. Built from ${CI_COMMIT_BRANCH} at ${CI_COMMIT_SHORT_SHA}."
+      ASSET_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pimeleon/${TARGET_PLATFORM}-v${VERSION}/pimeleon-${TARGET_PLATFORM}-v${VERSION}.img.xz"
+      ASSET_JSON="{\"name\":\"Pimeleon image (${TARGET_PLATFORM})\",\"url\":\"${ASSET_URL}\",\"link_type\":\"package\"}"
+
+      release-cli create \
+        --name "Pimeleon ${TARGET_PLATFORM} v${VERSION}" \
+        --tag-name "${TAG_NAME}" \
+        --ref "${CI_COMMIT_SHA}" \
+        --description "${DESCRIPTION}" \
+        --assets-link "${ASSET_JSON}"

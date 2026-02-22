@@ -11,9 +11,9 @@ mgmt_interface: "eth0:0"
 ethernet_available: true
 
 # WiFi AP network settings
-wifi_ap_ip: "192.168.77.1"
+wifi_ap_ip: "192.168.42.1"
 wifi_ap_netmask: "255.255.255.0"
-wifi_ap_network: "192.168.77.0/24"
+wifi_ap_network: "192.168.42.0/24"
 
 # LAN Aliases (Tied to primary WiFi AP)
 lan_ip: "{{ wifi_ap_ip }}"
@@ -24,8 +24,8 @@ mgmt_ip: "172.16.0.1"
 mgmt_netmask: "255.255.255.0"
 
 # DHCP configuration
-wifi_dhcp_range_start: "192.168.77.100"
-wifi_dhcp_range_end: "192.168.77.200"
+wifi_dhcp_range_start: "192.168.42.100"
+wifi_dhcp_range_end: "192.168.42.200"
 dhcp_lease_time: "12h"
 
 # WiFi AP configuration
@@ -51,10 +51,10 @@ pihole_port: 5553
 # Template Context Facts
 default_ip: "{{ wifi_ap_ip }}"
 dns_local: "127.0.0.1"
-dns_internal: "127.0.0.1"
+dns_internal: "{{ wifi_ap_ip }}"
 hostname: "pimeleon"
 
 # Squid Proxy Configuration
 squid_http_port: 3128
 squid_transparent_port: 3129
-squid_https_port: 3130
+squid_https_port: 31443

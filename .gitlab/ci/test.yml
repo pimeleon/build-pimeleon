@@ -1,15 +1,27 @@
 ---
 # GitLab CI/CD - Testing
 # Smoke and Integration Tests
+#
+# TARGET_PLATFORM is injected from setup:platform via dotenv artifact.
+# Jobs run on release/* branch pushes and on MRs targeting release/* branches.
+# MR pipelines use builder:latest / tester:latest since branch-tagged images
+# are only built on direct release/* pushes.
 
+# Smoke test — quick sanity check of the built image
 test:smoke:
   extends: .docker-job
   stage: test
-  needs: ["build:pimeleon"]
+  needs:
+    - job: setup:platform
+      artifacts: true
+    - job: build:pimeleon
+  tags:
+    - linux
   rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
-      when: never
-    - when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+      variables:
+        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
   script:
     - mkdir -p test-results
     - |
@@ -19,6 +31,7 @@ test:smoke:
         -v $CI_PROJECT_DIR/tests:/tests \
         -v $CI_PROJECT_DIR/test-results:/results \
         -e TEST_SUITE=smoke \
+        -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
         $TEST_IMAGE
   artifacts:
     when: always
@@ -28,14 +41,21 @@ test:smoke:
       junit: test-results/junit.xml
     expire_in: 1 week
 
+# Integration test — full end-to-end verification
 test:integration:
   extends: .docker-job
   stage: test
-  needs: ["build:pimeleon"]
+  needs:
+    - job: setup:platform
+      artifacts: true
+    - job: build:pimeleon
+  tags:
+    - linux
   rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
-      when: never
-    - when: on_success
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+      variables:
+        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
   script:
     - mkdir -p test-results
     - |
@@ -45,5 +65,6 @@ test:integration:
         -v $CI_PROJECT_DIR/tests:/tests \
         -v $CI_PROJECT_DIR/test-results:/results \
         -e TEST_SUITE=integration \
+        -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
         $TEST_IMAGE
   timeout: 30 minutes
