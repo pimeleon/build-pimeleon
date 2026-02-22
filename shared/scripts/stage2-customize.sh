@@ -4,22 +4,31 @@ set -euo pipefail
 # Stage 2: Customize system
 # Install packages and apply configurations
 
+# shellcheck disable=SC1091
+# shellcheck disable=SC1091
 source /scripts/common.sh
+# shellcheck disable=SC1091
+# shellcheck disable=SC1091
+source /scripts/lib-services.sh
 
 # Setup cleanup trap for error handling
-trap cleanup_on_exit EXIT ERR INT
+trap 'cleanup_on_exit' EXIT ERR INT TERM
 
 WORK_DIR=$1
 IMAGE_PATH=$2
 MOUNT_POINT="${WORK_DIR}/mount"
 BOOT_MOUNT="${WORK_DIR}/boot"
-IMAGE_NAME="pimeleon-${PIMELEON_APP:-rpi3-bookworm}"
+IMAGE_NAME="pimeleon-${TARGET_PLATFORM:-rpi3-bookworm}"
 ANSIBLE_LOG_FILE="/output/ansible-${IMAGE_NAME}.log"
+
+# Ansible directory from docker-compose environment
+SHARED_ANSIBLE_DIR="${ANSIBLE_DIR:-/ansible}"
 
 log_info "Starting system customization"
 
 # Mount image
-LOOP_DEVICE=$(mount_image "${IMAGE_PATH}" "${MOUNT_POINT}")
+mount_image "${IMAGE_PATH}" "${MOUNT_POINT}"
+LOOP_DEVICE="${CLEANUP_LOOP_DEVICE}"
 
 # Boot partition is already mounted at ${MOUNT_POINT}/boot by mount_image function
 BOOT_MOUNT="${MOUNT_POINT}/boot"
@@ -27,19 +36,12 @@ BOOT_MOUNT="${MOUNT_POINT}/boot"
 # Setup chroot
 setup_chroot "${MOUNT_POINT}"
 
+# Protect resolv.conf from systemd-resolved dpkg hooks converting it to a dangling symlink
+# See: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1020277
+sudo chattr +i "${MOUNT_POINT}/etc/resolv.conf" 2>/dev/null || true
+
 # Configure APT cache for chroot environment early
-if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
-    log_info "Configuring APT cache for chroot environment"
-    sudo mkdir -p "${MOUNT_POINT}/etc/apt/apt.conf.d"
-    sudo tee "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy" > /dev/null <<EOF
-# APT Cache Configuration for Build Process
-Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
-# Longer timeouts for slow cache/upstream responses
-Acquire::http::Timeout "120";
-Acquire::https::Timeout "120";
-Acquire::Retries "3";
-EOF
-fi
+configure_chroot_apt_proxy "${MOUNT_POINT}"
 
 # Update sources.list with current mirror (overrides cached base image)
 log_info "Updating APT sources to use: ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/}"
@@ -49,141 +51,83 @@ deb-src ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/} ${RASPBIAN
 EOF
 
 # Fix APT keyring deprecation warning (migrate from legacy trusted.gpg)
-if [ -f "${MOUNT_POINT}/etc/apt/trusted.gpg" ]; then
-    log_info "Migrating legacy APT keyring to new format"
-    sudo mkdir -p "${MOUNT_POINT}/etc/apt/trusted.gpg.d"
-    sudo gpg --no-default-keyring \
-        --keyring "${MOUNT_POINT}/etc/apt/trusted.gpg" \
-        --export 2>/dev/null | \
-        sudo gpg --no-default-keyring \
-            --keyring "gnupg-ring:${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" \
-            --import 2>/dev/null || true
-    sudo chmod 644 "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" 2>/dev/null || true
-    sudo rm -f "${MOUNT_POINT}/etc/apt/trusted.gpg"
-fi
+migrate_apt_keyring "${MOUNT_POINT}"
 
 # Update package lists
 log_info "Updating package lists"
 chroot_run "${MOUNT_POINT}" apt-get -q update
+chroot_run "${MOUNT_POINT}" apt-get -qy upgrade
+
+# Define package categories for better maintenance
+SYSTEM_PKGS=(
+    "systemd" "systemd-sysv" "systemd-resolved" "udev" "dbus" "policykit-1"
+    "locales" "locales-all" "tzdata" "fake-hwclock" "cron" "rsyslog" "logrotate"
+    "sudo" "parted" "pkg-config" "ca-certificates" "apt-transport-https"
+    "openssh-server" "zram-tools" "dphys-swapfile"
+)
+
+SHELL_PKGS=(
+    "bash-completion" "zsh" "tmux" "mc" "vim" "nano" "less" "file" "tree"
+    "unzip" "zip" "bc" "jq" "strace" "lsof" "procps" "psmisc"
+)
+
+NET_CORE_PKGS=(
+    "iproute2" "net-tools" "nftables" "iptables" "ipset" "conntrack" "tcpdump"
+    "dnsutils" "wget" "curl" "nmap" "mtr-tiny" "traceroute" "whois" "socat"
+    "bind9" "bind9utils"
+)
+
+NET_ROUTER_PKGS=(
+    "bridge-utils" "vlan" "ppp" "pppoeconf" "wireguard-tools"
+    "wireless-tools" "wireless-regdb" "rfkill" "wpasupplicant"
+    "isc-dhcp-server"
+)
+
+MONITOR_PKGS=(
+    "htop" "atop" "iotop" "iftop" "nethogs" "nload" "bmon" "bwm-ng"
+    "sysstat" "iptraf-ng" "vnstat" "wavemon" "speedtest-cli" "sysbench"
+)
+
+HARDWARE_PKGS=(
+    "usbutils" "lshw" "hdparm" "smartmontools" "ethtool"
+)
+
+BUILD_DEPS=(
+    "build-essential" "libevent-dev" "libnl-3-dev" "libnl-genl-3-dev"
+    "libssl-dev" "libzstd-dev" "sqlite3" "python3" "python3-pip"
+    "python3-venv" "python3-apt" "nodejs"
+)
 
 # Install essential packages (full router stack)
 log_info "Installing essential packages"
 chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
-    arp-scan \
-    arping \
-    arptables \
-    at \
-    atop \
-    bash-completion \
-    bc \
-    bmon \
-    build-essential \
-    bwm-ng \
-    ca-certificates \
-    conntrack \
-    curl \
-    dbus \
-    dnstop \
-    dnsutils \
-    dstat \
-    ethtool \
-    fake-hwclock \
-    file \
-    fping \
-    hdparm \
-    htop \
-    iftop \
-    ifstat \
-    iotop \
-    iperf3 \
-    iproute2 \
-    jq \
-    less \
-    libnl-3-dev \
-    libnl-genl-3-dev \
-    libssl-dev \
-    locales \
-    locales-all \
-    logrotate \
-    lshw \
-    lsof \
-    man-db \
-    manpages \
-    mc \
-    mtr-tiny \
-    nano \
-    ncdu \
-    netcat-openbsd \
-    net-tools \
-    nethogs \
-    nftables \
-    nload \
-    iptables \
-    ipset \
-    iptraf-ng \
-    nmap \
-    nodejs \
-    openssh-server \
-    parted \
-    pkg-config \
-    policykit-1 \
-    ppp \
-    pppoeconf \
-    procps \
-    psmisc \
-    python3 \
-    python3-apt \
-    python3-pip \
-    python3-venv \
-    rsyslog \
-    smartmontools \
-    socat \
-    speedtest-cli \
-    sqlite3 \
-    strace \
-    sudo \
-    sysbench \
-    sysstat \
-    systemd \
-    systemd-sysv \
-    tcpdump \
-    tmux \
-    traceroute \
-    tree \
-    tshark \
-    udev \
-    unzip \
-    usbutils \
-    vim \
-    vlan \
-    vnstat \
-    wavemon \
-    wget \
-    whiptail \
-    whois \
-    wireguard-tools \
-    wireless-tools \
-    zip \
-    zram-tools \
-    zsh
+    "${SYSTEM_PKGS[@]}" \
+    "${SHELL_PKGS[@]}" \
+    "${NET_CORE_PKGS[@]}" \
+    "${NET_ROUTER_PKGS[@]}" \
+    "${MONITOR_PKGS[@]}" \
+    "${HARDWARE_PKGS[@]}" \
+    "${BUILD_DEPS[@]}"
 
 # Verify Python3 installation (required for Ansible)
-if ! chroot_run "${MOUNT_POINT}" python3 --version; then
+log_info "Verifying Python3 installation..."
+if ! chroot_run "${MOUNT_POINT}" python3 --version > /dev/null 2>&1; then
     log_error "Python3 not installed - Ansible will fail"
     die "Python3 installation failed"
 fi
-log_info "Python3 installed: $(chroot_run "${MOUNT_POINT}" python3 --version)"
+PYTHON_VER=$(chroot_run "${MOUNT_POINT}" python3 --version)
+log_info "Python3 installed: ${PYTHON_VER}"
 
 # Install WiFi firmware (may fail if non-free not available)
 log_info "Installing WiFi firmware"
 chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
     firmware-brcm80211 || log_warn "WiFi firmware not available, wireless may not work"
 
-# Install Pi-specific packages (kernel, bootloader, firmware)
+# Install Pi-specific packages (kernel and firmware)
 log_info "Installing Raspberry Pi kernel and firmware"
 chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
     raspberrypi-kernel \
-    libraspberrypi-bin
+    raspberrypi-bootloader
 
 # Verify Pi boot firmware was installed to boot partition
 log_info "Verifying Pi boot firmware installation"
@@ -205,48 +149,20 @@ log_info "Installing basic networking tools"
 chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
     bridge-utils \
     isc-dhcp-server \
+    rfkill \
     wireless-regdb \
     wpasupplicant
 
-# Build hostapd from official w1.fi source (WPA3/SAE support)
-log_info "Building hostapd from source with WPA3/SAE support"
-HOSTAPD_VERSION="hostap_2_10"
-HOSTAPD_BUILD_DIR="${MOUNT_POINT}/tmp/hostapd-build"
+# Install router services (hostapd, pihole, tor)
+install_hostapd "${MOUNT_POINT}"
+install_pihole "${MOUNT_POINT}"
+install_tor "${MOUNT_POINT}" "${SHARED_ANSIBLE_DIR}"
 
-# Clone hostap repository on builder host (has network access)
-sudo mkdir -p "${HOSTAPD_BUILD_DIR}"
-if [[ ! -d "${HOSTAPD_BUILD_DIR}/hostap" ]]; then
-    log_info "Cloning hostap repository (${HOSTAPD_VERSION})..."
-    sudo git clone --depth 1 --branch "${HOSTAPD_VERSION}" \
-        https://git.w1.fi/hostap.git "${HOSTAPD_BUILD_DIR}/hostap"
-fi
-
-# Copy build script into chroot
-sudo cp /scripts/build-hostapd.sh "${MOUNT_POINT}/tmp/build-hostapd.sh"
-sudo chmod +x "${MOUNT_POINT}/tmp/build-hostapd.sh"
-
-# Build hostapd inside chroot (ARM cross-compilation via QEMU)
-log_info "Compiling hostapd inside chroot (this may take a while)..."
-chroot_run "${MOUNT_POINT}" /tmp/build-hostapd.sh
-
-# Verify hostapd installed
-if [[ -x "${MOUNT_POINT}/usr/local/bin/hostapd" ]]; then
-    log_info "hostapd compiled and installed successfully"
-    chroot_run "${MOUNT_POINT}" /usr/local/bin/hostapd -v 2>&1 | head -3 || true
-else
-    die "hostapd compilation failed - binary not found"
-fi
-
-# Cleanup build artifacts
-sudo rm -rf "${HOSTAPD_BUILD_DIR}"
-sudo rm -f "${MOUNT_POINT}/tmp/build-hostapd.sh"
-
-# Install DNS server packages
+# Install DNS server packages (dnscrypt-proxy uses pre-built binary, not APT)
 log_info "Installing DNS server packages"
 chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
     bind9 \
-    bind9utils \
-    dnscrypt-proxy
+    bind9utils
 
 # Install security packages
 log_info "Installing security packages"
@@ -272,6 +188,11 @@ chroot_run "${MOUNT_POINT}" systemctl disable NetworkManager 2>/dev/null || true
 chroot_run "${MOUNT_POINT}" systemctl disable ModemManager 2>/dev/null || true
 chroot_run "${MOUNT_POINT}" systemctl mask NetworkManager 2>/dev/null || true
 
+# Mask wpa_supplicant (we use hostapd for AP mode, not client mode)
+log_info "Disabling wpasupplicant"
+chroot_run "${MOUNT_POINT}" systemctl disable wpa_supplicant 2>/dev/null || true
+chroot_run "${MOUNT_POINT}" systemctl mask wpa_supplicant 2>/dev/null || true
+
 # Configure system
 log_info "Configuring system"
 
@@ -293,28 +214,7 @@ sudo chmod 644 "${MOUNT_POINT}/etc/sysctl.d/30-ip-forward.conf"
 sudo mkdir -p "${MOUNT_POINT}/etc/systemd/network"
 sudo chmod 755 "${MOUNT_POINT}/etc/systemd/network"
 
-# Configure locales (en_IE default, plus common languages)
-log_info "Configuring locales"
-
-# Create locale.alias if missing (prevents warning during locale-gen)
-if [ ! -f "${MOUNT_POINT}/etc/locale.alias" ]; then
-    sudo touch "${MOUNT_POINT}/etc/locale.alias"
-fi
-if [ ! -e "${MOUNT_POINT}/usr/share/locale/locale.alias" ]; then
-    sudo ln -sf /etc/locale.alias "${MOUNT_POINT}/usr/share/locale/locale.alias"
-fi
-
-sudo tee "${MOUNT_POINT}/etc/locale.gen" > /dev/null <<EOF
-en_IE.UTF-8 UTF-8
-en_US.UTF-8 UTF-8
-es_ES.UTF-8 UTF-8
-ru_RU.UTF-8 UTF-8
-uk_UA.UTF-8 UTF-8
-zh_CN.UTF-8 UTF-8
-ko_KR.UTF-8 UTF-8
-EOF
-chroot_run "${MOUNT_POINT}" locale-gen
-chroot_run "${MOUNT_POINT}" update-locale LANG=en_IE.UTF-8
+# Note: Locale generation handled in stage3-optimize.sh to avoid duplication
 
 # Configure SSH
 sudo sed -i 's/#PermitRootLogin.*/PermitRootLogin no/' "${MOUNT_POINT}/etc/ssh/sshd_config"
@@ -323,7 +223,7 @@ echo "AllowUsers pim" | sudo tee -a "${MOUNT_POINT}/etc/ssh/sshd_config" > /dev/
 
 # Create standard groups if they don't exist
 log_info "Ensuring standard groups exist"
-for group in adm dialout cdrom audio video plugdev games users input netdev; do
+for group in adm dialout cdrom users netdev; do
     chroot_run "${MOUNT_POINT}" groupadd -f "$group" 2>/dev/null || true
 done
 
@@ -348,7 +248,7 @@ chroot_run "${MOUNT_POINT}" id pim-ngrok || true
 
 # Create pim management user (full sudo via sudoers.d, not sudo group)
 log_info "Creating pim management user"
-chroot_run "${MOUNT_POINT}" useradd --create-home -s /bin/zsh -g pim -G adm,dialout,cdrom,audio,video,plugdev,games,users,input,netdev,gpio,i2c,spi pim || true
+chroot_run "${MOUNT_POINT}" useradd --create-home -s /bin/zsh -g pim -G adm,dialout,cdrom,users,netdev,gpio,i2c,spi pim || true
 # Ensure home directory exists (fallback if useradd -m fails)
 sudo mkdir -p "${MOUNT_POINT}/home/pim"
 chroot_run "${MOUNT_POINT}" chown pim:pim /home/pim
@@ -376,7 +276,6 @@ log_info "Downloading files for chroot installation"
 
 # Version numbers
 DNSCRYPT_VERSION="2.1.15"
-PIHOLE_VERSION="6.3"
 
 # Create download directory in cache (outside image to save space)
 DOWNLOAD_DIR="${CACHE_DIR}/pimeleon-downloads"
@@ -385,8 +284,13 @@ sudo chmod 755 "${DOWNLOAD_DIR}"
 sudo chown "$(id -u):$(id -g)" "${DOWNLOAD_DIR}"
 
 # Download dnscrypt-proxy (ARM binary - no source build needed)
-log_info "Downloading dnscrypt-proxy ${DNSCRYPT_VERSION}"
-DNSCRYPT_URL="https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNSCRYPT_VERSION}/dnscrypt-proxy-linux_arm-${DNSCRYPT_VERSION}.tar.gz"
+# Map RPI_ARCH to dnscrypt-proxy release naming: armhf->arm, arm64->arm64
+DNSCRYPT_ARCH="arm"
+if [[ "${RPI_ARCH}" == "arm64" ]]; then
+    DNSCRYPT_ARCH="arm64"
+fi
+log_info "Downloading dnscrypt-proxy ${DNSCRYPT_VERSION} for ${DNSCRYPT_ARCH}"
+DNSCRYPT_URL="https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNSCRYPT_VERSION}/dnscrypt-proxy-linux_${DNSCRYPT_ARCH}-${DNSCRYPT_VERSION}.tar.gz"
 if ! curl -fsSL -o "${DOWNLOAD_DIR}/dnscrypt-proxy.tar.gz" "${DNSCRYPT_URL}"; then
     if is_service_enabled "dnscrypt_proxy" 2>/dev/null; then
         die "Failed to download dnscrypt-proxy, which is enabled in the current profile."
@@ -395,31 +299,8 @@ if ! curl -fsSL -o "${DOWNLOAD_DIR}/dnscrypt-proxy.tar.gz" "${DNSCRYPT_URL}"; th
     fi
 fi
 
-# Download Pi-hole FTL source and dependencies for compilation
-log_info "Downloading Pi-hole FTL ${PIHOLE_VERSION} source"
-if [ ! -f "${DOWNLOAD_DIR}/pihole-ftl-${PIHOLE_VERSION}.tar.gz" ]; then
-    FTL_URL="https://github.com/pi-hole/pi-hole/archive/refs/tags/v${PIHOLE_VERSION}.tar.gz"
-    if ! curl -fsSL -o "${DOWNLOAD_DIR}/pihole-ftl-${PIHOLE_VERSION}.tar.gz" "${FTL_URL}"; then
-        if is_service_enabled "pihole" 2>/dev/null; then
-            die "Failed to download pihole-FTL source, which is enabled in the current profile."
-        else
-            log_warn "Failed to download pihole-FTL source, but it is not enabled. Continuing."
-        fi
-    fi
-fi
-
-# Extract Pi-hole if downloaded
-SHARED_ANSIBLE_DIR="${WORKSPACE_DIR:-/workspace}/shared/ansible"
-if [ -f "${DOWNLOAD_DIR}/pihole-ftl-${PIHOLE_VERSION}.tar.gz" ]; then
-    log_info "Extracting Pi-hole FTL source"
-    cd "${DOWNLOAD_DIR}"
-    tar -xzf "${DOWNLOAD_DIR}/pihole-ftl-${PIHOLE_VERSION}.tar.gz" 2>&1 || true
-    if [ -d "${DOWNLOAD_DIR}/pi-hole-${PIHOLE_VERSION}" ] && [ ! -d "${SHARED_ANSIBLE_DIR}/playbooks/files/pi-hole-${PIHOLE_VERSION}" ]; then
-        sudo mkdir -p "${SHARED_ANSIBLE_DIR}/playbooks/files/"
-        sudo mv -f "${DOWNLOAD_DIR}/pi-hole-${PIHOLE_VERSION}" "${SHARED_ANSIBLE_DIR}/playbooks/files/pi-hole-${PIHOLE_VERSION}" || true
-    fi
-    cd "$WORK_DIR"
-fi
+# Pi-hole FTL is built from source (see build-pihole-ftl.sh)
+# Tor is installed from official Tor Project repository (see tor-setup.yml)
 
 # Copy downloads into chroot for Ansible to find
 log_info "Copying downloads into chroot"
@@ -433,12 +314,19 @@ curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc 2>&1 | chroot_run "${MO
 echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" 2>&1 | chroot_run "${MOUNT_POINT}" tee /etc/apt/sources.list.d/ngrok.list
 log_info "Installing ngrok for remote access tunneling"
 chroot_run "${MOUNT_POINT}" apt-get -q update
+chroot_run "${MOUNT_POINT}" apt-get -qy upgrade
 chroot_run "${MOUNT_POINT}" apt-get -qy install ngrok
 
 # =============================================================================
 # Clone and build Pimeleon Web UI from GitLab
 # =============================================================================
 log_info "Building Pimeleon Web UI from GitLab..."
+
+# Fix for 504 Gateway Timeout and SSL issues with local GitLab
+git config --global http.sslVerify false
+git config --global http.lowSpeedLimit 0
+git config --global http.lowSpeedTime 999999
+git config --global core.compression 0
 
 # Configurable via environment variables (see docker-compose.yml)
 PIMELEON_UI_REPO="${PIMELEON_UI_REPO:-https://gitlab.pimeleon.dev/pimeleon/pimeleon-ui.git}"
@@ -448,7 +336,7 @@ if [[ -n "${PIMELEON_UI_BRANCH:-}" ]]; then
     # Use explicitly configured branch
     :
 elif [[ "${PIMELEON_PROFILE:-development}" == "development" ]]; then
-    PIMELEON_UI_BRANCH="develop"
+    PIMELEON_UI_BRANCH="staging"
 else
     PIMELEON_UI_BRANCH="master"
 fi
@@ -461,7 +349,7 @@ sudo chown "$(id -u):$(id -g)" "${PIMELEON_UI_BUILD_DIR}"
 
 # Construct authenticated URL if token is available
 if [[ -n "${PIMELEON_UI_BUILD_TOKEN:-}" ]]; then
-    PIMELEON_UI_REPO_AUTH=$(echo "${PIMELEON_UI_REPO}" | sed "s|https://|https://oauth2:${PIMELEON_UI_BUILD_TOKEN}@|")
+    PIMELEON_UI_REPO_AUTH="${PIMELEON_UI_REPO/https:\/\//https:\/\/oauth2:${PIMELEON_UI_BUILD_TOKEN}@}"
 else
     PIMELEON_UI_REPO_AUTH="${PIMELEON_UI_REPO}"
 fi
@@ -469,9 +357,10 @@ fi
 # Clone or update repo
 if [[ -d "${PIMELEON_UI_BUILD_DIR}/.git" ]]; then
     log_info "Updating existing pimeleon-ui clone..."
-    git -C "${PIMELEON_UI_BUILD_DIR}" fetch origin
-    git -C "${PIMELEON_UI_BUILD_DIR}" checkout "${PIMELEON_UI_BRANCH}"
-    git -C "${PIMELEON_UI_BUILD_DIR}" reset --hard "origin/${PIMELEON_UI_BRANCH}"
+    # Fetch specific branch (shallow clones don't have remote tracking refs)
+    git -C "${PIMELEON_UI_BUILD_DIR}" fetch origin "${PIMELEON_UI_BRANCH}"
+    # Create/reset local branch from FETCH_HEAD (origin/branch doesn't exist in shallow clones)
+    git -C "${PIMELEON_UI_BUILD_DIR}" checkout -B "${PIMELEON_UI_BRANCH}" FETCH_HEAD
 else
     log_info "Cloning pimeleon-ui from ${PIMELEON_UI_REPO} (branch: ${PIMELEON_UI_BRANCH})..."
     git clone --depth 1 --branch "${PIMELEON_UI_BRANCH}" "${PIMELEON_UI_REPO_AUTH}" "${PIMELEON_UI_BUILD_DIR}"
@@ -555,18 +444,26 @@ SHARED_VARS_DIR="${SHARED_ANSIBLE_DIR}/vars"
 PLAYBOOKS_DIR="${SHARED_ANSIBLE_DIR}/playbooks"
 
 # Apply Ansible playbooks if available
-if [[ -d "${PLAYBOOKS_DIR}" ]] && [[ -n "$(ls -A ${PLAYBOOKS_DIR}/*.yml 2>/dev/null)" ]]; then
+if [[ -d "${PLAYBOOKS_DIR}" ]] && [[ -n "$(ls -A "${PLAYBOOKS_DIR}"/*.yml 2>/dev/null)" ]]; then
     log_info "Applying Ansible playbooks (Monorepo mode)"
-    log_info "App: ${PIMELEON_APP:-not set}"
+    log_info "App: ${TARGET_PLATFORM:-not set}"
     export ANSIBLE_CONFIG="${SHARED_ANSIBLE_DIR}/ansible.cfg"
     export ANSIBLE_HOST_KEY_CHECKING=False
     export PYTHONUNBUFFERED=1
 
     # Determine platform group from environment (3B+ -> raspberrypi_3bplus, 4B -> raspberrypi_4b)
-    PLATFORM_GROUP="raspberrypi_$(echo ${PIMELEON_RPI_MODEL:-3B+} | tr '[:upper:]' '[:lower:]' | tr -d '+')"
+    PLATFORM_GROUP="raspberrypi_$(echo "${PIMELEON_RPI_MODEL:-3B+}" | tr '[:upper:]' '[:lower:]' | tr -d '+')"
     log_info "Platform group: ${PLATFORM_GROUP}"
 
     # Create temporary inventory with platform group membership
+    proxy_vars=""
+    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+        proxy_url="http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+        proxy_vars="http_proxy=\"${proxy_url}\"
+https_proxy=\"${proxy_url}\"
+no_proxy=\"localhost,127.0.0.1,local\""
+    fi
+
     cat > "${WORK_DIR}/inventory" <<EOF
 [all]
 pimeleon ansible_connection=chroot ansible_host=${MOUNT_POINT}
@@ -581,6 +478,11 @@ pimeleon
 ansible_python_interpreter=/usr/bin/python3
 EOF
 
+    # Append proxy vars if available (avoids empty variable expansion issues)
+    if [[ -n "${proxy_vars}" ]]; then
+        echo "${proxy_vars}" >> "${WORK_DIR}/inventory"
+    fi
+
     # Setup group_vars directory structure for Ansible
     mkdir -p "${WORK_DIR}/group_vars/all"
     mkdir -p "${WORK_DIR}/group_vars/raspberrypi"
@@ -589,20 +491,20 @@ EOF
     # Layer 1: Copy shared common vars (lowest priority)
     if [[ -d "${SHARED_VARS_DIR}/common" ]]; then
         log_info "Loading shared common vars from: ${SHARED_VARS_DIR}/common"
-        cp -r "${SHARED_VARS_DIR}/common/"* "${WORK_DIR}/group_vars/all/" 2>/dev/null || true
+        cp -R "${SHARED_VARS_DIR}/common/"* "${WORK_DIR}/group_vars/all/" 2>/dev/null || true
     fi
 
     # Layer 2: Copy platform vars (raspberrypi family)
     if [[ -d "${SHARED_VARS_DIR}/platform/raspberrypi" ]]; then
         log_info "Loading platform vars from: ${SHARED_VARS_DIR}/platform/raspberrypi"
-        cp -r "${SHARED_VARS_DIR}/platform/raspberrypi/"* "${WORK_DIR}/group_vars/raspberrypi/" 2>/dev/null || true
+        cp -R "${SHARED_VARS_DIR}/platform/raspberrypi/"* "${WORK_DIR}/group_vars/raspberrypi/" 2>/dev/null || true
     fi
 
     # Layer 3: Copy app-specific vars (highest priority - overrides shared)
-    APP_VARS_DIR="${WORKSPACE_DIR:-/workspace}/apps/${PIMELEON_APP}/vars"
+    APP_VARS_DIR="${WORKSPACE_DIR:-/workspace}/apps/${TARGET_PLATFORM}/vars"
     if [[ -d "${APP_VARS_DIR}" ]]; then
         log_info "Loading app-specific vars from: ${APP_VARS_DIR}"
-        cp -r "${APP_VARS_DIR}/"* "${WORK_DIR}/group_vars/${PLATFORM_GROUP}/" 2>/dev/null || true
+        cp -R "${APP_VARS_DIR}/"* "${WORK_DIR}/group_vars/${PLATFORM_GROUP}/" 2>/dev/null || true
     fi
 
     # Copy profile vars to all group
@@ -612,14 +514,15 @@ EOF
     fi
 
     # Run playbooks with platform, version, app, and profile extra-vars
-    for playbook in ${PLAYBOOKS_DIR}/*.yml; do
-        log_info "Running playbook: $(basename $playbook)"
+    for playbook in "${PLAYBOOKS_DIR}"/*.yml; do
+        log_info "Running playbook: $(basename "$playbook")"
         sudo -E ansible-playbook -v \
             -i "${WORK_DIR}/inventory" \
             --extra-vars "platform_model=${PIMELEON_RPI_MODEL:-3B+}" \
+            --extra-vars "rpi_arch=${RPI_ARCH:-armhf}" \
             --extra-vars "debian_version=${RASPBIAN_VERSION:-bookworm}" \
             --extra-vars "pimeleon_profile=${PIMELEON_PROFILE:-development}" \
-            --extra-vars "pimeleon_app=${PIMELEON_APP:-}" \
+            --extra-vars "pimeleon_app=${TARGET_PLATFORM:-}" \
             --extra-vars "pimeleon_initial_password=${PIMELEON_INITIAL_PASSWORD:-netblox}" \
             --extra-vars "pimeleon_ap_name=${PIMELEON_AP_NAME:-Pimeleon}" \
             "$playbook" 2>&1 | sudo tee -a "${ANSIBLE_LOG_FILE}" || die "Playbook failed: $playbook. See ${ANSIBLE_LOG_FILE} for details."
@@ -633,18 +536,18 @@ if [[ -d "${CONFIG_DIR}" ]]; then
     log_info "Copying custom configurations"
 
     # Network configs
-    if [[ -d "${CONFIG_DIR}/network" ]] && [[ -n "$(ls -A ${CONFIG_DIR}/network/* 2>/dev/null)" ]]; then
-        sudo cp -r "${CONFIG_DIR}/network/"* "${MOUNT_POINT}/etc/network/" || true
+    if [[ -d "${CONFIG_DIR}/network" ]] && [[ -n "$(ls -A "${CONFIG_DIR}/network"/* 2>/dev/null)" ]]; then
+        sudo cp -R "${CONFIG_DIR}/network/"* "${MOUNT_POINT}/etc/network/" || true
     fi
 
     # Security configs
-    if [[ -d "${CONFIG_DIR}/security" ]] && [[ -n "$(ls -A ${CONFIG_DIR}/security/* 2>/dev/null)" ]]; then
-        sudo cp -r "${CONFIG_DIR}/security/"* "${MOUNT_POINT}/etc/" || true
+    if [[ -d "${CONFIG_DIR}/security" ]] && [[ -n "$(ls -A "${CONFIG_DIR}/security"/* 2>/dev/null)" ]]; then
+        sudo cp -R "${CONFIG_DIR}/security/"* "${MOUNT_POINT}/etc/" || true
     fi
 
     # Service configs
-    if [[ -d "${CONFIG_DIR}/services" ]] && [[ -n "$(ls -A ${CONFIG_DIR}/services/* 2>/dev/null)" ]]; then
-        sudo cp -r "${CONFIG_DIR}/services/"* "${MOUNT_POINT}/etc/" || true
+    if [[ -d "${CONFIG_DIR}/services" ]] && [[ -n "$(ls -A "${CONFIG_DIR}/services"/* 2>/dev/null)" ]]; then
+        sudo cp -R "${CONFIG_DIR}/services/"* "${MOUNT_POINT}/etc/" || true
     fi
 fi
 
@@ -657,13 +560,17 @@ fi
 # Configure static resolv.conf for production (BIND9 handles DNS)
 # This must be done AFTER all network operations (git clone, apt, etc.)
 log_info "Configuring static DNS resolver for production"
-cat > /tmp/resolv.conf <<EOF
+sudo chattr -i "${MOUNT_POINT}/etc/resolv.conf" 2>/dev/null || true
+sudo rm -f "${MOUNT_POINT}/etc/resolv.conf"
+sudo tee "${MOUNT_POINT}/etc/resolv.conf" > /dev/null <<EOF
 # Static DNS configuration - BIND9 on localhost
 nameserver 127.0.0.1
 options edns0 trust-ad
 EOF
-sudo cp /tmp/resolv.conf "${MOUNT_POINT}/etc/resolv.conf"
 sudo chmod 644 "${MOUNT_POINT}/etc/resolv.conf"
+
+# Verify stage completion
+verify_stage 2 "${MOUNT_POINT}"
 
 # Cleanup chroot
 cleanup_chroot "${MOUNT_POINT}"

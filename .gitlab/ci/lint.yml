@@ -1,0 +1,46 @@
+---
+# GitLab CI/CD - Linting
+# YAML, Ansible, and Shell
+
+lint:yaml:
+  stage: lint
+  image: python:3.11-slim
+  tags:
+    - python
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - when: on_success
+  before_script:
+    - pip install --quiet yamllint
+  script:
+    - yamllint -c .yamllint .
+  allow_failure: true
+
+lint:ansible:
+  stage: lint
+  image: python:3.11-slim
+  tags:
+    - python
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - when: on_success
+  before_script:
+    - pip install --quiet ansible-lint
+  script:
+    - ansible-lint shared/ansible/playbooks/*.yml
+  allow_failure: true
+
+lint:shell:
+  stage: lint
+  image: koalaman/shellcheck-alpine:latest
+  tags:
+    - linux
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - when: on_success
+  script:
+    - find . -name "*.sh" -type f -exec shellcheck {} \;
+  allow_failure: true

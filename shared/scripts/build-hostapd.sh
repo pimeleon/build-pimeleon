@@ -46,7 +46,7 @@ EOF
 
 echo "Compiling hostapd..."
 make clean 2>/dev/null || true
-make -j$(nproc)
+make -j"$(nproc)"
 
 echo "Installing hostapd to ${INSTALL_DIR}..."
 install -m 755 hostapd "${INSTALL_DIR}/hostapd"

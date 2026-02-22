@@ -1,0 +1,77 @@
+---
+# GitLab CI/CD - Publishing
+# Image registry, GitLab Pages, and Review Apps
+
+publish:image:
+  stage: publish
+  tags:
+    - lightweight
+  needs: ["build:pimeleon", "test:smoke"]
+  rules:
+    # Publish on platform release branches
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - cd output
+    - |
+      for file in pimeleon-*.img.xz pimeleon-*.tar.gz; do
+        if [ -f "$file" ]; then
+          curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+            --upload-file "$file" \
+            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pimeleon/${CI_COMMIT_TAG:-latest}/$(basename $file)"
+        fi
+      done
+
+publish:pages:
+  stage: publish
+  image: python:3.11-slim
+  tags:
+    - lightweight
+  needs: ["test:integration", "test:smoke"]
+  rules:
+    # Publish docs from primary or release branches
+    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/rpi[34]-/'
+  environment:
+    name: documentation/production
+    url: https://docs.pimeleon.dev/
+  script:
+    - apt-get -qy update && apt-get -q install -y --no-install-recommends git
+    - pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin
+    - mkdocs build -d public
+  artifacts:
+    paths:
+      - public
+
+# Review App for Documentation (Merge Requests)
+publish:docs-preview:
+  stage: publish
+  image: python:3.11-slim
+  tags:
+    - lightweight
+  needs: ["test:integration", "test:smoke"]  # Faster feedback loop for previews
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  environment:
+    name: documentation/review/$CI_COMMIT_REF_SLUG
+    url: https://$CI_PROJECT_NAMESPACE.gitlab.io/-/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/public/index.html
+    on_stop: stop:docs-preview
+  script:
+    - apt-get -qy update && apt-get -q install -y --no-install-recommends git
+    - pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin
+    - mkdocs build -d public
+  artifacts:
+    paths:
+      - public
+    expire_in: 1 week
+
+stop:docs-preview:
+  stage: publish
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+  environment:
+    name: documentation/review/$CI_COMMIT_REF_SLUG
+    action: stop
+  script:
+    - echo "Stopping review app for $CI_COMMIT_REF_SLUG"

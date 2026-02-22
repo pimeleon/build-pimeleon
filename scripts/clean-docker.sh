@@ -32,7 +32,7 @@ print_error() {
 # Check if we want to preserve caches
 PRESERVE_CACHE=true
 PRESERVE_VOLUMES=true
-CLEAN_OUTPUT=false
+CLEAN_OUTPUT=true
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -54,16 +54,21 @@ while [[ $# -gt 0 ]]; do
             CLEAN_OUTPUT=true
             shift
             ;;
+        --keep-output)
+            CLEAN_OUTPUT=false
+            shift
+            ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo "Options:"
             echo "  --full           Full cleanup (removes everything including caches and old outputs)"
             echo "  --no-cache       Remove local cache directory but keep Docker volumes"
             echo "  --no-volumes     Remove Docker volumes but keep local cache"
-            echo "  --clean-output   Clean old image files and logs from output directory"
+            echo "  --clean-output   Clean old image files and logs from output directory (default)"
+            echo "  --keep-output    Preserve all image files and logs in output directory"
             echo "  -h, --help       Show this help message"
             echo ""
-            echo "Default: Preserves successful base image caches, Docker volumes, and output files"
+            echo "Default: Preserves successful base image caches and Docker volumes, but cleans old outputs"
             exit 0
             ;;
         *)
@@ -97,12 +102,23 @@ TEMP_CACHE_DIR=""
 if [[ "$PRESERVE_CACHE" == "true" ]] && [[ -d "./cache" ]] && [[ -n "$(ls -A ./cache 2>/dev/null)" ]]; then
     TEMP_CACHE_DIR=$(mktemp -d)
     print_info "Backing up cache directory to $TEMP_CACHE_DIR"
-    cp -r ./cache/* "$TEMP_CACHE_DIR/" 2>/dev/null || true
+    # Use rsync if available for more reliable copy, fallback to cp
+    if command -v rsync &>/dev/null; then
+        rsync -a ./cache/ "$TEMP_CACHE_DIR/"
+    else
+        cp -a ./cache/. "$TEMP_CACHE_DIR/"
+    fi
 fi
 
-# Cleanup Docker containers and images
-print_info "Removing Docker containers, images, and networks..."
-docker system prune -af
+# Cleanup Docker resources (granularly to avoid stalls and provide feedback)
+print_info "Removing stopped Docker containers..."
+docker container prune -f
+
+print_info "Removing unused Docker networks..."
+docker network prune -f
+
+print_info "Removing unused Docker images..."
+docker image prune -f
 
 # Cleanup build cache
 print_info "Clearing Docker build cache..."
@@ -111,17 +127,18 @@ docker builder prune -af
 # Handle volumes
 if [[ "$PRESERVE_VOLUMES" == "true" ]]; then
     print_warning "Preserving Docker volumes (apt-cache, debootstrap-cache, pip-cache)"
-    # Only remove orphaned volumes, not our named ones
+    # Only remove orphaned volumes
+    print_info "Removing orphaned volumes..."
     docker volume prune -f
 else
     print_warning "Removing all Docker volumes including caches"
-    docker system prune -af --volumes
+    docker volume prune -af
 fi
 
 # Handle local cache directory
 if [[ "$PRESERVE_CACHE" == "false" ]]; then
     print_warning "Removing local cache directory"
-    rm -rf ./cache
+    sudo rm -rf ./cache
     mkdir -p ./cache
 else
     print_info "Preserving local cache directory"
@@ -131,8 +148,22 @@ fi
 if [[ -n "$TEMP_CACHE_DIR" ]] && [[ "$PRESERVE_CACHE" == "true" ]]; then
     print_info "Restoring cache directory"
     mkdir -p ./cache
-    cp -r "$TEMP_CACHE_DIR"/* ./cache/ 2>/dev/null || true
+    if command -v rsync &>/dev/null; then
+        rsync -a "$TEMP_CACHE_DIR/" ./cache/
+    else
+        cp -a "$TEMP_CACHE_DIR"/. ./cache/
+    fi
     rm -rf "$TEMP_CACHE_DIR"
+fi
+
+# Reload cached images if missing
+if [[ -f "./cache/pimeleon-adblock2privoxy.tar.gz" ]]; then
+    if ! docker image inspect pimeleon-adblock2privoxy:latest &>/dev/null; then
+        print_info "Reloading adblock2privoxy image from cache..."
+        zcat "./cache/pimeleon-adblock2privoxy.tar.gz" | docker load
+    else
+        print_info "adblock2privoxy image already exists, skipping reload"
+    fi
 fi
 
 # Handle output directory cleanup
@@ -214,10 +245,10 @@ else
     echo "🧹 Output directory cleaned - kept latest image, log, and password file"
 fi
 
-echo ""
 echo -e "${BLUE}🚀 Next Steps:${NC}"
-echo "1. Rebuild containers: APT_CACHE_SERVER=192.168.42.5 docker compose build --no-cache builder"
-echo "2. Run build: APT_CACHE_SERVER=192.168.42.5 docker compose --progress quiet run --rm builder"
+echo "1. Rebuild adblock dependency: ./scripts/build-ab2p.sh"
+echo "2. Rebuild containers: APT_CACHE_SERVER=192.168.76.5 docker compose build --no-cache builder"
+echo "3. Run build: TARGET_PLATFORM=rpi3-bookworm make build"
 echo ""
 echo "Or use the full command with cache server detection:"
-echo 'if ping -c1 192.168.42.5 &>/dev/null; then export APT_CACHE_SERVER=192.168.42.5; fi && docker compose build --no-cache builder'
+echo 'if timeout 1 bash -c "cat < /dev/null > /dev/tcp/192.168.76.5/3142" &>/dev/null; then export APT_CACHE_SERVER=192.168.76.5; fi && ./scripts/build-ab2p.sh && docker compose build --no-cache builder'

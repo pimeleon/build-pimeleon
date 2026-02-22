@@ -557,7 +557,6 @@ load_ssh_config() {
     if [[ -f "$SSH_CONFIG" ]]; then
         source "$SSH_CONFIG"
     else
-        SSH_ETH1="yes"
         SSH_WLAN0="yes"
     fi
 }
@@ -568,7 +567,6 @@ save_ssh_config() {
 # SSH Interface Access Control
 # Managed by pim-config - do not edit manually
 # Set to 'yes' to allow SSH, 'no' to block
-SSH_ETH1=$SSH_ETH1
 SSH_WLAN0=$SSH_WLAN0
 EOF
 }
@@ -580,10 +578,6 @@ update_ssh_nftables() {
     cat > "$SSH_NFT" << 'EOF'
 # SSH access control rules - managed by pim-config
 EOF
-
-    if [[ "$SSH_ETH1" == "no" ]]; then
-        echo 'iifname "eth1" tcp dport 22 counter drop comment "SSH blocked on eth1"' >> "$SSH_NFT"
-    fi
 
     if [[ "$SSH_WLAN0" == "no" ]]; then
         echo 'iifname "wlan0" tcp dport 22 counter drop comment "SSH blocked on wlan0"' >> "$SSH_NFT"
@@ -601,35 +595,19 @@ menu_ssh_access() {
     load_ssh_config
 
     while true; do
-        local eth1_status="[ ]"
         local wlan0_status="[ ]"
-        [[ "$SSH_ETH1" == "yes" ]] && eth1_status="[*]"
         [[ "$SSH_WLAN0" == "yes" ]] && wlan0_status="[*]"
 
         local choice
         choice=$(whiptail --title "SSH Access Control" --menu \
-            "Toggle SSH access per interface:\n\n$eth1_status eth1 (Ethernet LAN)\n$wlan0_status wlan0 (WiFi AP)\n\nNote: SSH on eth0 (WAN) is always blocked." \
+            "Toggle SSH access per interface:\n\n$wlan0_status wlan0 (WiFi AP)\n\nNote: SSH on eth0 (WAN) is always blocked." \
             $WT_HEIGHT $WT_WIDTH $WT_MENU_HEIGHT \
-            "1" "Toggle eth1 SSH (currently: $SSH_ETH1)" \
-            "2" "Toggle wlan0 SSH (currently: $SSH_WLAN0)" \
+            "1" "Toggle wlan0 SSH (currently: $SSH_WLAN0)" \
             "B" "Back to System Settings" \
             3>&1 1>&2 2>&3) || break
 
         case $choice in
             1)
-                if [[ "$SSH_ETH1" == "yes" ]]; then
-                    SSH_ETH1="no"
-                else
-                    SSH_ETH1="yes"
-                fi
-                save_ssh_config
-                if update_ssh_nftables; then
-                    whiptail --msgbox "SSH on eth1: $SSH_ETH1\nFirewall rules updated." 10 50
-                else
-                    whiptail --msgbox "SSH config saved but firewall reload failed.\nChanges will apply on next reboot." 10 50
-                fi
-                ;;
-            2)
                 if [[ "$SSH_WLAN0" == "yes" ]]; then
                     SSH_WLAN0="no"
                 else

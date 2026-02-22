@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.6
 # Pimeleon Build Container
 
 # Stage 1: Use pre-built adblock2privoxy image
@@ -26,7 +25,7 @@ RUN if [ -n "$APT_CACHE_SERVER" ]; then \
 # Install base dependencies and build tools
 # APT caching handled by remote apt-cacher-ng at APT_CACHE_SERVER
 # Clean local cache after install to reduce image size
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     ansible \
     bc \
     bison \
@@ -84,9 +83,8 @@ RUN groupadd -g 999 docker && \
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install Python packages with cache mount
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip && \
+# Install Python packages
+RUN pip install --upgrade pip && \
     pip install \
     pyyaml \
     jinja2 \
@@ -131,7 +129,7 @@ FROM base AS development
 USER root
 
 # Install development and debugging tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     ansible-lint \
     dnsutils \
     htop \

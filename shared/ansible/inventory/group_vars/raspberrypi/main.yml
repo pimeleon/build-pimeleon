@@ -7,8 +7,7 @@ bootloader_type: "pi-firmware"
 # Kernel and firmware packages
 kernel_package: "raspberrypi-kernel"
 firmware_packages:
-  - libraspberrypi-bin
-  - libraspberrypi0
+  - raspberrypi-bootloader
   - firmware-brcm80211
 
 # Boot partition
@@ -21,7 +20,7 @@ hardware_features:
   spi: true
   i2c: true
   gpio: true
-  camera: true
-  audio: true
+  camera: false
+  audio: false
   wifi: true
-  bluetooth: true
+  bluetooth: false

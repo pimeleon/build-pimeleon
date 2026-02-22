@@ -24,6 +24,9 @@
   # PTR response
   piholePTR = "PI.HOLE"
 
+  # Log DNS queries and replies to pihole.log
+  queryLogging = false
+
   # Rate limiting
   rateLimit.count = 1000
   rateLimit.interval = 60
@@ -34,6 +37,11 @@
 
   [dns.cache]
     size = 10000
+
+  [dns.domain]
+    # The DNS domain used by your Pi-hole.
+    name = "{{ dns_domain | default('pimeleon.local') }}"
+    local = true
 
 [dhcp]
   # DHCP disabled - isc-dhcp-server handles this
@@ -51,7 +59,7 @@
 
 [misc]
   # Load additional dnsmasq config from /etc/dnsmasq.d/
-  etc_dnsmasq_d = true
+  etc_dnsmasq_d = false
 
   # Privacy level (0 = show everything)
   privacylevel = 0
@@ -60,3 +68,5 @@
   log.dnsmasq = "/var/log/pihole/pihole.log"
   log.ftl = "/var/log/pihole/FTL.log"
   database = "/etc/pihole/pihole-FTL.db"
+  gravity = "/etc/pihole/gravity.db"
+  gravity_tmp = "/tmp"

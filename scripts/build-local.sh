@@ -96,6 +96,9 @@ main() {
     check_deps
     source_common
 
+    # Setup cleanup trap
+    trap 'cleanup_on_exit' EXIT ERR INT TERM
+
     # Create work directory
     log_section "Setting up build environment"
     rm -rf "${WORK_DIR}"
@@ -120,17 +123,16 @@ main() {
         log_info "Stage 3 skipped (set ENABLE_STAGE3=true to enable)"
     fi
 
-    # Stage 4: Packaging (if enabled)
-    if [[ "${ENABLE_STAGE4:-false}" == "true" ]]; then
+    # Stage 4: Packaging and Metadata (CI/Release only)
+    if [[ -n "${CI:-}" || "${ENABLE_STAGE4:-false}" == "true" ]]; then
         log_section "Stage 4: Packaging image"
         "${BUILDER_SCRIPTS}/stage4-package.sh" "${WORK_DIR}" "${IMAGE_PATH}"
-    else
-        log_info "Stage 4 skipped (set ENABLE_STAGE4=true to enable)"
-    fi
 
-    # Generate metadata
-    log_section "Generating metadata"
-    generate_metadata "${IMAGE_PATH}"
+        log_section "Generating metadata"
+        generate_metadata "${IMAGE_PATH}"
+    else
+        log_info "Skipping Stage 4 (Packaging) and Metadata generation for local build"
+    fi
 
     # Cleanup
     log_section "Cleaning up"

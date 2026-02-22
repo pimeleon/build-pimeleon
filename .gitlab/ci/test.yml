@@ -1,0 +1,49 @@
+---
+# GitLab CI/CD - Testing
+# Smoke and Integration Tests
+
+test:smoke:
+  extends: .docker-job
+  stage: test
+  needs: ["build:pimeleon"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
+      when: never
+    - when: on_success
+  script:
+    - mkdir -p test-results
+    - |
+      docker run --rm \
+        --privileged \
+        -v $CI_PROJECT_DIR/output:/images:ro \
+        -v $CI_PROJECT_DIR/tests:/tests \
+        -v $CI_PROJECT_DIR/test-results:/results \
+        -e TEST_SUITE=smoke \
+        $TEST_IMAGE
+  artifacts:
+    when: always
+    paths:
+      - test-results/
+    reports:
+      junit: test-results/junit.xml
+    expire_in: 1 week
+
+test:integration:
+  extends: .docker-job
+  stage: test
+  needs: ["build:pimeleon"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^(feat|fix|chore|refactor|docs|test|style|perf|ci|build)\//'
+      when: never
+    - when: on_success
+  script:
+    - mkdir -p test-results
+    - |
+      docker run --rm \
+        --privileged \
+        -v $CI_PROJECT_DIR/output:/images:ro \
+        -v $CI_PROJECT_DIR/tests:/tests \
+        -v $CI_PROJECT_DIR/test-results:/results \
+        -e TEST_SUITE=integration \
+        $TEST_IMAGE
+  timeout: 30 minutes

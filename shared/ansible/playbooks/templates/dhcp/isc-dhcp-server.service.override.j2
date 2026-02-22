@@ -1,14 +1,4 @@
-# {{ ansible_managed }}
-# Ensure DHCP starts after WiFi interface and network are ready
-#
-# Problem: isc-dhcp-server fails when wlan0 doesn't exist yet
-# Solution: Wait for hostapd, the network interface device, and DNS services (for DDNS)
-
 [Unit]
-After=hostapd.service
-Wants=hostapd.service
-BindsTo=sys-subsystem-net-devices-{{ wifi_interface | default('wlan0') }}.device
-After=sys-subsystem-net-devices-{{ wifi_interface | default('wlan0') }}.device
-# Network and DNS dependencies for DDNS functionality
-After=network-online.target nss-lookup.target bind9.service
-Wants=network-online.target
+# Ensure DHCP starts after BIND9 (for DDNS) and hostapd (for WiFi interface)
+After=network-online.target bind9.service hostapd.service
+Wants=network-online.target bind9.service hostapd.service

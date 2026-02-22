@@ -1,7 +1,7 @@
 [Unit]
 Description=Pimeleon Nitro Proxy Server
-After=network.target pimeleon-api.service
-Wants=pimeleon-api.service
+After=network-online.target pimeleon-api.service
+Wants=network-online.target pimeleon-api.service
 
 [Service]
 Type=simple

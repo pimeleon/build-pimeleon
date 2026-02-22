@@ -1,7 +1,7 @@
 .PHONY: help build build-ab2p build-app build-all build-local build-docker test clean lint dev shell docs check-deps list-apps
 
-# Default app (can be overridden: make build APP=rpi4-bookworm)
-APP ?= rpi3-bookworm
+# Default platform (can be overridden: make build TARGET_PLATFORM=rpi4-bookworm)
+TARGET_PLATFORM ?= rpi3-bookworm
 PROFILE ?= development
 
 # Default target
@@ -10,21 +10,21 @@ help:
 	@echo "================================="
 	@echo ""
 	@echo "Build targets:"
-	@echo "  make build APP=<app>   - Build specified app (default: $(APP))"
-	@echo "  make build-all         - Build all apps"
-	@echo "  make build-prod        - Build with production profile"
-	@echo "  make list-apps         - List available apps"
-	@echo "  make check-deps        - Check local build dependencies"
+	@echo "  make build TARGET_PLATFORM=<platform>   - Build specified platform (default: $(TARGET_PLATFORM))"
+	@echo "  make build-all                          - Build all platforms"
+	@echo "  make build-prod                         - Build with production profile"
+	@echo "  make list-apps                          - List available apps"
+	@echo "  make check-deps                         - Check local build dependencies"
 	@echo ""
 	@echo "Test targets:"
-	@echo "  make test APP=<app>    - Run all tests for app"
-	@echo "  make test-smoke        - Run smoke tests only"
+	@echo "  make test TARGET_PLATFORM=<platform>    - Run all tests for platform"
+	@echo "  make test-smoke                         - Run smoke tests only"
 	@echo ""
 	@echo "Development:"
-	@echo "  make dev               - Start development environment"
-	@echo "  make shell             - Open shell in builder container"
-	@echo "  make lint              - Run linters"
-	@echo "  make clean             - Clean build artifacts"
+	@echo "  make dev                                - Start development environment"
+	@echo "  make shell                              - Open shell in builder container"
+	@echo "  make lint                               - Run linters"
+	@echo "  make clean                              - Clean build artifacts"
 	@echo ""
 	@echo "Available apps:"
 	@for app in apps/*/; do \
@@ -32,8 +32,8 @@ help:
 	done
 	@echo ""
 	@echo "Examples:"
-	@echo "  make build APP=rpi3-bookworm"
-	@echo "  make build APP=rpi4-bookworm PROFILE=production"
+	@echo "  make build TARGET_PLATFORM=rpi3-bookworm"
+	@echo "  make build TARGET_PLATFORM=rpi4-bookworm PROFILE=production"
 	@echo ""
 
 # List available apps
@@ -59,18 +59,20 @@ build-ab2p:
 	fi
 
 build-docker: build-ab2p
-	@echo "Building app: $(APP)"
-	@if [ ! -d "apps/$(APP)" ]; then \
-		echo "Error: App '$(APP)' not found"; \
+	@echo "Building platform: $(TARGET_PLATFORM)"
+	@if [ ! -d "apps/$(TARGET_PLATFORM)" ]; then \
+		echo "Error: Platform '$(TARGET_PLATFORM)' not found"; \
 		echo ""; \
 		$(MAKE) list-apps; \
 		exit 1; \
 	fi
-	docker compose build builder
-	PIMELEON_APP=$(APP) PIMELEON_PROFILE=$(PROFILE) docker compose run --rm builder
+	@if [ "$(SKIP_DOCKER_BUILD)" != "1" ]; then \
+		docker compose build builder; \
+	fi
+	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PROFILE) docker compose run --rm builder
 
 build-all:
-	@echo "Building all apps..."
+	@echo "Building all platforms..."
 	@for app in apps/*/; do \
 		[ -d "$$app" ] || continue; \
 		appname=$$(basename $$app); \
@@ -78,27 +80,27 @@ build-all:
 		echo "========================================"; \
 		echo "Building $$appname..."; \
 		echo "========================================"; \
-		$(MAKE) build APP=$$appname || exit 1; \
+		$(MAKE) build TARGET_PLATFORM=$$appname || exit 1; \
 	done
 	@echo ""
-	@echo "All apps built successfully!"
+	@echo "All platforms built successfully!"
 
 build-prod:
-	@echo "Building production image for $(APP)..."
+	@echo "Building production image for $(TARGET_PLATFORM)..."
 	$(MAKE) build PROFILE=production
 
 build-dev:
-	@echo "Building development image for $(APP)..."
+	@echo "Building development image for $(TARGET_PLATFORM)..."
 	$(MAKE) build PROFILE=development
 
 build-nocache: build-ab2p
-	@echo "Building $(APP) (no cache)..."
+	@echo "Building $(TARGET_PLATFORM) (no cache)..."
 	docker compose build --no-cache builder
-	PIMELEON_APP=$(APP) PIMELEON_PROFILE=$(PROFILE) docker compose run --rm builder
+	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PROFILE) docker compose run --rm builder
 
 build-local: check-deps
 	@echo "Building Pimeleon image (local)..."
-	sudo PIMELEON_APP=$(APP) ./shared/scripts/build.sh
+	sudo TARGET_PLATFORM=$(TARGET_PLATFORM) ./shared/scripts/build.sh
 
 check-deps:
 	@echo "Checking local build dependencies..."
@@ -106,24 +108,24 @@ check-deps:
 
 # Test targets
 test: build
-	@echo "Running full test suite for $(APP)..."
+	@echo "Running full test suite for $(TARGET_PLATFORM)..."
 	docker compose build tester
-	PIMELEON_APP=$(APP) docker compose run --rm -e TEST_SUITE=all tester
+	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=all tester
 
 test-smoke:
-	@echo "Running smoke tests for $(APP)..."
+	@echo "Running smoke tests for $(TARGET_PLATFORM)..."
 	docker compose build tester
-	PIMELEON_APP=$(APP) docker compose run --rm -e TEST_SUITE=smoke tester
+	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=smoke tester
 
 test-integration:
-	@echo "Running integration tests for $(APP)..."
+	@echo "Running integration tests for $(TARGET_PLATFORM)..."
 	docker compose build tester
-	PIMELEON_APP=$(APP) docker compose run --rm -e TEST_SUITE=integration tester
+	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=integration tester
 
 test-security:
-	@echo "Running security tests for $(APP)..."
+	@echo "Running security tests for $(TARGET_PLATFORM)..."
 	docker compose build tester
-	PIMELEON_APP=$(APP) docker compose run --rm -e TEST_SUITE=security tester
+	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=security tester
 
 # Development targets
 dev:
@@ -132,25 +134,37 @@ dev:
 	@echo "Development environment is ready. Use 'make shell' to enter."
 
 shell:
-	@echo "Opening shell in builder container for $(APP)..."
-	PIMELEON_APP=$(APP) docker compose run --rm builder bash
+	@echo "Opening shell in builder container for $(TARGET_PLATFORM)..."
+	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm builder bash
 
 # Linting targets
 lint: lint-yaml lint-shell lint-ansible
 
 lint-yaml:
 	@echo "Linting YAML files..."
-	@docker run --rm -v $(PWD):/workspace cytopia/yamllint -c .yamllint . 2>/dev/null || echo "yamllint not available"
+	@if command -v yamllint >/dev/null 2>&1; then \
+		yamllint -c .yamllint .; \
+	else \
+		docker run --rm -v $(PWD):/workspace cytopia/yamllint -c .yamllint . 2>/dev/null || echo "yamllint not available"; \
+	fi
 
 lint-shell:
 	@echo "Linting shell scripts..."
-	@docker run --rm -v $(PWD):/workspace koalaman/shellcheck-alpine \
-		find /workspace/shared/scripts -name "*.sh" -type f -exec shellcheck {} \; 2>/dev/null || echo "shellcheck not available"
+	@if command -v shellcheck >/dev/null 2>&1; then \
+		find shared/scripts -name "*.sh" -type f -exec shellcheck {} +; \
+	else \
+		docker run --rm -v $(PWD):/workspace koalaman/shellcheck-alpine \
+			find /workspace/shared/scripts -name "*.sh" -type f -exec shellcheck {} \; 2>/dev/null || echo "shellcheck not available"; \
+	fi
 
 lint-ansible:
 	@echo "Linting Ansible playbooks..."
-	@docker run --rm -v $(PWD):/workspace \
-		cytopia/ansible-lint shared/ansible/playbooks/*.yml 2>/dev/null || echo "ansible-lint not available"
+	@if command -v ansible-lint >/dev/null 2>&1; then \
+		ansible-lint shared/ansible/playbooks/; \
+	else \
+		docker run --rm -v $(PWD):/workspace \
+			cytopia/ansible-lint shared/ansible/playbooks/*.yml 2>/dev/null || echo "ansible-lint not available"; \
+	fi
 
 lint-docker:
 	@echo "Linting Dockerfiles..."
@@ -186,10 +200,10 @@ ps:
 
 # CI/CD simulation
 ci-local:
-	@echo "Running local CI pipeline for $(APP)..."
+	@echo "Running local CI pipeline for $(TARGET_PLATFORM)..."
 	$(MAKE) lint
-	$(MAKE) build APP=$(APP)
-	$(MAKE) test-smoke APP=$(APP)
+	$(MAKE) build TARGET_PLATFORM=$(TARGET_PLATFORM)
+	$(MAKE) test-smoke TARGET_PLATFORM=$(TARGET_PLATFORM)
 	@echo "Local CI pipeline completed!"
 
 # Version information

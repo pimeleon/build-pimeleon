@@ -1,0 +1,13 @@
+---
+# GitLab CI/CD Templates
+# Reusable job definitions
+
+# Docker job template with registry authentication
+# Runner has host docker socket mounted, no dind needed
+# Uses CI_REGISTRY_PASSWORD for read-write access (CI_JOB_TOKEN is read-only)
+.docker-job:
+  image: docker:latest
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
+  tags:
+    - containers

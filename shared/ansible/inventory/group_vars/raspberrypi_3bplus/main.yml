@@ -19,20 +19,17 @@ device_tree_overlays:
 
 # Network interfaces
 # WAN: eth0 (onboard, connects to upstream router/modem)
-# LAN: eth1 (optional USB dongle for wired clients)
 # WiFi: wlan0 (WiFi AP, wireless clients)
 wan_interface: "eth0"
-lan_interface: "eth1"
 wifi_interface: "wlan0"
 
-# Network performance (USB 2.0 limited to ~300Mbps)
+# Network performance
 ethernet_available: true
 ethernet_max_speed_mbps: 300
 wifi_max_speed_mbps: 100
 
 # CAKE QoS bandwidth limits (from working gw)
 wan_bandwidth: "200mbit"
-lan_bandwidth: "500mbit"
 wifi_bandwidth: "40mbit"
 
 # config.txt parameters
