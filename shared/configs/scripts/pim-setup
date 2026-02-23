@@ -391,6 +391,11 @@ apply_timezone() {
 restart_services() {
     log_info "Restarting network services..."
 
+    if [[ -n "${SSH_CONNECTION:-}" ]]; then
+        whiptail --title "SSH Connection Warning" --msgbox \
+            "You are connected via SSH. Restarting network services may cause a temporary disconnect.\n\nIf you lose connection, please wait a moment and then log back in to see the completion message." 12 60
+    fi
+
     whiptail --infobox "Applying configuration and restarting services...\n\nThis may take a moment." 8 50
 
     systemctl daemon-reload

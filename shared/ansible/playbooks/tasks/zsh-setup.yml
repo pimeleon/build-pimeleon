@@ -60,7 +60,8 @@
               echo "  Configuring system. Please wait..."
               echo "  Starting first-time setup wizard..."
               sleep 2
-              sudo /usr/local/bin/pim-setup
+              # Use || true to prevent parent shell from exiting if setup is cancelled
+              sudo /usr/local/bin/pim-setup || true
           elif [[ ! -f /var/lib/pimeleon/.pim-config.ran ]]; then
               echo "  Run 'sudo pim-config' for configuration menu"
           fi

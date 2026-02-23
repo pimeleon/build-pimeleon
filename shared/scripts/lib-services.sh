@@ -34,6 +34,8 @@ install_hostapd() {
         else
             log_info "Installing hostapd from APT (Development mode)"
             chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends hostapd"
+            # Create compatibility symlink for systemd service
+            chroot_run "${mount_point}" ln -sf /usr/sbin/hostapd /usr/local/bin/hostapd
         fi
     else
         log_info "hostapd not enabled in profile, skipping installation"
