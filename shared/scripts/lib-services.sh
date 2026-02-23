@@ -24,7 +24,7 @@ install_hostapd() {
 
             if [[ -x "${mount_point}/usr/local/bin/hostapd" ]]; then
                 log_info "hostapd compiled and installed successfully"
-                chroot_run "${mount_point}" /usr/local/bin/hostapd -v 2>&1 | head -3 || true
+                chroot_run "${mount_point}" /usr/local/bin/hostapd -v 2>&1 | head -3
             else
                 die "hostapd compilation failed - binary not found"
             fi
@@ -56,7 +56,7 @@ install_pihole() {
 
             if [[ -x "${mount_point}/usr/local/bin/pihole-FTL" ]]; then
                 log_info "Pi-hole FTL compiled and installed successfully"
-                chroot_run "${mount_point}" /usr/local/bin/pihole-FTL --version || true
+                chroot_run "${mount_point}" /usr/local/bin/pihole-FTL --version
             else
                 log_error "Pi-hole FTL compilation failed - binary not found"
             fi
@@ -161,7 +161,7 @@ install_tor() {
             chroot_run "${mount_point}" /tmp/build-tor.sh "${tor_version_val:-0.4.8.13}"
             if [[ -x "${mount_point}/usr/local/bin/tor" ]]; then
                 log_info "Tor compiled and installed successfully"
-                chroot_run "${mount_point}" /usr/local/bin/tor --version | head -1 || true
+                chroot_run "${mount_point}" /usr/local/bin/tor --version | head -1
             else
                 die "Tor compilation failed - binary not found"
             fi

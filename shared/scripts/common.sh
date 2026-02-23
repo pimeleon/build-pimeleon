@@ -649,8 +649,7 @@ list_apps() {
     local apps_dir="${workspace_dir}/apps"
 
     if [[ ! -d "$apps_dir" ]]; then
-        log_warn "No apps directory found at: $apps_dir"
-        return 1
+        die "FATAL: No apps directory found at: $apps_dir"
     fi
 
     echo ""
