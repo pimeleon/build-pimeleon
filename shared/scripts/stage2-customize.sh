@@ -16,6 +16,7 @@ trap 'cleanup_on_exit' EXIT ERR INT TERM
 
 WORK_DIR=$1
 IMAGE_PATH=$2
+CLEANUP_IMAGE_PATH="${IMAGE_PATH}"
 MOUNT_POINT="${WORK_DIR}/mount"
 BOOT_MOUNT="${WORK_DIR}/boot"
 IMAGE_NAME="pimeleon-${TARGET_PLATFORM:-rpi3-bookworm}"
@@ -35,10 +36,6 @@ BOOT_MOUNT="${MOUNT_POINT}/boot"
 
 # Setup chroot
 setup_chroot "${MOUNT_POINT}"
-
-# Protect resolv.conf from systemd-resolved dpkg hooks converting it to a dangling symlink
-# See: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1020277
-sudo chattr +i "${MOUNT_POINT}/etc/resolv.conf" 2>/dev/null || true
 
 # Configure APT cache for chroot environment early
 configure_chroot_apt_proxy "${MOUNT_POINT}"
@@ -63,7 +60,7 @@ SYSTEM_PKGS=(
     "systemd" "systemd-sysv" "systemd-resolved" "udev" "dbus" "policykit-1"
     "locales" "locales-all" "tzdata" "fake-hwclock" "cron" "rsyslog" "logrotate"
     "sudo" "parted" "pkg-config" "ca-certificates" "apt-transport-https"
-    "openssh-server" "zram-tools" "dphys-swapfile"
+    "openssh-server" "zram-tools" "dphys-swapfile" "at" "smartmontools"
 )
 
 SHELL_PKGS=(
@@ -108,6 +105,16 @@ chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
     "${MONITOR_PKGS[@]}" \
     "${HARDWARE_PKGS[@]}" \
     "${BUILD_DEPS[@]}"
+
+# Restore and protect resolv.conf (systemd-resolved might have converted it to a symlink)
+log_info "Restoring and protecting resolv.conf"
+sudo rm -f "${MOUNT_POINT}/etc/resolv.conf"
+sudo tee "${MOUNT_POINT}/etc/resolv.conf" > /dev/null <<EOF
+# DNS for chroot build environment (restored after package installation)
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+EOF
+sudo chattr +i "${MOUNT_POINT}/etc/resolv.conf" 2>/dev/null || true
 
 # Verify Python3 installation (required for Ansible)
 log_info "Verifying Python3 installation..."
@@ -567,15 +574,16 @@ if [[ -f "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy" ]]; then
     sudo rm -f "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy"
 fi
 
-# Configure static resolv.conf for production (BIND9 handles DNS)
+# Configure static resolv.conf for production
 # This must be done AFTER all network operations (git clone, apt, etc.)
 log_info "Configuring static DNS resolver for production"
 sudo chattr -i "${MOUNT_POINT}/etc/resolv.conf" 2>/dev/null || true
 sudo rm -f "${MOUNT_POINT}/etc/resolv.conf"
 sudo tee "${MOUNT_POINT}/etc/resolv.conf" > /dev/null <<EOF
-# Static DNS configuration - BIND9 on localhost
-nameserver 127.0.0.1
-options edns0 trust-ad
+# DNS for chroot build environment
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+# nameserver 127.0.0.1
 EOF
 sudo chmod 644 "${MOUNT_POINT}/etc/resolv.conf"
 
