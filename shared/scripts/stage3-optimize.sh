@@ -172,21 +172,28 @@ safe_rm "${MOUNT_POINT}/usr/share/lintian/*"
 
 # Remove unused locales except supported ones
 sudo find "${MOUNT_POINT}/usr/share/locale" -mindepth 1 -maxdepth 1 \
-    ! -name 'en*' ! -name 'es*' ! -name 'ru*' ! -name 'uk*' ! -name 'zh*' ! -name 'ko*' \
+    ! -name 'ar*' ! -name 'en*' ! -name 'es*' ! -name 'fa*' ! -name 'fr*' ! -name 'id*' ! -name 'pt*' ! -name 'ru*' ! -name 'tr*' ! -name 'uk*' ! -name 'zh*' ! -name 'ko*' \
     -exec rm -rf {} \; 2>/dev/null || true
 
 # Remove SSH host keys (will be regenerated on first boot)
 safe_rm "${MOUNT_POINT}/etc/ssh/ssh_host_*"
 
-# Configure locales (en_IE default, plus Spanish, Russian, Ukrainian, Chinese, Korean)
+# Configure locales
 log_info "Configuring locales"
 sudo tee "${MOUNT_POINT}/etc/locale.gen" > /dev/null <<EOF
+ar_SA.UTF-8 UTF-8
 en_IE.UTF-8 UTF-8
 en_US.UTF-8 UTF-8
 es_ES.UTF-8 UTF-8
+fa_IR.UTF-8 UTF-8
+fr_FR.UTF-8 UTF-8
+id_ID.UTF-8 UTF-8
+pt_BR.UTF-8 UTF-8
 ru_RU.UTF-8 UTF-8
+tr_TR.UTF-8 UTF-8
 uk_UA.UTF-8 UTF-8
 zh_CN.UTF-8 UTF-8
+zh_TW.UTF-8 UTF-8
 ko_KR.UTF-8 UTF-8
 EOF
 chroot_run "${MOUNT_POINT}" locale-gen
