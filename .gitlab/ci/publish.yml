@@ -54,15 +54,18 @@ publish:pages:
     paths:
       - public
 
-# Documentation preview for Merge Requests (artifact-based, no review environment)
-publish:docs-preview:
+# Documentation preview for project builds (artifact-based)
+publish-project-docs:
   stage: publish
   image: python:3.11-slim
   tags:
     - lightweight
   needs: ["lint:yaml"]
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
   before_script:
     - echo "Acquire::http::Proxy \"http://${APT_PROXY}\";" > /etc/apt/apt.conf.d/01proxy
   script:
