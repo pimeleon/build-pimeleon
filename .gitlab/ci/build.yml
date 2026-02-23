@@ -58,12 +58,9 @@ build:containers:
   extends: .docker-job
   stage: build
   rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-      changes:
-        - containers/**/*
-        - shared/containers/**/*
-        - .gitlab/ci/build.yml
-        - .gitlab-ci.yml
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.*)$/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
     - when: never
