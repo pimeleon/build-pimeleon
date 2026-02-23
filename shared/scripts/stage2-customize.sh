@@ -396,20 +396,6 @@ if ! curl -fsSL -o "${DOWNLOAD_DIR}/dnscrypt-proxy.tar.gz" "${DNSCRYPT_URL}"; th
     fi
 fi
 
-# Download Pi-hole FTL (ARM binary - fallback if not building from source)
-PIHOLE_ARCH="armhf-linux-gnu"
-if [[ "${RPI_ARCH}" == "arm64" ]]; then
-    PIHOLE_ARCH="aarch64-linux-gnu"
-fi
-log_info "Downloading Pi-hole FTL for ${PIHOLE_ARCH}"
-PIHOLE_URL="https://github.com/pi-hole/FTL/releases/latest/download/pihole-FTL-${PIHOLE_ARCH}"
-if ! curl -fsSL -o "${DOWNLOAD_DIR}/pihole-FTL" "${PIHOLE_URL}"; then
-    if is_service_enabled "pihole" 2>/dev/null; then
-        log_warn "Failed to download Pi-hole FTL binary from GitHub."
-    fi
-fi
-
-
 # Pi-hole FTL is built from source (see build-pihole-ftl.sh)
 # Tor is installed from official Tor Project repository (see tor-setup.yml)
 
