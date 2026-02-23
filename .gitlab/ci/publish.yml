@@ -15,6 +15,7 @@ publish:image:
       artifacts: true
     - job: test:smoke
       artifacts: false
+      optional: true
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_COMMIT_BRANCH == "develop"'
