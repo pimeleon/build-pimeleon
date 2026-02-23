@@ -130,7 +130,7 @@ cleanup_on_exit() {
 # Check if a service is enabled in the current profile
 is_service_enabled() {
     local service_name=$1
-    local ansible_dir="${WORKSPACE_DIR:-/workspace}/shared/ansible"
+    local ansible_dir="${ANSIBLE_DIR:-/ansible}"
     local profile_path="${ansible_dir}/vars/common/profiles/${PIMELEON_PROFILE:-development}.yml"
 
     if [[ ! -f "$profile_path" ]]; then
@@ -149,8 +149,9 @@ is_service_enabled() {
 # Check if a service should be built from source in the current profile
 is_build_from_source_enabled() {
     local service_name=$1
-    local profile_path="${ANSIBLE_DIR:-/workspace/shared/ansible}/vars/common/profiles/${PIMELEON_PROFILE:-development}.yml"
-    local versions_path="${ANSIBLE_DIR:-/workspace/shared/ansible}/vars/common/versions.yml"
+    local ansible_dir="${ANSIBLE_DIR:-/ansible}"
+    local profile_path="${ansible_dir}/vars/common/profiles/${PIMELEON_PROFILE:-development}.yml"
+    local versions_path="${ansible_dir}/vars/common/versions.yml"
 
     # Check profile first, then fallback to versions.yml
     if python3 -c "
@@ -178,32 +179,6 @@ sys.exit(0 if val == True else 1)
     else
         return 1
     fi
-}
-
-# Check if a service should be built from source in the current profile
-is_build_from_source_enabled() {
-    local service_name=$1
-    local ansible_dir="${WORKSPACE_DIR:-/workspace}/shared/ansible"
-
-    # First check profile override
-    local profile_path="${ansible_dir}/vars/common/profiles/${PIMELEON_PROFILE:-development}.yml"
-    if [[ -f "$profile_path" ]]; then
-        if grep -A 50 "build_from_source:" "$profile_path" 2>/dev/null | grep -q "^\s*${service_name}:\s*true"; then
-            return 0
-        elif grep -A 50 "build_from_source:" "$profile_path" 2>/dev/null | grep -q "^\s*${service_name}:\s*false"; then
-            return 1
-        fi
-    fi
-
-    # Fallback to common versions.yml
-    local versions_path="${ansible_dir}/vars/common/versions.yml"
-    if [[ -f "$versions_path" ]]; then
-        if grep -A 50 "build_from_source:" "$versions_path" 2>/dev/null | grep -q "^\s*${service_name}:\s*true"; then
-            return 0
-        fi
-    fi
-
-    return 1 # Default to false
 }
 
 # Cleanup stale mounts from previous failed builds
