@@ -21,7 +21,7 @@ services:
       # Monorepo structure - mount entire workspace
       - .:/workspace:ro
       - ./shared/scripts:/scripts:ro
-      - ./shared/ansible:/ansible:ro
+      - ./ansible:/ansible:ro
       # Docker volumes for caching
       - apt-cache:/var/cache/apt
       - pip-cache:/root/.cache/pip

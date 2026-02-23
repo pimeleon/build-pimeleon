@@ -148,12 +148,12 @@ EOF
 # Install Tor (source or apt)
 install_tor() {
     local mount_point=$1
-    local shared_ansible_dir=$2
     if is_service_enabled "tor" 2>/dev/null; then
         if is_build_from_source_enabled "tor" 2>/dev/null; then
             log_info "Building Tor from source (Production mode)"
             local tor_version_val
-            tor_version_val=$(grep "tor:" "${shared_ansible_dir}/vars/common/versions.yml" | head -1 | awk '{print $2}' | tr -d '"')
+            local ansible_dir="${ANSIBLE_DIR:-/ansible}"
+            tor_version_val=$(grep "tor:" "${ansible_dir}/vars/common/versions.yml" | head -1 | awk '{print $2}' | tr -d '"')
             sudo cp /scripts/build-tor.sh "${mount_point}/tmp/build-tor.sh"
             sudo chmod +x "${mount_point}/tmp/build-tor.sh"
             chroot_run "${mount_point}" /tmp/build-tor.sh "${tor_version_val:-0.4.8.13}"

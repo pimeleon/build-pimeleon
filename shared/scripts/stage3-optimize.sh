@@ -23,80 +23,71 @@ LOOP_DEVICE="${CLEANUP_LOOP_DEVICE}"
 
 # Enable services (without chroot - create symlinks directly)
 # This runs after Ansible has installed and configured all services
-log_info "Enabling services"
+log_info "Enabling services based on profile configuration"
 
 MULTI_USER_WANTS="${MOUNT_POINT}/etc/systemd/system/multi-user.target.wants"
 sudo mkdir -p "${MULTI_USER_WANTS}"
 
-# Services list matching the working reference build
-SERVICES_TO_ENABLE=(
-    # Core infrastructure
-    "ssh"
-    "systemd-networkd"
-    "nftables"
-    "rsyslog"
-    "cron"
-    "fake-hwclock"
-    "e2scrub_reap"
-    "unattended-upgrades"
-    "atd"
-    "zramswap"
-    "sysstat"
-    "smartmontools"
-    "vnstat"
-    "atop"
-    "atopacct"
+# Map of systemd service name to profile key
+# Format: "service_name:profile_key" (profile_key 'none' means always enable)
+SERVICES_MAPPING=(
+    # Core infrastructure (mostly always enabled)
+    "ssh:ssh"
+    "systemd-networkd:networkd"
+    "nftables:firewall"
+    "rsyslog:none"
+    "cron:none"
+    "fake-hwclock:none"
+    "e2scrub_reap:none"
+    "unattended-upgrades:none"
+    "atd:none"
+    "zramswap:zram"
+    "sysstat:none"
+    "smartmontools:none"
+    "vnstat:none"
+    "atop:none"
+    "atopacct:none"
     # Network services
-    "hostapd"
-    "named"
-    "fail2ban"
-    "wpa_supplicant"
-    "avahi-daemon"
-    "network-optimization"
-    # Proxy services
-    "privoxy"
-    "squid"
-    "tor"
+    "hostapd:hostapd"
+    "named:dns_server"
+    "fail2ban:fail2ban"
+    "wpa_supplicant:networkd"
+    "avahi-daemon:avahi"
+    "network-optimization:none"
+    # Proxy & Adblock
+    "privoxy:privoxy"
+    "squid:squid"
+    "tor:tor"
+    "tor@default:tor"
+    "dnscrypt-proxy:dnscrypt_proxy"
+    "pihole-FTL:pihole"
     # Pimeleon application
-    "pimeleon-api"
-    "pimeleon-proxy"
-    "pim-setup"
-    "firstboot"
+    "pimeleon-api:pimeleon_api"
+    "pimeleon-proxy:pimeleon_api"
+    "pim-setup:none"
+    "firstboot:none"
 )
 
-# Optional services - only enable if configured in profile
-# Uses is_service_enabled function from common.sh
-if is_service_enabled "dnscrypt_proxy"; then
-    SERVICES_TO_ENABLE+=("dnscrypt-proxy")
-fi
-if is_service_enabled "privoxy"; then
-    SERVICES_TO_ENABLE+=("privoxy")
-fi
-if is_service_enabled "squid"; then
-    SERVICES_TO_ENABLE+=("squid")
-fi
-if is_service_enabled "tor"; then
-    SERVICES_TO_ENABLE+=("tor@default")
-fi
-if is_service_enabled "pihole"; then
-    SERVICES_TO_ENABLE+=("pihole-FTL")
-fi
+for mapping in "${SERVICES_MAPPING[@]}"; do
+    service="${mapping%%:*}"
+    profile_key="${mapping#*:}"
 
-MULTI_USER_WANTS="${MOUNT_POINT}/etc/systemd/system/multi-user.target.wants"
-sudo mkdir -p "${MULTI_USER_WANTS}"
+    # Check if service should be enabled
+    if [[ "$profile_key" != "none" ]]; then
+        if ! is_service_enabled "$profile_key"; then
+            log_info "Service $service is disabled in profile, skipping."
+            continue
+        fi
+    fi
 
-for service in "${SERVICES_TO_ENABLE[@]}"; do
-    SERVICE_FILE=""
     SEARCH_NAME="${service}"
     if [[ "${service}" == *"@"* ]]; then
         SEARCH_NAME="${service%%@*}@"
     fi
 
-    # Robust discovery: Use find INSIDE the chroot to locate the service unit.
-    # This correctly handles Merged-/usr symlinks (/lib -> /usr/lib).
     log_info "Searching for service: ${service}"
 
-    # We use a helper variable to get the relative path from the chroot root
+    # Robust discovery: Use find INSIDE the chroot to locate the service unit.
     REL_SERVICE_PATH=$(chroot_run "${MOUNT_POINT}" find /lib/systemd/system /usr/lib/systemd/system /etc/systemd/system -name "${SEARCH_NAME}.service" -print -quit 2>/dev/null || true)
 
     if [[ -n "${REL_SERVICE_PATH}" ]]; then
@@ -104,16 +95,18 @@ for service in "${SERVICES_TO_ENABLE[@]}"; do
         # Create symlink relative to the image's filesystem
         sudo ln -sf "${REL_SERVICE_PATH}" "${MULTI_USER_WANTS}/${service}.service"
     else
-        # Fallback/Diagnostic
+        # Fallback/Diagnostic for legacy Pi-hole or specific cases
         if [[ "${service}" == "pihole-FTL" ]]; then
              log_info "Attempting legacy Pi-hole enablement..."
              chroot_run "${MOUNT_POINT}" systemctl enable pihole-FTL 2>/dev/null || true
         else
-             log_warn "Service not found: ${service}. (Checked standard systemd paths in chroot)"
+             # CRITICAL: Missing service that is supposed to be enabled is a fatal error
+             log_error "FATAL: Service not found: ${service}. (Checked standard systemd paths in chroot)"
              if [[ "${DEBUG:-0}" == "1" ]]; then
                  log_info "DEBUG: Listing all service files in chroot for diagnostics:"
                  chroot_run "${MOUNT_POINT}" find /lib/systemd/system /usr/lib/systemd/system /etc/systemd/system -name "*.service" | grep "${SEARCH_NAME}" || true
              fi
+             die "Build failed: Required service '${service}' not found in image."
         fi
     fi
 done

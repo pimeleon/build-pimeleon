@@ -8,7 +8,7 @@ publish-project-docs:
   image: python:3.11-slim
   tags:
     - lightweight
-  needs: ["lint:yaml"]
+  needs: ["build:pimeleon"]
   rules:
     # Run on develop branch push
     - if: '$CI_COMMIT_BRANCH == "develop"'
@@ -39,7 +39,7 @@ publish-project-docs:
 # Trigger preview site build on downstream repository
 trigger-docs-preview:
   stage: docs
-  needs: ["lint:yaml"]
+  needs: ["build:pimeleon"]
   trigger:
     project: pimeleon/pimeleon-site
     branch: preview
@@ -65,7 +65,7 @@ trigger-docs-preview:
 # Trigger production site build on downstream repository
 trigger-docs-production:
   stage: docs
-  needs: ["lint:yaml"]
+  needs: ["build:pimeleon"]
   trigger:
     project: pimeleon/pimeleon-site
     branch: develop
