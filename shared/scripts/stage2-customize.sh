@@ -132,12 +132,12 @@ chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
 # Verify Pi boot firmware was installed to boot partition
 log_info "Verifying Pi boot firmware installation"
 FIRMWARE_OK=true
-[[ -f "${BOOT_MOUNT}/bootcode.bin" ]] || { log_warn "bootcode.bin not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/start.elf" ]] || { log_warn "start.elf not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/fixup.dat" ]] || { log_warn "fixup.dat not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/kernel7.img" ]] || { log_warn "kernel7.img not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/bcm2710-rpi-3-b-plus.dtb" ]] || { log_warn "Pi 3B+ device tree not found"; FIRMWARE_OK=false; }
-[[ -d "${BOOT_MOUNT}/overlays" ]] || { log_warn "Boot overlays not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/bootcode.bin" ]] || { log_error "bootcode.bin not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/start.elf" ]] || { log_error "start.elf not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/fixup.dat" ]] || { log_error "fixup.dat not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/kernel7.img" ]] || { log_error "kernel7.img not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/bcm2710-rpi-3-b-plus.dtb" ]] || { log_error "Pi 3B+ device tree not found"; FIRMWARE_OK=false; }
+[[ -d "${BOOT_MOUNT}/overlays" ]] || { log_error "Boot overlays not found"; FIRMWARE_OK=false; }
 if [[ "$FIRMWARE_OK" == "true" ]]; then
     log_info "All Pi boot firmware files verified"
 else
@@ -179,7 +179,7 @@ log_info "Generating Privoxy ad-blocking filters"
 if [[ -x /scripts/generate-privoxy-filters.sh ]]; then
     /scripts/generate-privoxy-filters.sh "${MOUNT_POINT}"
 else
-    log_warn "Privoxy filter generator not found, skipping"
+    die "FATAL: Privoxy filter generator not found at /scripts/generate-privoxy-filters.sh"
 fi
 
 # Disable NetworkManager (Bookworm default) in favor of systemd-networkd
@@ -305,7 +305,11 @@ fi
 # Copy downloads into chroot for Ansible to find
 log_info "Copying downloads into chroot"
 sudo mkdir -p "${MOUNT_POINT}/tmp/pimeleon-downloads"
-sudo cp -r "${DOWNLOAD_DIR}"/* "${MOUNT_POINT}/tmp/pimeleon-downloads/" 2>/dev/null || true
+if [[ -n "$(ls -A "${DOWNLOAD_DIR}" 2>/dev/null)" ]]; then
+    sudo cp -r "${DOWNLOAD_DIR}"/* "${MOUNT_POINT}/tmp/pimeleon-downloads/"
+else
+    log_info "No files found in ${DOWNLOAD_DIR} to copy"
+fi
 sudo chmod -R 755 "${MOUNT_POINT}/tmp/pimeleon-downloads"
 
 # Install ngrok (for remote access tunneling)
@@ -406,7 +410,7 @@ if [[ -d "${PIMELEON_API_SRC}" ]] && [[ -f "${PIMELEON_API_SRC}/requirements.txt
     sudo rsync -a --exclude '__pycache__' --exclude '*.pyc' --exclude 'logs' --exclude 'venv' --exclude '.env' --exclude '.env.example' "${PIMELEON_API_SRC}/" "${PIMELEON_API_DEST}/"
     log_info "Python FastAPI server copied: $(du -sh "${PIMELEON_API_DEST}" | cut -f1)"
 else
-    log_warn "Python FastAPI server not found at ${PIMELEON_API_SRC}, skipping"
+    die "FATAL: Python FastAPI server not found at ${PIMELEON_API_SRC}"
 fi
 
 # Copy Nitro proxy if available
@@ -416,7 +420,7 @@ if [[ -d "${PIMELEON_PROXY_SRC}" ]] && [[ -f "${PIMELEON_PROXY_SRC}/index.mjs" ]
     sudo rsync -a --exclude 'node_modules' --exclude '.nuxt' --exclude 'logs' "${PIMELEON_PROXY_SRC}/" "${PIMELEON_PROXY_DEST}/"
     log_info "Nitro proxy copied: $(du -sh "${PIMELEON_PROXY_DEST}" | cut -f1)"
 else
-    log_warn "Nitro proxy not found at ${PIMELEON_PROXY_SRC}, skipping"
+    die "FATAL: Nitro proxy not found at ${PIMELEON_PROXY_SRC}"
 fi
 
 # Copy Quasar SPA if available
@@ -426,7 +430,7 @@ if [[ -d "${PIMELEON_UI_SRC}" ]] && [[ -f "${PIMELEON_UI_SRC}/index.html" ]]; th
     sudo rsync -a --exclude 'node_modules' --exclude '.quasar' --exclude 'logs' "${PIMELEON_UI_SRC}/" "${PIMELEON_UI_DEST}/"
     log_info "Quasar SPA copied: $(du -sh "${PIMELEON_UI_DEST}" | cut -f1)"
 else
-    log_warn "Quasar SPA not found at ${PIMELEON_UI_SRC}, skipping"
+    die "FATAL: Quasar SPA not found at ${PIMELEON_UI_SRC}"
 fi
 
 # Set interim ownership to root:root for chroot operations
@@ -493,20 +497,24 @@ EOF
     if [[ -d "${SHARED_VARS_DIR}/common" ]]; then
         log_info "Loading shared common vars from: ${SHARED_VARS_DIR}/common"
         find "${SHARED_VARS_DIR}/common" -maxdepth 1 -not -name profiles -not -path "${SHARED_VARS_DIR}/common" \
-            -exec cp -R {} "${WORK_DIR}/group_vars/all/" \; 2>/dev/null || true
+            -exec cp -R {} "${WORK_DIR}/group_vars/all/" \;
     fi
 
     # Layer 2: Copy platform vars (raspberrypi family)
     if [[ -d "${SHARED_VARS_DIR}/platform/raspberrypi" ]]; then
         log_info "Loading platform vars from: ${SHARED_VARS_DIR}/platform/raspberrypi"
-        cp -R "${SHARED_VARS_DIR}/platform/raspberrypi/"* "${WORK_DIR}/group_vars/raspberrypi/" 2>/dev/null || true
+        if [[ -n "$(ls -A "${SHARED_VARS_DIR}/platform/raspberrypi/" 2>/dev/null)" ]]; then
+            cp -R "${SHARED_VARS_DIR}/platform/raspberrypi/"* "${WORK_DIR}/group_vars/raspberrypi/"
+        fi
     fi
 
     # Layer 3: Copy app-specific vars (highest priority - overrides shared)
     APP_VARS_DIR="${WORKSPACE_DIR:-/workspace}/apps/${TARGET_PLATFORM}/vars"
     if [[ -d "${APP_VARS_DIR}" ]]; then
         log_info "Loading app-specific vars from: ${APP_VARS_DIR}"
-        cp -R "${APP_VARS_DIR}/"* "${WORK_DIR}/group_vars/${PLATFORM_GROUP}/" 2>/dev/null || true
+        if [[ -n "$(ls -A "${APP_VARS_DIR}/" 2>/dev/null)" ]]; then
+            cp -R "${APP_VARS_DIR}/"* "${WORK_DIR}/group_vars/${PLATFORM_GROUP}/"
+        fi
     fi
 
     # Copy profile vars to all group
@@ -530,7 +538,7 @@ EOF
             "$playbook" 2>&1 | sudo tee -a "${ANSIBLE_LOG_FILE}" || die "Playbook failed: $playbook. See ${ANSIBLE_LOG_FILE} for details."
     done
 else
-    log_warn "No Ansible playbooks found at: ${PLAYBOOKS_DIR}"
+    die "FATAL: No Ansible playbooks found at: ${PLAYBOOKS_DIR}"
 fi
 
 # Copy custom configs if available
@@ -539,17 +547,17 @@ if [[ -d "${CONFIG_DIR}" ]]; then
 
     # Network configs
     if [[ -d "${CONFIG_DIR}/network" ]] && [[ -n "$(ls -A "${CONFIG_DIR}/network"/* 2>/dev/null)" ]]; then
-        sudo cp -R "${CONFIG_DIR}/network/"* "${MOUNT_POINT}/etc/network/" || true
+        sudo cp -R "${CONFIG_DIR}/network/"* "${MOUNT_POINT}/etc/network/"
     fi
 
     # Security configs
     if [[ -d "${CONFIG_DIR}/security" ]] && [[ -n "$(ls -A "${CONFIG_DIR}/security"/* 2>/dev/null)" ]]; then
-        sudo cp -R "${CONFIG_DIR}/security/"* "${MOUNT_POINT}/etc/" || true
+        sudo cp -R "${CONFIG_DIR}/security/"* "${MOUNT_POINT}/etc/"
     fi
 
     # Service configs
     if [[ -d "${CONFIG_DIR}/services" ]] && [[ -n "$(ls -A "${CONFIG_DIR}/services"/* 2>/dev/null)" ]]; then
-        sudo cp -R "${CONFIG_DIR}/services/"* "${MOUNT_POINT}/etc/" || true
+        sudo cp -R "${CONFIG_DIR}/services/"* "${MOUNT_POINT}/etc/"
     fi
 fi
 
