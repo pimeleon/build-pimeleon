@@ -47,6 +47,9 @@ test-results/
 coverage/
 .coverage
 htmlcov/
+tests/results/
+tests/__pycache__/
+tests/.pytest_cache/
 
 # Security
 *.key
@@ -74,8 +77,6 @@ vendor/
 shared/ansible/playbooks/files/
 
 # Pimeleon build system
-*test*.*
-!/.gitlab/ci/*test*.*
 benchmarks/*
 output/*
 
