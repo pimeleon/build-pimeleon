@@ -2,8 +2,44 @@
 # GitLab CI/CD - Docs Triggers
 # External documentation site triggers
 
+# Build MkDocs site and provide artifact preview (internal to project)
+publish-project-docs:
+  stage: docs
+  image: python:3.11-slim
+  tags:
+    - lightweight
+  needs: ["lint:yaml"]
+  rules:
+    # Run on develop branch push
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
+    # Run on release branch push (merge to release/*)
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
+    # Run on MRs targeting develop or release branches
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
+  before_script:
+    - echo "Acquire::http::Proxy \"http://${APT_PROXY}\";" > /etc/apt/apt.conf.d/01proxy
+  script:
+    - apt-get -qy update && apt-get -q install -y --no-install-recommends git
+    - pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin
+    - mkdocs build -d public
+  artifacts:
+    paths:
+      - public
+    expire_in: 1 week
+
+# Trigger preview site build on downstream repository
 trigger-docs-preview:
   stage: docs
+  needs: ["lint:yaml"]
   trigger:
     project: pimeleon/pimeleon-site
     branch: preview
@@ -15,13 +51,21 @@ trigger-docs-preview:
     name: documentation/preview
     url: https://preview.pimeleon-docs.pages.dev
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Trigger on MRs targeting develop or release branches
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
+    # Trigger on release branch push (merge to release/*)
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       changes:
         - docs/**/*
         - mkdocs.yml
 
+# Trigger production site build on downstream repository
 trigger-docs-production:
   stage: docs
+  needs: ["lint:yaml"]
   trigger:
     project: pimeleon/pimeleon-site
     branch: develop
