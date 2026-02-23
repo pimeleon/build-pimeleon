@@ -13,6 +13,7 @@ setup:platform:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.*)$/'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
   script:
     - |
       if [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ]; then
@@ -24,6 +25,9 @@ setup:platform:
           PLATFORM="rpi3-bookworm"
           PROFILE="development"
         fi
+      elif [ "$CI_PIPELINE_SOURCE" == "web" ]; then
+        PLATFORM="${TARGET_PLATFORM:-rpi3-bookworm}"
+        PROFILE="${PIMELEON_PROFILE:-production}"
       else
         if [[ "$CI_COMMIT_BRANCH" =~ ^release/ ]]; then
           PLATFORM=$(echo "$CI_COMMIT_BRANCH" | sed 's|^release/||')
@@ -55,6 +59,7 @@ warm-cache:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.*)$/'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
   cache:
     key: "base-system-${TARGET_PLATFORM}"
     paths:
@@ -75,23 +80,18 @@ warm-cache:
 build:containers:
   extends: .docker-job
   stage: build
+  needs:
+    - job: setup:platform
+      artifacts: true
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-      variables:
-        DEPLOY_ENV: "cicd production environment"
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.*)$/'
-      variables:
-        DEPLOY_ENV: "cicd development environment"
     - if: '$CI_COMMIT_BRANCH == "develop"'
-      variables:
-        DEPLOY_ENV: "cicd development environment"
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
-      variables:
-        DEPLOY_ENV: "cicd development environment"
     - when: never
   environment:
-    name: $DEPLOY_ENV
+    name: cicd/$PIMELEON_PROFILE
   script:
     - |
       # Prioritize local Dockerfiles if they exist in the branch root
@@ -201,19 +201,10 @@ build:pimeleon:
   extends: .build-pimeleon
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-      variables:
-        BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:latest
-        DEPLOY_ENV: "cicd production environment"
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.*)$/'
-      variables:
-        BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:latest
-        DEPLOY_ENV: "cicd development environment"
     - if: '$CI_COMMIT_BRANCH == "develop"'
-      variables:
-        BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:latest
-        DEPLOY_ENV: "cicd development environment"
   environment:
-    name: $DEPLOY_ENV
+    name: cicd/$PIMELEON_PROFILE
 
 # Custom build — manually triggered via Web/API with configurable variables
 build:custom:
@@ -229,8 +220,12 @@ build:custom:
     PIMELEON_PROFILE: "production"
     DEBUG: "0"
   needs:
+    - job: setup:platform
+      artifacts: true
     - job: build:containers
       optional: true
+  environment:
+    name: cicd/$PIMELEON_PROFILE
   cache:
     key: "base-system-${TARGET_PLATFORM}"
     paths:
