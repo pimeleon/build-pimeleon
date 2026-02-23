@@ -381,6 +381,8 @@ fi
 log_info "Building Pimeleon UI and API (${PIMELEON_PROFILE:-development} mode, branch: ${PIMELEON_UI_BRANCH})..."
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
+# Ensure jose is present in the API package
+pnpm --filter "@pi-router/api" add jose
 NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm install --frozen-lockfile
 NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm build
 popd > /dev/null
