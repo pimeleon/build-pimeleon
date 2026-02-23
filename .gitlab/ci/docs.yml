@@ -89,6 +89,8 @@ trigger-docs-production:
     - job: "test:integration"
       optional: true
   trigger:
+    project: pirouter/pimeleon-site
+    branch: main
   variables:
     TRIGGERED_BY: pimeleon-build
     SOURCE_BRANCH: $CI_COMMIT_BRANCH
