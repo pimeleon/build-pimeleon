@@ -89,8 +89,7 @@ EOF
             chroot_run "${mount_point}" useradd -r -s /usr/sbin/nologin -g pihole -d /etc/pihole pihole || true
 
             # 2. Mock pihole-FTL to bypass installer service checks
-            # Mock only in /usr/bin as the installer will overwrite it with the real binary.
-            # We avoid /usr/local/bin to prevent it from taking precedence over the real binary in the PATH.
+            # Mock in /usr/bin where the service expects it
             sudo mkdir -p "${mount_point}/usr/bin"
             sudo ln -sf /bin/true "${mount_point}/usr/bin/pihole-FTL"
             sudo ln -sf /bin/true "${mount_point}/usr/bin/pihole"
@@ -126,9 +125,21 @@ EOF
             }
             sudo chattr -i "${mount_point}/etc/resolv.conf" 2>/dev/null || true
 
-            # Cleanup mocks
-            sudo rm -f "${mount_point}/usr/bin/pihole-FTL"
-            sudo rm -f "${mount_point}/usr/bin/pihole"
+            # Cleanup mocks if installer didn't overwrite them
+            # Some installers put things in /usr/local/bin, but we WANT it in /usr/bin for systemd
+            if [[ -L "${mount_point}/usr/bin/pihole-FTL" ]] && [[ $(readlink "${mount_point}/usr/bin/pihole-FTL") == "/bin/true" ]]; then
+                sudo rm -f "${mount_point}/usr/bin/pihole-FTL"
+                if [[ -f "${mount_point}/usr/local/bin/pihole-FTL" ]]; then
+                    log_info "Moving pihole-FTL from /usr/local/bin to /usr/bin"
+                    sudo mv "${mount_point}/usr/local/bin/pihole-FTL" "${mount_point}/usr/bin/pihole-FTL"
+                fi
+            fi
+            if [[ -L "${mount_point}/usr/bin/pihole" ]] && [[ $(readlink "${mount_point}/usr/bin/pihole") == "/bin/true" ]]; then
+                sudo rm -f "${mount_point}/usr/bin/pihole"
+                if [[ -f "${mount_point}/usr/local/bin/pihole" ]]; then
+                    sudo mv "${mount_point}/usr/local/bin/pihole" "${mount_point}/usr/bin/pihole"
+                fi
+            fi
 
             # RESTORE DNS: Pi-hole installer overwrites /etc/resolv.conf
             log_info "Restoring build-time resolv.conf for chroot"
