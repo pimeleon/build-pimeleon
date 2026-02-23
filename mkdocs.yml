@@ -158,8 +158,10 @@ nav:
       - Build Pipeline: architecture/build-pipeline.md
       - Network Design: architecture/networking.md
       - Multi-Platform Strategy: architecture/multi-platform-strategy.md
+      - Multi-Platform Plan: architecture/ansible-multi-platform-plan.md
       - Hardware Profiles: architecture/hardware-profiles.md
       - CI/CD Infrastructure: architecture/cicd.md
+      - Services Analysis: architecture/production-services-analysis.md
       - Migration Roadmap: architecture/migration-roadmap.md
 
   - Platforms:
