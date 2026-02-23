@@ -129,7 +129,7 @@ build:containers:
     policy: pull
   script:
     - set -e
-    - echo "Building Pimeleon image for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."
+    - 'echo "Building Pimeleon image for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."'
     - mkdir -p output cache
     - |
       # Compute mount paths - prioritize shared as baseline, allow branch-local overrides
@@ -232,7 +232,7 @@ build:custom:
     policy: pull-push
   script:
     - set -e
-    - echo "Custom build for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."
+    - 'echo "Custom build for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."'
     - mkdir -p output cache
     - |
       # Compute mount paths - prioritize shared as baseline, allow branch-local overrides
