@@ -140,8 +140,6 @@ build:containers:
         --privileged \
         -v /dev:/dev:rw \
         -v "$CI_PROJECT_DIR/cache":/cache \
-        -v "$CI_PROJECT_DIR/${CONFIGS_DIR#./}":/configs \
-        -v "$CI_PROJECT_DIR/${ANSIBLE_DIR#./}":/ansible:ro \
         -e CI=true \
         -e WORKSPACE_DIR=/workspace \
         -e CACHE_DIR=/cache \
@@ -152,6 +150,8 @@ build:containers:
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
         "$BUILD_IMAGE")
       docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/
+      docker cp "${CONFIGS_DIR}/." "$CONTAINER_ID":/configs/
+      docker cp "${ANSIBLE_DIR}/." "$CONTAINER_ID":/ansible/
       docker start -a "$CONTAINER_ID"
       EXIT_CODE=$(docker inspect "$CONTAINER_ID" --format='{{.State.ExitCode}}')
       echo "Container exit code: ${EXIT_CODE}"
@@ -239,8 +239,6 @@ build:custom:
         --privileged \
         -v /dev:/dev:rw \
         -v "$CI_PROJECT_DIR/cache":/cache \
-        -v "$CI_PROJECT_DIR/${CONFIGS_DIR#./}":/configs \
-        -v "$CI_PROJECT_DIR/${ANSIBLE_DIR#./}":/ansible:ro \
         -e CI=true \
         -e WORKSPACE_DIR=/workspace \
         -e CACHE_DIR=/cache \
@@ -251,6 +249,8 @@ build:custom:
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
         "$BUILD_IMAGE")
       docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/
+      docker cp "${CONFIGS_DIR}/." "$CONTAINER_ID":/configs/
+      docker cp "${ANSIBLE_DIR}/." "$CONTAINER_ID":/ansible/
       docker start -a "$CONTAINER_ID"
       EXIT_CODE=$(docker inspect "$CONTAINER_ID" --format='{{.State.ExitCode}}')
       if [ "${EXIT_CODE}" -ne 0 ]; then
