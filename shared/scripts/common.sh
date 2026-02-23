@@ -134,8 +134,7 @@ is_service_enabled() {
     local profile_path="${ansible_dir}/vars/common/profiles/${PIMELEON_PROFILE:-development}.yml"
 
     if [[ ! -f "$profile_path" ]]; then
-        log_warn "Profile file not found: $profile_path"
-        return 1
+        die "FATAL: Profile file not found: $profile_path"
     fi
 
     # Use Python for robust YAML parsing (available in builder image)
@@ -152,6 +151,10 @@ is_build_from_source_enabled() {
     local ansible_dir="${ANSIBLE_DIR:-/ansible}"
     local profile_path="${ansible_dir}/vars/common/profiles/${PIMELEON_PROFILE:-development}.yml"
     local versions_path="${ansible_dir}/vars/common/versions.yml"
+
+    if [[ ! -f "$profile_path" ]]; then
+        die "FATAL: Profile file not found: $profile_path"
+    fi
 
     # Check profile first, then fallback to versions.yml
     if python3 -c "
