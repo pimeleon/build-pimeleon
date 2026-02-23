@@ -75,7 +75,7 @@ build:containers:
       echo "Using tester Dockerfile: ${TESTER_DF}"
 
       docker build --cache-from ${CI_REGISTRY_IMAGE}/builder:latest --build-arg APT_CACHE_SERVER=${APT_PROXY%:*} -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest -f "$BUILDER_DF" .
-      docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest --build-arg APT_CACHE_SERVER=${APT_PROXY%:*} -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest -f "$TESTER_DF" .
+      docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest --build-arg APT_CACHE_SERVER=${APT_PROXY%:*} -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest -f "$TESTER_DF" "$(dirname "$TESTER_DF")"
     - docker push $BUILD_IMAGE
     - docker push ${CI_REGISTRY_IMAGE}/builder:latest
     - docker push $TEST_IMAGE
