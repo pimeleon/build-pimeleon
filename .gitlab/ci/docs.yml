@@ -8,7 +8,15 @@ publish-project-docs:
   image: python:3.11-slim
   tags:
     - lightweight
-  needs: ["build:pimeleon"]
+  needs:
+    - job: "lint:yaml"
+    - job: "build:pimeleon"
+      optional: true
+    - job: "test:smoke"
+      optional: true
+    - job: "test:integration"
+      optional: true
+
   rules:
     # Run on develop branch push
     - if: '$CI_COMMIT_BRANCH == "develop"'
@@ -39,7 +47,14 @@ publish-project-docs:
 # Trigger preview site build on downstream repository
 trigger-docs-preview:
   stage: docs
-  needs: ["build:pimeleon"]
+  needs:
+    - job: "lint:yaml"
+    - job: "build:pimeleon"
+      optional: true
+    - job: "test:smoke"
+      optional: true
+    - job: "test:integration"
+      optional: true
   trigger:
     project: pirouter/pimeleon-site
     branch: preview
@@ -65,10 +80,15 @@ trigger-docs-preview:
 # Trigger production site build on downstream repository
 trigger-docs-production:
   stage: docs
-  needs: ["build:pimeleon"]
+  needs:
+    - job: "lint:yaml"
+    - job: "build:pimeleon"
+      optional: true
+    - job: "test:smoke"
+      optional: true
+    - job: "test:integration"
+      optional: true
   trigger:
-    project: pirouter/pimeleon-site
-    branch: develop
   variables:
     TRIGGERED_BY: pimeleon-build
     SOURCE_BRANCH: $CI_COMMIT_BRANCH
