@@ -19,7 +19,6 @@ trigger-docs-preview:
       changes:
         - docs/**/*
         - mkdocs.yml
-        - .gitlab/ci/docs.yml
 
 trigger-docs-production:
   stage: docs
@@ -39,4 +38,3 @@ trigger-docs-production:
       changes:
         - docs/**/*
         - mkdocs.yml
-        - .gitlab/ci/docs.yml
