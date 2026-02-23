@@ -91,6 +91,8 @@ build:containers:
     - job: warm-cache
     - job: build:containers
       optional: true
+  tags:
+    - heavy
   cache:
     key: "base-system-${TARGET_PLATFORM}"
     paths:
