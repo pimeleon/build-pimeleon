@@ -10,6 +10,7 @@ setup:platform:
   tags:
     - lightweight
   rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.*)$/'
   script:
@@ -17,15 +18,26 @@ setup:platform:
       if [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ]; then
         if [[ "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" =~ ^release/ ]]; then
           PLATFORM=$(echo "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" | sed 's|^release/||')
+          PROFILE="production"
         else
-          # For develop MRs, default to rpi3-bookworm or similar
+          # For develop MRs, use development profile
           PLATFORM="rpi3-bookworm"
+          PROFILE="development"
         fi
       else
-        PLATFORM=$(echo "$CI_COMMIT_BRANCH" | sed 's|^release/||')
+        if [[ "$CI_COMMIT_BRANCH" =~ ^release/ ]]; then
+          PLATFORM=$(echo "$CI_COMMIT_BRANCH" | sed 's|^release/||')
+          PROFILE="production"
+        else
+          # Direct push to develop or other branch
+          PLATFORM="rpi3-bookworm"
+          PROFILE="development"
+        fi
       fi
       echo "TARGET_PLATFORM=$PLATFORM" > platform.env
+      echo "PIMELEON_PROFILE=$PROFILE" >> platform.env
       echo "Platform detected: $PLATFORM"
+      echo "Profile selected: $PROFILE"
   artifacts:
     reports:
       dotenv: platform.env
@@ -40,6 +52,7 @@ warm-cache:
     - job: setup:platform
       artifacts: true
   rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.*)$/'
   cache:
@@ -67,6 +80,9 @@ build:containers:
       variables:
         DEPLOY_ENV: "cicd production environment"
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.*)$/'
+      variables:
+        DEPLOY_ENV: "cicd development environment"
+    - if: '$CI_COMMIT_BRANCH == "develop"'
       variables:
         DEPLOY_ENV: "cicd development environment"
     - if: '$CI_PIPELINE_SOURCE == "web"'
@@ -113,7 +129,7 @@ build:containers:
     policy: pull
   script:
     - set -e
-    - echo "Building Pimeleon image for ${TARGET_PLATFORM}..."
+    - echo "Building Pimeleon image for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."
     - mkdir -p output cache
     - |
       # Compute mount paths - prioritize shared as baseline, allow branch-local overrides
@@ -146,6 +162,7 @@ build:containers:
         -e OUTPUT_DIR=/output \
         -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
         -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
+        -e PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
         -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
         "$BUILD_IMAGE")
@@ -190,6 +207,10 @@ build:pimeleon:
       variables:
         BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:latest
         DEPLOY_ENV: "cicd development environment"
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      variables:
+        BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:latest
+        DEPLOY_ENV: "cicd development environment"
   environment:
     name: $DEPLOY_ENV
 
@@ -216,7 +237,7 @@ build:custom:
     policy: pull-push
   script:
     - set -e
-    - echo "Custom build for ${TARGET_PLATFORM}..."
+    - echo "Custom build for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."
     - mkdir -p output cache
     - |
       # Compute mount paths - prioritize shared as baseline, allow branch-local overrides
@@ -244,6 +265,7 @@ build:custom:
         -e OUTPUT_DIR=/output \
         -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
         -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
+        -e PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
         -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
         "$BUILD_IMAGE")
