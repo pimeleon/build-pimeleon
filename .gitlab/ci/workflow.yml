@@ -3,6 +3,7 @@
 # Stages, Variables, Defaults, and Workflow Rules
 
 stages:
+  - .pre
   - scan
   - lint
   - build

@@ -27,7 +27,7 @@ setup:platform:
 
 # Pull (or seed) the base image cache for the detected platform
 warm-cache:
-  stage: build
+  stage: .pre
   image: alpine:latest
   tags:
     - linux
@@ -137,7 +137,7 @@ build:containers:
         -e OUTPUT_DIR=/output \
         -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
         -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
-        -e APT_CACHE_SERVER="${APT_PROXY%:*} " \
+        -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
         "$BUILD_IMAGE")
       docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/
@@ -232,7 +232,7 @@ build:custom:
         -e OUTPUT_DIR=/output \
         -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
         -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
-        -e APT_CACHE_SERVER="${APT_PROXY%:*} " \
+        -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
         "$BUILD_IMAGE")
       docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/
