@@ -33,7 +33,7 @@ install_hostapd() {
             safe_rm "${mount_point}/tmp/build-hostapd.sh"
         else
             log_info "Installing hostapd from APT (Development mode)"
-            chroot_run "${mount_point}" apt-get install -qy --no-install-recommends hostapd
+            chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends hostapd"
         fi
 
         die "Failed to fetch hostapd artifact — cannot continue"
@@ -168,7 +168,7 @@ install_tor() {
             safe_rm "${mount_point}/tmp/build-tor.sh"
         else
             log_info "Installing Tor from APT (Development mode)"
-            chroot_run "${mount_point}" apt-get install -qy --no-install-recommends tor tor-geoipdb
+            chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends tor tor-geoipdb"
         fi
 
         die "Failed to fetch tor artifact — cannot continue"

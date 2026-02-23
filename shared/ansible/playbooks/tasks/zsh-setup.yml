@@ -74,7 +74,7 @@
 
 - name: Deploy zshrc configuration
   ansible.builtin.template:
-    src: zshrc.j2
+    src: system/zshrc.j2
     dest: /home/pim/.zshrc
     owner: pim
     group: pim

@@ -101,8 +101,14 @@ cleanup_on_exit() {
         fi
     fi
 
-    # On failure (non-zero exit code, excluding successful termination via signal)
-    if [[ $exit_code -ne 0 ]] && [[ $exit_code -ne 130 ]] && [[ $exit_code -ne 143 ]]; then
+    # On failure (non-zero exit code)
+    if [[ $exit_code -ne 0 ]]; then
+        if [[ $exit_code -eq 130 ]]; then
+            log_warn "Build interrupted by user (Ctrl+C). Cleaning up..."
+        elif [[ $exit_code -eq 143 ]]; then
+            log_warn "Build terminated by signal (SIGTERM). Cleaning up..."
+        fi
+
         if [[ -n "${LOG_FILE:-}" ]]; then
             log_error "Failure detected (exit code: $exit_code). Detailed build log: ${LOG_FILE}"
         else

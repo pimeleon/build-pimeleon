@@ -14,6 +14,7 @@ trap 'cleanup_on_exit' EXIT ERR INT TERM
 WORK_DIR=$1
 IMAGE_PATH=$2
 IMAGE_SIZE=$3
+CLEANUP_IMAGE_PATH="${IMAGE_PATH}"
 
 # Validate parameters
 if [[ -z "$WORK_DIR" || -z "$IMAGE_PATH" || -z "$IMAGE_SIZE" ]]; then

@@ -13,6 +13,7 @@ trap 'cleanup_on_exit' EXIT ERR INT TERM
 
 WORK_DIR=$1
 IMAGE_PATH=$2
+CLEANUP_IMAGE_PATH="${IMAGE_PATH}"
 MOUNT_POINT="${WORK_DIR}/mount"
 
 log_info "Starting image optimization"
@@ -42,6 +43,7 @@ SERVICES_MAPPING=(
     "unattended-upgrades:none"
     "atd:none"
     "zramswap:zram"
+    "dphys-swapfile:swapfile"
     "sysstat:none"
     "smartmontools:none"
     "vnstat:none"
@@ -49,6 +51,7 @@ SERVICES_MAPPING=(
     "atopacct:none"
     # Network services
     "hostapd:hostapd"
+    "isc-dhcp-server:dhcp_server"
     "named:dns_server"
     "fail2ban:fail2ban"
     "wpa_supplicant:networkd"
@@ -65,7 +68,6 @@ SERVICES_MAPPING=(
     "pimeleon-api:pi_router_api"
     "pimeleon-proxy:pi_router_api"
     "pim-setup:none"
-    "firstboot:none"
 )
 
 for mapping in "${SERVICES_MAPPING[@]}"; do
@@ -92,13 +94,23 @@ for mapping in "${SERVICES_MAPPING[@]}"; do
 
     if [[ -n "${REL_SERVICE_PATH}" ]]; then
         log_info "Enabling service: ${service} (found at ${REL_SERVICE_PATH})"
-        # Create symlink relative to the image's filesystem
+        # Create symlink relative to the image's filesystem in multi-user.target.wants
         sudo ln -sf "${REL_SERVICE_PATH}" "${MULTI_USER_WANTS}/${service}.service"
+
+        # Special handling for template instances (e.g., tor@default)
+        if [[ "${service}" == *"@"* ]]; then
+            master_service="${service%%@*}"
+            instance_name="${service#*@}"
+            wants_dir="${MOUNT_POINT}/etc/systemd/system/${master_service}.service.wants"
+            log_info "Creating template instance symlink for ${service} in ${wants_dir}"
+            sudo mkdir -p "${wants_dir}"
+            sudo ln -sf "${REL_SERVICE_PATH}" "${wants_dir}/${instance_name}.service"
+        fi
     else
         # Fallback/Diagnostic for legacy Pi-hole or specific cases
-        if [[ "${service}" == "pihole-FTL" ]]; then
-             log_info "Attempting legacy Pi-hole enablement..."
-             chroot_run "${MOUNT_POINT}" systemctl enable pihole-FTL 2>/dev/null || true
+        if [[ "${service}" == "pihole-FTL" ]] || [[ "${service}" == "isc-dhcp-server" ]] || [[ "${service}" == "pim-setup" ]]; then
+             log_info "Attempting legacy service enablement for ${service}..."
+             chroot_run "${MOUNT_POINT}" systemctl enable "${service}" 2>/dev/null || true
         else
              # CRITICAL: Missing service that is supposed to be enabled is a fatal error
              log_error "FATAL: Service not found: ${service}. (Checked standard systemd paths in chroot)"

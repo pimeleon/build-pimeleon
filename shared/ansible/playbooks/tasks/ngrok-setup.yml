@@ -26,7 +26,7 @@
 
 - name: Create ngrok systemd service
   ansible.builtin.template:
-    src: ngrok.service.j2
+    src: ngrok/ngrok.service.j2
     dest: /etc/systemd/system/ngrok.service
     mode: '0644'
   notify:
@@ -34,7 +34,7 @@
 
 - name: Copy ngrok README
   ansible.builtin.template:
-    src: ngrok-README.md
+    src: ngrok/ngrok-README.md
     dest: /var/lib/ngrok/README.md
     owner: pim-ngrok
     group: pim

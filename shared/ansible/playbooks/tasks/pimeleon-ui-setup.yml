@@ -167,15 +167,22 @@
 # Create FastAPI systemd service
 - name: Create Pimeleon FastAPI systemd service
   ansible.builtin.template:
-    src: pimeleon-api.service.j2
+    src: pimeleon/pimeleon-api.service.j2
     dest: /etc/systemd/system/pimeleon-api.service
     mode: '0644'
 
 # Create Nitro proxy systemd service
 - name: Create Pimeleon Proxy systemd service
   ansible.builtin.template:
-    src: pimeleon-proxy.service.j2
+    src: pimeleon/pimeleon-proxy.service.j2
     dest: /etc/systemd/system/pimeleon-proxy.service
+    mode: '0644'
+
+# Create pim-setup systemd service
+- name: Create Pimeleon Setup systemd service
+  ansible.builtin.template:
+    src: pimeleon/pim-setup.service.j2
+    dest: /etc/systemd/system/pim-setup.service
     mode: '0644'
 
 # NOTE: Service enablement happens in stage3-optimize.sh (outside Ansible chroot context)
