@@ -46,6 +46,6 @@ config_txt:
 # hostapd WiFi capabilities (2.4GHz only for best compatibility)
 wifi_hw_mode: "g"
 wifi_channel: 6
-hostapd_ht_capab: "[HT40+][HT40-][SHORT-GI-20][TX-STBC][RX-STBC1]"
 hostapd_vht_enabled: false
+hostapd_require_ht: false
 hostapd_max_sta: 10
