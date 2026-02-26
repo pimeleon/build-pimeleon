@@ -110,11 +110,11 @@ sysinfo() {
 # Ensure cursor is visible and set to steady underscore
 # \e[?25h  - Show cursor
 # \e[4 q   - Steady underscore (use 3 for blinking)
-echo -ne '\e[?25h\e[4 q'
+printf '\e[?25h\e[4 q'
 
 # Ensure cursor settings persist after commands and line editing
 _fix_cursor() {
-    echo -ne '\e[?25h\e[4 q'
+    printf '\e[?25h\e[4 q'
 }
 precmd_functions+=(_fix_cursor)
 zle_line_init_functions+=(_fix_cursor)
