@@ -54,14 +54,20 @@
           echo "  Welcome to Pimeleon - Your Privacy Gateway"
           echo "  Hostname: $(hostname) | IP: $(hostname -I 2>/dev/null | awk '{print $1}')"
 
-          # Auto-run setup wizard if not completed
+          # Auto-run setup wizard if not completed AND not on SSH
           if [[ ! -f /var/lib/pimeleon/.setup-complete ]]; then
-              echo ""
-              echo "  Configuring system. Please wait..."
-              echo "  Starting first-time setup wizard..."
-              sleep 2
-              # Use || true to prevent parent shell from exiting if setup is cancelled
-              sudo /usr/local/bin/pim-setup || true
+              if [[ -z "$SSH_CONNECTION" ]]; then
+                  echo ""
+                  echo "  Configuring system. Please wait..."
+                  echo "  Starting first-time setup wizard..."
+                  sleep 2
+                  # Use || true to prevent parent shell from exiting if setup is cancelled
+                  sudo /usr/local/bin/pim-setup || true
+              else
+                  echo ""
+                  echo "  [NOTICE] System setup is not complete."
+                  echo "  Please run 'sudo pim-setup' to configure your Pimeleon."
+              fi
           elif [[ ! -f /var/lib/pimeleon/.pim-config.ran ]]; then
               echo "  Run 'sudo pim-config' for configuration menu"
           fi
@@ -80,12 +86,6 @@
     owner: pim
     group: pim
     mode: '0644'
-
-- name: Ensure zshrc sources /etc/profile for MOTD support
-  ansible.builtin.lineinfile:
-    path: /home/pim/.zshrc
-    line: "[[ -f /etc/profile ]] && source /etc/profile"
-    insertbefore: BOF
 
 - name: Set zsh as default shell for pim user
   ansible.builtin.user:
