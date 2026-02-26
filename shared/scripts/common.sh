@@ -632,10 +632,12 @@ load_app_config() {
         rpi3)
             export PIMELEON_RPI_MODEL="3B+"
             export RPI_ARCH="armhf"
+            export PIMELEON_IMAGE_SIZE="${PIMELEON_IMAGE_SIZE:-3G}"
             ;;
         rpi4)
             export PIMELEON_RPI_MODEL="4B"
             export RPI_ARCH="arm64"
+            export PIMELEON_IMAGE_SIZE="${PIMELEON_IMAGE_SIZE:-4G}"
             ;;
         *)
             die "Unknown device: $device (expected rpi3, rpi4)"
@@ -643,7 +645,6 @@ load_app_config() {
     esac
 
     export RASPBIAN_VERSION="$debian"
-    export PIMELEON_IMAGE_SIZE="${PIMELEON_IMAGE_SIZE:-4G}"
 
     log_info "App: ${app_name}"
     log_info "  Model: ${PIMELEON_RPI_MODEL}, Arch: ${RPI_ARCH}, Debian: ${RASPBIAN_VERSION}"

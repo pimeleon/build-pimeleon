@@ -216,6 +216,8 @@ sudo tee "${MOUNT_POINT}/etc/systemd/system/firstboot.service" > /dev/null <<EOF
 [Unit]
 Description=First Boot Setup
 After=network.target
+Before=ssh.service
+Before=sshd.service
 ConditionPathExists=!/etc/firstboot.done
 
 [Service]
