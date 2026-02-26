@@ -52,8 +52,8 @@ migrate_apt_keyring "${MOUNT_POINT}"
 
 # Update package lists
 log_info "Updating package lists"
-chroot_run "${MOUNT_POINT}" apt-get -q update
-chroot_run "${MOUNT_POINT}" apt-get -qy upgrade
+chroot_run "${MOUNT_POINT}" apt-get update
+chroot_run "${MOUNT_POINT}" apt-get -y upgrade
 
 # Define package categories for better maintenance
 SYSTEM_PKGS=(
@@ -76,7 +76,7 @@ NET_CORE_PKGS=(
 
 NET_ROUTER_PKGS=(
     "bridge-utils" "vlan" "ppp" "pppoeconf" "wireguard-tools"
-    "wireless-tools" "wireless-regdb" "rfkill" "wpasupplicant"
+    "wireless-tools" "wireless-regdb" "rfkill" "wpasupplicant" "iw"
     "isc-dhcp-server"
 )
 
@@ -95,16 +95,27 @@ BUILD_DEPS=(
     "python3-venv" "python3-apt" "nodejs"
 )
 
-# Install essential packages (full router stack)
-log_info "Installing essential packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
-    "${SYSTEM_PKGS[@]}" \
-    "${SHELL_PKGS[@]}" \
-    "${NET_CORE_PKGS[@]}" \
-    "${NET_ROUTER_PKGS[@]}" \
-    "${MONITOR_PKGS[@]}" \
-    "${HARDWARE_PKGS[@]}" \
-    "${BUILD_DEPS[@]}"
+# Install essential packages by category for better visibility
+log_info "Installing system core packages"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${SYSTEM_PKGS[@]}"
+
+log_info "Installing shell and utility packages"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${SHELL_PKGS[@]}"
+
+log_info "Installing core networking packages"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${NET_CORE_PKGS[@]}"
+
+log_info "Installing routing and wireless packages"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${NET_ROUTER_PKGS[@]}"
+
+log_info "Installing monitoring and diagnostics packages"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${MONITOR_PKGS[@]}"
+
+log_info "Installing hardware-specific packages"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${HARDWARE_PKGS[@]}"
+
+log_info "Installing build dependencies and runtime environments"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${BUILD_DEPS[@]}"
 
 # Restore and protect resolv.conf (systemd-resolved might have converted it to a symlink)
 log_info "Restoring and protecting resolv.conf"
@@ -127,12 +138,12 @@ log_info "Python3 installed: ${PYTHON_VER}"
 
 # Install WiFi firmware (may fail if non-free not available)
 log_info "Installing WiFi firmware"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     firmware-brcm80211 || log_warn "WiFi firmware not available, wireless may not work"
 
 # Install Pi-specific packages (kernel and firmware)
 log_info "Installing Raspberry Pi kernel and firmware"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     raspberrypi-kernel \
     raspberrypi-bootloader
 
@@ -153,7 +164,7 @@ fi
 
 # Install basic networking tools (hostapd compiled from source separately)
 log_info "Installing basic networking tools"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     bridge-utils \
     isc-dhcp-server \
     rfkill \
@@ -167,18 +178,18 @@ install_tor "${MOUNT_POINT}"
 
 # Install DNS server packages (dnscrypt-proxy uses pre-built binary, not APT)
 log_info "Installing DNS server packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     bind9 \
     bind9utils
 
 # Install security packages
 log_info "Installing security packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     fail2ban
 
 # Install proxy packages
 log_info "Installing proxy packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     privoxy
 
 # Generate Privoxy filters from AdBlock lists (runs on x86, outputs to chroot)
@@ -240,22 +251,26 @@ for group in gpio i2c spi; do
     chroot_run "${MOUNT_POINT}" groupadd -f -r "$group" || true
 done
 
-# Create Pimeleon service group and users
-log_info "Creating Pimeleon service group and users"
-chroot_run "${MOUNT_POINT}" groupadd -f -r pim
+# Create Pimeleon management user (UID/GID 1000 like default pi user)
+log_info "Creating pim management user"
+# Ensure pim group is GID 1000
+chroot_run "${MOUNT_POINT}" groupadd -f -g 1000 pim
+# Ensure pim user is UID 1000
+chroot_run "${MOUNT_POINT}" useradd --create-home -u 1000 -s /bin/zsh -g pim -G adm,dialout,cdrom,users,netdev,gpio,i2c,spi pim || true
+
+# Create Pimeleon service users (using same pim group)
+log_info "Creating Pimeleon service users"
 chroot_run "${MOUNT_POINT}" useradd -r -s /usr/sbin/nologin -g pim -d /opt/pimeleon/api pim-api || true
 chroot_run "${MOUNT_POINT}" useradd -r -s /usr/sbin/nologin -g pim -d /opt/pimeleon/proxy pim-proxy || true
 chroot_run "${MOUNT_POINT}" useradd -r -s /usr/sbin/nologin -g pim -d /var/lib/ngrok pim-ngrok || true
 
 # Verify users
 log_info "Verifying Pimeleon users"
+chroot_run "${MOUNT_POINT}" id pim || true
 chroot_run "${MOUNT_POINT}" id pim-api || true
 chroot_run "${MOUNT_POINT}" id pim-proxy || true
 chroot_run "${MOUNT_POINT}" id pim-ngrok || true
 
-# Create pim management user (full sudo via sudoers.d, not sudo group)
-log_info "Creating pim management user"
-chroot_run "${MOUNT_POINT}" useradd --create-home -s /bin/zsh -g pim -G adm,dialout,cdrom,users,netdev,gpio,i2c,spi pim || true
 # Ensure home directory exists (fallback if useradd -m fails)
 sudo mkdir -p "${MOUNT_POINT}/home/pim"
 chroot_run "${MOUNT_POINT}" chown pim:pim /home/pim
@@ -324,9 +339,9 @@ log_info "Downloading ngrok"
 curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc 2>&1 | chroot_run "${MOUNT_POINT}" tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
 echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" 2>&1 | chroot_run "${MOUNT_POINT}" tee /etc/apt/sources.list.d/ngrok.list
 log_info "Installing ngrok for remote access tunneling"
-chroot_run "${MOUNT_POINT}" apt-get -q update
-chroot_run "${MOUNT_POINT}" apt-get -qy upgrade
-chroot_run "${MOUNT_POINT}" apt-get -qy install ngrok
+chroot_run "${MOUNT_POINT}" apt-get update
+chroot_run "${MOUNT_POINT}" apt-get -y upgrade
+chroot_run "${MOUNT_POINT}" apt-get -y install ngrok
 
 # =============================================================================
 # Clone and build Pimeleon Web UI from GitLab
@@ -426,7 +441,7 @@ fi
 if [[ -d "${PIMELEON_PROXY_SRC}" ]] && [[ -f "${PIMELEON_PROXY_SRC}/index.mjs" ]]; then
     log_info "Copying pre-built Pimeleon Nuxt proxy files"
     sudo mkdir -p "${PIMELEON_PROXY_DEST}"
-    sudo rsync -a --exclude 'node_modules' --exclude '.nuxt' --exclude 'logs' "${PIMELEON_PROXY_SRC}/" "${PIMELEON_PROXY_DEST}/"
+    sudo rsync -a --exclude '.nuxt' --exclude 'logs' "${PIMELEON_PROXY_SRC}/" "${PIMELEON_PROXY_DEST}/"
     log_info "Nitro proxy copied: $(du -sh "${PIMELEON_PROXY_DEST}" | cut -f1)"
 else
     die "FATAL: Nitro proxy not found at ${PIMELEON_PROXY_SRC}"
