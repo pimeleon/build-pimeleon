@@ -7,6 +7,8 @@ After=network-online.target nss-lookup.target
 Wants=network-online.target nss-lookup.target
 
 [Service]
+User=debian-tor
+Group=debian-tor
 # Clear inherited ExecStartPre and ExecStart from package unit before overriding
 ExecStartPre=
 ExecStartPre=/usr/bin/tor --verify-config -f /etc/tor/torrc
