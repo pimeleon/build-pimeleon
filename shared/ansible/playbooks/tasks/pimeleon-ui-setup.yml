@@ -116,6 +116,13 @@
     state: present
   when: pimeleon_ui_files.stat.exists | default(false)
 
+# Generate shared secrets once so API and proxy use identical values
+- name: Generate shared Pimeleon secrets
+  ansible.builtin.set_fact:
+    pimeleon_jwt_secret: "{{ lookup('pipe', 'openssl rand -hex 32') }}"
+    pimeleon_admin_password: "{{ lookup('pipe', 'openssl rand -base64 16 | tr -d /+= | head -c 16') }}"
+  when: pimeleon_ui_files.stat.exists | default(false)
+
 # Create FastAPI .env file
 - name: Create Pimeleon FastAPI environment file
   ansible.builtin.copy:
@@ -134,10 +141,10 @@
       DATABASE_PATH=/opt/pimeleon/data/pimeleon.db
 
       # Authentication
-      JWT_SECRET={{ lookup('pipe', 'openssl rand -hex 32') }}
+      JWT_SECRET={{ pimeleon_jwt_secret }}
       JWT_EXPIRES_IN=24h
       ADMIN_USERNAME=admin
-      ADMIN_PASSWORD={{ lookup('pipe', 'openssl rand -base64 16 | tr -d /+= | head -c 16') }}
+      ADMIN_PASSWORD={{ pimeleon_admin_password }}
 
       # Paths
       PLUGIN_DIR=/opt/pimeleon/plugins
@@ -162,6 +169,12 @@
 
       # Static files
       STATIC_DIR=/opt/pimeleon/ui
+
+      # Authentication (shared with API - must match)
+      JWT_SECRET={{ pimeleon_jwt_secret }}
+      JWT_EXPIRES_IN=24h
+      ADMIN_USERNAME=admin
+      ADMIN_PASSWORD={{ pimeleon_admin_password }}
   when: pimeleon_ui_files.stat.exists | default(false)
 
 # Create FastAPI systemd service
