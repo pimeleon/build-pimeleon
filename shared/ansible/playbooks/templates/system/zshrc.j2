@@ -120,4 +120,5 @@ precmd_functions+=(_fix_cursor)
 zle_line_init_functions+=(_fix_cursor)
 
 
-# Banner is displayed via /etc/profile.d/pimeleon-motd.sh for all shells
+# Show MOTD on login (zsh does not source /etc/profile.d automatically)
+[[ -o login ]] && [[ -f /etc/profile.d/pimeleon-motd.sh ]] && source /etc/profile.d/pimeleon-motd.sh
