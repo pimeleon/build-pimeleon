@@ -45,7 +45,6 @@ SERVICES_MAPPING=(
     "zramswap:zram"
     "dphys-swapfile:swapfile"
     "sysstat:none"
-    "smartmontools:none"
     "vnstat:none"
     "atop:none"
     "atopacct:none"
@@ -54,20 +53,18 @@ SERVICES_MAPPING=(
     "isc-dhcp-server:dhcp_server"
     "named:dns_server"
     "fail2ban:fail2ban"
-    "wpa_supplicant:networkd"
+    "wpa_supplicant:wpa_supplicant"
     "avahi-daemon:avahi"
     "network-optimization:none"
     # Proxy & Adblock
     "privoxy:privoxy"
     "squid:squid"
     "tor:tor"
-    "tor@default:tor"
     "dnscrypt-proxy:dnscrypt_proxy"
     "pihole-FTL:pihole"
     # Pimeleon application
     "pimeleon-api:pimeleon_api"
     "pimeleon-proxy:pimeleon_api"
-    "pim-setup:none"
 )
 
 for mapping in "${SERVICES_MAPPING[@]}"; do
@@ -108,17 +105,17 @@ for mapping in "${SERVICES_MAPPING[@]}"; do
         fi
     else
         # Fallback/Diagnostic for legacy Pi-hole or specific cases
-        if [[ "${service}" == "pihole-FTL" ]] || [[ "${service}" == "isc-dhcp-server" ]] || [[ "${service}" == "pim-setup" ]]; then
-             log_info "Attempting legacy service enablement for ${service}..."
-             chroot_run "${MOUNT_POINT}" systemctl enable "${service}" 2>/dev/null || true
+        if [[ "${service}" == "pihole-FTL" ]] || [[ "${service}" == "isc-dhcp-server" ]]; then
+            log_info "Attempting legacy service enablement for ${service}..."
+            chroot_run "${MOUNT_POINT}" systemctl enable "${service}" 2>/dev/null || true
         else
-             # CRITICAL: Missing service that is supposed to be enabled is a fatal error
-             log_error "FATAL: Service not found: ${service}. (Checked standard systemd paths in chroot)"
-             if [[ "${DEBUG:-0}" == "1" ]]; then
-                 log_info "DEBUG: Listing all service files in chroot for diagnostics:"
-                 chroot_run "${MOUNT_POINT}" find /lib/systemd/system /usr/lib/systemd/system /etc/systemd/system -name "*.service" | grep "${SEARCH_NAME}" || true
-             fi
-             die "Build failed: Required service '${service}' not found in image."
+            # CRITICAL: Missing service that is supposed to be enabled is a fatal error
+            log_error "FATAL: Service not found: ${service}. (Checked standard systemd paths in chroot)"
+            if [[ "${DEBUG:-0}" == "1" ]]; then
+                log_info "DEBUG: Listing all service files in chroot for diagnostics:"
+                chroot_run "${MOUNT_POINT}" find /lib/systemd/system /usr/lib/systemd/system /etc/systemd/system -name "*.service" | grep "${SEARCH_NAME}" || true
+            fi
+            die "Build failed: Required service '${service}' not found in image."
         fi
     fi
 done
@@ -292,7 +289,7 @@ unmount_image "${MOUNT_POINT}" "${LOOP_DEVICE}"
 
 # Shrink image if possible
 log_info "Checking if image can be shrunk"
-# Use a subshell to ensure cleanup of loop device even if commands fail
+# Use a sub-shell to ensure cleanup of loop device even if commands fail
 (
     LOOP_DEV=$(sudo losetup -f --show "${IMAGE_PATH}")
     # Setup trap for inner loop device
