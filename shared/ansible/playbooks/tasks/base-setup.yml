@@ -10,6 +10,12 @@
     mode: '0755'
   when: config_txt is defined
 
+- name: Remove deprecated elevator= kernel parameter from cmdline.txt
+  ansible.builtin.replace:
+    path: /boot/cmdline.txt
+    regexp: ' ?elevator=\S+'
+    replace: ''
+
 - name: Set system hostname
   ansible.builtin.hostname:
     name: pimeleon
@@ -167,16 +173,6 @@
   ansible.builtin.apt:
     name: whiptail
     state: present
-
-# Deploy pim-setup first-boot wizard
-# Default config (if wizard not run): AP on wlan0 + DHCP client on eth0
-- name: Deploy pim-setup first-boot wizard
-  ansible.builtin.copy:
-    src: /configs/scripts/pim-setup
-    dest: /usr/local/bin/pim-setup
-    mode: '0755'
-    owner: root
-    group: root
 
 - name: Create pimeleon directory
   ansible.builtin.file:
