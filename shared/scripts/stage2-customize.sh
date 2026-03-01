@@ -16,7 +16,7 @@ trap 'cleanup_on_exit' EXIT ERR INT TERM
 
 WORK_DIR=$1
 IMAGE_PATH=$2
-CLEANUP_IMAGE_PATH="${IMAGE_PATH}"
+# CLEANUP_IMAGE_PATH="${IMAGE_PATH}"
 MOUNT_POINT="${WORK_DIR}/mount"
 BOOT_MOUNT="${WORK_DIR}/boot"
 IMAGE_NAME="pimeleon-${TARGET_PLATFORM:-rpi3-bookworm}"
@@ -60,7 +60,7 @@ SYSTEM_PKGS=(
     "systemd" "systemd-sysv" "systemd-resolved" "udev" "dbus" "policykit-1"
     "locales" "locales-all" "tzdata" "fake-hwclock" "cron" "rsyslog" "logrotate"
     "sudo" "parted" "pkg-config" "ca-certificates" "apt-transport-https"
-    "openssh-server" "zram-tools" "dphys-swapfile" "at" "smartmontools"
+    "openssh-server" "zram-tools" "dphys-swapfile" "at"
 )
 
 SHELL_PKGS=(
@@ -86,7 +86,7 @@ MONITOR_PKGS=(
 )
 
 HARDWARE_PKGS=(
-    "usbutils" "lshw" "hdparm" "smartmontools" "ethtool"
+    "usbutils" "lshw" "hdparm" "ethtool"
 )
 
 BUILD_DEPS=(
@@ -282,7 +282,7 @@ echo "${TEMP_PASSWORD}" | sudo tee "${OUTPUT_DIR}/pim-initial-password.txt" > /d
 sudo chmod 600 "${OUTPUT_DIR}/pim-initial-password.txt"
 log_warn "Initial password saved to: ${OUTPUT_DIR}/pim-initial-password.txt"
 
-# Create full sudo access for pim user (passwordless)
+# Create full sudo access for pim user (password-less)
 sudo mkdir -p "${MOUNT_POINT}/etc/sudoers.d"
 sudo chmod 755 "${MOUNT_POINT}/etc/sudoers.d"
 cat > /tmp/sudoers-pim << EOF
