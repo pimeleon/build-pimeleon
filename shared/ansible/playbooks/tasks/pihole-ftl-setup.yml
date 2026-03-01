@@ -40,6 +40,7 @@
     mode: "{{ item.mode }}"
   loop:
     - { path: /etc/pihole, mode: '0775' }
+    - { path: /etc/pihole/config_backups, mode: '0755' }
     - { path: /var/lib/pihole, mode: '0755' }
     - { path: /var/log/pihole, mode: '0755' }
     - { path: /run/pihole, mode: '0755' }
