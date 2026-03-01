@@ -265,12 +265,12 @@ configure_ethernet() {
     local current_mode="DHCP"
     local current_ip=""
 
-    if [[ -f /etc/systemd/network/10-wan.network ]]; then
-        if grep -q "DHCP=yes" /etc/systemd/network/10-wan.network 2>/dev/null; then
+    if [[ -f /etc/systemd/network/10-eth0-wan.network ]]; then
+        if grep -q "DHCP=yes" /etc/systemd/network/10-eth0-wan.network 2>/dev/null; then
             current_mode="DHCP"
         else
             current_mode="Static"
-            current_ip=$(grep -E "^Address=" /etc/systemd/network/10-wan.network 2>/dev/null | cut -d= -f2 || echo "")
+            current_ip=$(grep -E "^Address=" /etc/systemd/network/10-eth0-wan.network 2>/dev/null | cut -d= -f2 || echo "")
         fi
     fi
 
@@ -292,9 +292,9 @@ configure_ethernet() {
 }
 
 configure_eth_dhcp() {
-    cat > /etc/systemd/network/10-wan.network <<EOF
+    cat > /etc/systemd/network/10-eth0-wan.network <<EOF
 [Match]
-Name=eth0
+Type=ether
 
 [Network]
 DHCP=yes
@@ -324,9 +324,9 @@ configure_eth_static() {
         return
     fi
 
-    cat > /etc/systemd/network/10-wan.network <<EOF
+    cat > /etc/systemd/network/10-eth0-wan.network <<EOF
 [Match]
-Name=eth0
+Type=ether
 
 [Network]
 Address=$ip
