@@ -119,9 +119,17 @@
 # Generate shared secrets once so API and proxy use identical values
 - name: Generate shared Pimeleon secrets
   ansible.builtin.set_fact:
-    pimeleon_jwt_secret: "{{ lookup('pipe', 'openssl rand -hex 32') }}"
-    pimeleon_admin_password: "{{ lookup('pipe', 'openssl rand -base64 16 | tr -d /+= | head -c 16') }}"
+    pimeleon_jwt_secret: "{{ lookup('password', '/dev/null length=64 chars=hexdigits') }}"
+    pimeleon_admin_password: "{{ lookup('password', '/dev/null length=16 chars=ascii_letters,digits') }}"
   when: pimeleon_ui_files.stat.exists | default(false)
+
+- name: Validate generated secrets are non-empty
+  ansible.builtin.fail:
+    msg: "Secret generation failed - pimeleon_jwt_secret or pimeleon_admin_password is empty"
+  when:
+    - pimeleon_ui_files.stat.exists | default(false)
+    - (pimeleon_jwt_secret | default('') | length == 0) or
+      (pimeleon_admin_password | default('') | length == 0)
 
 # Create FastAPI .env file
 - name: Create Pimeleon FastAPI environment file
@@ -191,11 +199,5 @@
     dest: /etc/systemd/system/pimeleon-proxy.service
     mode: '0644'
 
-# Create pim-setup systemd service
-- name: Create Pimeleon Setup systemd service
-  ansible.builtin.template:
-    src: pimeleon/pim-setup.service.j2
-    dest: /etc/systemd/system/pim-setup.service
-    mode: '0644'
 
 # NOTE: Service enablement happens in stage3-optimize.sh (outside Ansible chroot context)
