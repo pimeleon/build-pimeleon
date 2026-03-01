@@ -1,24 +1,37 @@
 # {{ ansible_managed }}
-# Tor systemd drop-in override for Pimeleon router
-# Drop-ins extend the package unit - ExecStart must be cleared before resetting
+# Standalone tor.service for Pimeleon router
+# Replaces the stock Debian unit (which delegates to tor@default.service)
+# to ensure tor runs directly under tor.service with correct user
 
 [Unit]
-After=network-online.target nss-lookup.target
+Description=Anonymizing overlay network for TCP (The Onion Router)
+After=network.target network-online.target nss-lookup.target
 Wants=network-online.target nss-lookup.target
 
 [Service]
+Type=simple
 User=debian-tor
 Group=debian-tor
-# Clear inherited ExecStartPre and ExecStart from package unit before overriding
-ExecStartPre=
 ExecStartPre=/usr/bin/tor --verify-config -f /etc/tor/torrc
-ExecStart=
 ExecStart=/usr/bin/tor -f /etc/tor/torrc
+ExecReload=/bin/kill -HUP $MAINPID
+KillSignal=SIGINT
+Restart=on-failure
 TimeoutStartSec=300
 TimeoutStopSec=60
 WatchdogSec=60
 
-# Additional hardening not in package unit
+# Filesystem access
+ReadWritePaths=/var/lib/tor
+ReadWritePaths=/var/log/tor
+ReadWritePaths=/run/tor
+
+# Hardening
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHome=yes
+ProtectSystem=full
+NoNewPrivileges=yes
 SystemCallFilter=@system-service
 SystemCallArchitectures=native
 MemoryDenyWriteExecute=yes
@@ -26,3 +39,6 @@ LockPersonality=yes
 RestrictRealtime=yes
 RestrictSUIDSGID=yes
 RestrictNamespaces=yes
+
+[Install]
+WantedBy=multi-user.target

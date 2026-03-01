@@ -42,17 +42,10 @@
   when: services_enabled.tor | default(false)
   notify: Restart tor
 
-- name: Create Tor systemd service override directory
-  ansible.builtin.file:
-    path: /etc/systemd/system/tor@default.service.d
-    state: directory
-    mode: '0755'
-  when: services_enabled.tor | default(false)
-
-- name: Configure Tor systemd service override
+- name: Deploy Tor systemd service unit
   ansible.builtin.template:
     src: tor/tor.service.j2
-    dest: /etc/systemd/system/tor@default.service.d/override.conf
+    dest: /etc/systemd/system/tor.service
     mode: '0644'
   when: services_enabled.tor | default(false)
   notify:
