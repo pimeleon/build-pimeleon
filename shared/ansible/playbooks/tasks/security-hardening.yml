@@ -15,6 +15,7 @@
     - { regexp: '^#?ClientAliveInterval', line: 'ClientAliveInterval 300' }
     - { regexp: '^#?ClientAliveCountMax', line: 'ClientAliveCountMax 2' }
     - { regexp: '^#?Protocol', line: 'Protocol 2' }
+    - { regexp: '^#?PrintMotd', line: 'PrintMotd yes' }
     - { regexp: '^#?AllowUsers', line: 'AllowUsers pim' }
   notify: Restart SSH
 
