@@ -121,7 +121,7 @@ wifi_dhcp_range_end: "192.168.42.200"
 
 # WiFi AP configuration
 wifi_ssid: "pimeleon"
-wifi_passphrase: "changeme123"
+wifi_passphrase: "changeme123!"
 wifi_channel: 6
 wifi_hw_mode: "g"      # g=2.4GHz, a=5GHz
 wifi_country_code: "US"
