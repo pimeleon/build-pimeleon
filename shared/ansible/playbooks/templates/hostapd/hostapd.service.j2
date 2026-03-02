@@ -5,18 +5,20 @@
 Description=IEEE 802.11 AP, IEEE 802.1X/WPA/WPA2/WPA3 Authenticator
 Documentation=man:hostapd(8)
 # AP mode does not need internet - only needs wlan0 device and networkd started
-After=systemd-networkd.service sys-subsystem-net-devices-{{ wifi_interface | default('wlan0') }}.device
+After=network.target
 Wants=systemd-networkd.service
 BindsTo=sys-subsystem-net-devices-{{ wifi_interface | default('wlan0') }}.device
 
 [Service]
 Type=forking
 PIDFile=/run/hostapd.pid
-ExecStartPre=/usr/local/bin/hostapd -t /etc/hostapd/hostapd.conf
-ExecStart=/usr/local/bin/hostapd -B -P /run/hostapd.pid /etc/hostapd/hostapd.conf
+EnvironmentFile=/etc/default/hostapd
+Environment=DAEMON_CONF=/etc/hostapd/hostapd.conf
+Environment=DAEMON_OPTS="-t -f /var/log/hostapd.log"
+ExecStart=/usr/local/bin/hostapd -B -P /run/hostapd.pid $DAEMON_CONF $DAEMON_OPTS
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
-RestartSec=5
+RestartSec=10
 
 # Hardening
 ProtectSystem=full
