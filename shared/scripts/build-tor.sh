@@ -26,7 +26,9 @@ apt-get install -qy --no-install-recommends \
     libsystemd-dev \
     pkg-config \
     autoconf \
-    automake
+    automake \
+    liblzma-dev \
+    libcap-dev
 
 # Clone Tor source
 echo "Cloning Tor repository from GitLab..."
