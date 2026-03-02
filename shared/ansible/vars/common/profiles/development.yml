@@ -41,12 +41,6 @@ services_enabled:
   zram: true
   swapfile: true
 
-# Build from source overrides
-build_from_source:
-  pihole_ftl: false
-  hostapd: false
-  tor: false
-
 # Development packages - debug and diagnostic tools
 dev_packages:
   - htop
