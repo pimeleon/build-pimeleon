@@ -51,15 +51,22 @@ collect_system_info() {
     echo "Collecting system information..."
 
     # System specs
-    local cpu_cores=$(nproc)
-    local total_ram=$(free -m | awk '/^Mem:/{print $2}')
-    local available_ram=$(free -m | awk '/^Mem:/{print $7}')
-    local disk_space=$(df -BG / | tail -1 | awk '{print $2}' | sed 's/G//')
-    local available_space=$(df -BG / | tail -1 | awk '{print $4}' | sed 's/G//')
+    local cpu_cores
+    cpu_cores=$(nproc)
+    local total_ram
+    total_ram=$(free -m | awk '/^Mem:/{print $2}')
+    local available_ram
+    available_ram=$(free -m | awk '/^Mem:/{print $7}')
+    local disk_space
+    disk_space=$(df -BG / | tail -1 | awk '{print $2}' | sed 's/G//')
+    local available_space
+    available_space=$(df -BG / | tail -1 | awk '{print $4}' | sed 's/G//')
 
     # Docker info
-    local docker_version=$(docker --version | awk '{print $3}' | sed 's/,//')
-    local docker_storage_driver=$(docker system info 2>/dev/null | grep "Storage Driver" | awk '{print $3}')
+    local docker_version
+    docker_version=$(docker --version | awk '{print $3}' | sed 's/,//')
+    local docker_storage_driver
+    docker_storage_driver=$(docker system info 2>/dev/null | grep "Storage Driver" | awk '{print $3}')
 
     # Build configuration
     local rpi_model=${RPI_MODEL:-3B+}

@@ -13,7 +13,6 @@ trap 'cleanup_on_exit' EXIT ERR INT TERM
 
 WORK_DIR=$1
 IMAGE_PATH=$2
-CLEANUP_IMAGE_PATH="${IMAGE_PATH}"
 MOUNT_POINT="${WORK_DIR}/mount"
 
 log_info "Starting image optimization"
