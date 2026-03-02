@@ -60,17 +60,6 @@
     - pihole_ftl_path != ""
   notify: Restart pihole-FTL
 
-- name: Create setupVars.conf for compatibility
-  ansible.builtin.template:
-    src: pihole/setupVars.conf.j2
-    dest: /etc/pihole/setupVars.conf
-    owner: pihole
-    group: pihole
-    mode: '0644'
-  when:
-    - services_enabled.pihole | default(false)
-    - pihole_ftl_path != ""
-
 - name: Create Pi-hole FTL systemd service
   ansible.builtin.template:
     src: pihole/pihole-FTL.service.j2
