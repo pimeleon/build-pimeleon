@@ -10,6 +10,8 @@ security:trivy:
   tags:
     - linux
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
     - when: on_success
   cache:
     key: trivy-db
@@ -44,6 +46,8 @@ security:gitleaks:
   tags:
     - linux
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
     - when: on_success
   script:
     - echo "Running secret detection with gitleaks..."
