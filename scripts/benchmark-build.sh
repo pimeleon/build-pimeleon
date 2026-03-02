@@ -110,7 +110,8 @@ collect_system_info() {
     fi
 
     # System load before build
-    local load_avg=$(cat /proc/loadavg | awk '{print $1}')
+    local load_avg
+    load_avg=$(cat /proc/loadavg | awk '{print $1}')
 
     cat > "$BENCHMARK_FILE" <<EOF
 {
@@ -153,9 +154,12 @@ finalize_benchmark() {
     local image_path=$3
 
     # System load after build
-    local load_avg_post=$(cat /proc/loadavg | awk '{print $1}')
-    local available_ram_post=$(free -m | awk '/^Mem:/{print $7}')
-    local available_space_post=$(df -BG / | tail -1 | awk '{print $4}' | sed 's/G//')
+    local load_avg_post
+    load_avg_post=$(cat /proc/loadavg | awk '{print $1}')
+    local available_ram_post
+    available_ram_post=$(free -m | awk '/^Mem:/{print $7}')
+    local available_space_post
+    available_space_post=$(df -BG / | tail -1 | awk '{print $4}' | sed 's/G//')
 
     # Image info if successful
     local image_size_mb="null"
@@ -166,14 +170,16 @@ finalize_benchmark() {
     fi
 
     # Calculate cache effectiveness
-    local cache_files=$(find ./cache -name "*.tar.gz" 2>/dev/null | wc -l)
+    local cache_files
+    cache_files=$(find ./cache -name "*.tar.gz" 2>/dev/null | wc -l)
     local cache_size_mb=0
     if [[ -d "./cache" ]]; then
         cache_size_mb=$(du -sm ./cache 2>/dev/null | awk '{print $1}' || echo 0)
     fi
 
     # Docker volumes usage
-    local docker_volumes=$(docker volume ls --filter name=pimeleon-build --format "{{.Name}}" | wc -l)
+    local docker_volumes
+    docker_volumes=$(docker volume ls --filter name=pimeleon-build --format "{{.Name}}" | wc -l)
 
     # Append build results to JSON
     cat >> "$BENCHMARK_FILE" <<EOF
