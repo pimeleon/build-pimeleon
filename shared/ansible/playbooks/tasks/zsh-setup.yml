@@ -54,7 +54,6 @@
           echo "  Welcome to Pimeleon - Your Privacy Gateway"
           echo "  Hostname: $(hostname) | IP: $(hostname -I 2>/dev/null | awk '{print $1}')"
           echo "  Run 'pim-config' for configuration menu"
-          fi
           echo ""
       fi
 
