@@ -103,12 +103,29 @@ EOF
     fi
 }
 
-# Install Tor (always use apt)
+# Install Tor (source or apt)
 install_tor() {
     local mount_point=$1
     if is_service_enabled "tor" 2>/dev/null; then
-        log_info "Installing Tor from APT"
-        chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends tor tor-geoipdb"
+        if is_build_from_source_enabled "tor" 2>/dev/null; then
+            log_info "Building Tor from source (Production mode)"
+            local tor_version_val
+            local ansible_dir="${ANSIBLE_DIR:-/ansible}"
+            tor_version_val=$(grep "tor:" "${ansible_dir}/vars/common/versions.yml" | head -1 | awk '{print $2}' | tr -d '"')
+            sudo cp /scripts/build-tor.sh "${mount_point}/tmp/build-tor.sh"
+            sudo chmod +x "${mount_point}/tmp/build-tor.sh"
+            chroot_run "${mount_point}" /tmp/build-tor.sh "${tor_version_val:-0.4.8.13}"
+            if [[ -x "${mount_point}/usr/local/bin/tor" ]]; then
+                log_info "Tor compiled and installed successfully"
+                chroot_run "${mount_point}" /usr/local/bin/tor --version | head -1
+            else
+                die "Tor compilation failed - binary not found"
+            fi
+            safe_rm "${mount_point}/tmp/build-tor.sh"
+        else
+            log_info "Installing Tor from APT (Development mode)"
+            chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends tor tor-geoipdb"
+        fi
     else
         die "tor is not enabled in profile — cannot build Pimeleon image without it"
     fi
