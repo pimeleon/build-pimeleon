@@ -398,6 +398,7 @@ export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
 # Ensure jose is present in the API package
 pnpm --filter "@pimeleon/api" add jose
+export CI=true
 NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm install --frozen-lockfile
 NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm build
 popd > /dev/null
