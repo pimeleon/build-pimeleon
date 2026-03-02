@@ -12,8 +12,6 @@ test:smoke:
   stage: test
   variables:
     DOCKER_HOST: unix:///var/run/docker.sock
-  tags:
-    - linux
   needs:
     - job: setup:platform
       artifacts: true
@@ -53,8 +51,6 @@ test:integration:
   stage: test
   variables:
     DOCKER_HOST: unix:///var/run/docker.sock
-  tags:
-    - linux
   needs:
     - job: setup:platform
       artifacts: true
