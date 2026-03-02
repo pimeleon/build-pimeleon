@@ -41,11 +41,11 @@ services_enabled:
   zram: true
   swapfile: true
 
-# Build from source overrides
+# Build from source overrides (disabled - use APT)
 build_from_source:
-  pihole_ftl: true
-  hostapd: true
-  tor: true
+  pihole_ftl: false
+  hostapd: false
+  tor: false
 
 # Minimal packages for production (no debug tools)
 dev_packages: []

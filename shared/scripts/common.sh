@@ -151,45 +151,6 @@ is_service_enabled() {
     fi
 }
 
-# Check if a service should be built from source in the current profile
-is_build_from_source_enabled() {
-    local service_name=$1
-    local ansible_dir="${ANSIBLE_DIR:-/ansible}"
-    local profile_path="${ansible_dir}/vars/common/profiles/${PIMELEON_PROFILE:-development}.yml"
-    local versions_path="${ansible_dir}/vars/common/versions.yml"
-
-    if [[ ! -f "$profile_path" ]]; then
-        die "FATAL: Profile file not found: $profile_path"
-    fi
-
-    # Check profile first, then fallback to versions.yml
-    if python3 -c "
-import yaml
-import sys
-import os
-
-def get_val(path, section, key):
-    try:
-        if not os.path.exists(path): return None
-        with open(path, 'r') as f:
-            data = yaml.safe_load(f)
-            return data.get(section, {}).get(key)
-    except Exception: return None
-
-# Try profile override
-val = get_val('$profile_path', 'build_from_source', '$service_name')
-if val is not None: sys.exit(0 if val == True else 1)
-
-# Fallback to versions.yml
-val = get_val('$versions_path', 'build_from_source', '$service_name')
-sys.exit(0 if val == True else 1)
-" 2>/dev/null; then
-        return 0
-    else
-        return 1
-    fi
-}
-
 # Cleanup stale mounts from previous failed builds
 cleanup_stale_mounts() {
     log_info "Checking for stale mounts from previous builds..."
