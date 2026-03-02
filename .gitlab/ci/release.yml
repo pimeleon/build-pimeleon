@@ -1,9 +1,30 @@
 ---
 # GitLab CI/CD - Release
-#
-# Note: Conventional GitLab Releases are tag-bound.
-# Since this project follows a tagless, branch-based release model,
-# this file is currently a placeholder for future non-tag-based release logic.
+# Creates GitLab Releases on version tags.
+# Tag format: {platform}-v{version}, e.g., rpi4-bookworm-v1.2.3
 
-variables:
-  RELEASE_MODEL: "branch-based"
+# Create a GitLab Release tied to the version tag
+release:create:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  tags:
+    - lightweight
+  needs:
+    - job: setup:platform
+      artifacts: true
+    - job: publish:image
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  environment:
+    name: cicd/production
+  script:
+    - echo "Creating GitLab Release for ${CI_COMMIT_TAG} (${TARGET_PLATFORM})"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "Pimeleon ${TARGET_PLATFORM} ${CI_COMMIT_TAG}"
+    description: |
+      Pimeleon image release for **${TARGET_PLATFORM}**.
+
+      Built from commit ${CI_COMMIT_SHORT_SHA} on branch ${CI_COMMIT_REF_NAME}.
+
+      Download the image from the [Generic Packages registry](${CI_PROJECT_URL}/-/packages).
