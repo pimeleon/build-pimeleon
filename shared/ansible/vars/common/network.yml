@@ -30,7 +30,7 @@ dhcp_lease_time: "12h"
 
 # WiFi AP configuration
 wifi_ssid: "pimeleon"
-wifi_passphrase: "changeme123"
+wifi_passphrase: "changeme123!"
 wifi_channel: 6
 wifi_hw_mode: "g"
 wifi_country_code: "US"

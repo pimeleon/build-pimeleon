@@ -4,7 +4,7 @@
 interface={{ wifi_interface | default('wlan0') }}
 driver=nl80211
 ssid={{ pimeleon_ap_name | default('Pimeleon') }}
-wpa_passphrase={{ wifi_passphrase | default('changeme123') }}
+wpa_passphrase={{ wifi_passphrase | default('changeme123!') }}
 country_code={{ wifi_country_code | default('US') }}
 # Disable 802.11d to prevent COUNTRY_UPDATE state cycling
 ieee80211d=0
