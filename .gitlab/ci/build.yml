@@ -202,8 +202,6 @@ build:containers:
 # Platform build — triggered by push to release/* branches, version tags, MRs, and develop (dev profile)
 build:pimeleon:
   extends: .build-pimeleon
-  environment:
-    name: cicd/$PIMELEON_PROFILE
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_COMMIT_TAG'
@@ -217,19 +215,6 @@ build:custom:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: manual
-  variables:
-    # Defaults that can be overridden in the GitLab UI
-    TARGET_PLATFORM: "rpi3-bookworm"
-    PIMELEON_IMAGE_SIZE: "4G"
-    PIMELEON_PROFILE: "production"
-    DEBUG: "0"
-  needs:
-    - job: setup:platform
-      artifacts: true
-    - job: build:containers
-      optional: true
-  environment:
-    name: cicd/$PIMELEON_PROFILE
   cache:
     key: "base-system-${TARGET_PLATFORM}"
     paths:
