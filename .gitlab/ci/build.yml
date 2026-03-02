@@ -192,11 +192,16 @@ build:containers:
     - chown -R "$(id -u):$(id -g)" output/ || true
   artifacts:
     paths:
-      - output/*.img
       - output/*.img.xz
       - output/*.img.metadata.json
+      - output/*.img.sha256
+      - output/*.img.md5
+      - output/*.img.xz.sha256
+      - output/*.img.xz.md5
+      - output/*.packages.txt
+      - output/*.version.txt
       - output/*.log
-      - output/pi-initial-password.txt
+      - output/pim-initial-password.txt
     expire_in: 1 week
 
 # Platform build — triggered by push to release/* branches, version tags, MRs, and develop (dev profile)
@@ -271,10 +276,15 @@ build:custom:
     - chown -R "$(id -u):$(id -g)" output/ || true
   artifacts:
     paths:
-      - output/*.img
       - output/*.img.xz
       - output/*.img.metadata.json
+      - output/*.img.sha256
+      - output/*.img.md5
+      - output/*.img.xz.sha256
+      - output/*.img.xz.md5
+      - output/*.packages.txt
+      - output/*.version.txt
       - output/*.log
-      - output/pi-initial-password.txt
+      - output/pim-initial-password.txt
     expire_in: 1 week
   allow_failure: true

@@ -2,7 +2,7 @@
 
 # Default platform (can be overridden: make build TARGET_PLATFORM=rpi4-bookworm)
 TARGET_PLATFORM ?= rpi3-bookworm
-PROFILE ?= development
+PIMELEON_PROFILE ?= development
 
 # Default target
 help:
@@ -33,7 +33,7 @@ help:
 	@echo ""
 	@echo "Examples:"
 	@echo "  make build TARGET_PLATFORM=rpi3-bookworm"
-	@echo "  make build TARGET_PLATFORM=rpi4-bookworm PROFILE=production"
+	@echo "  make build TARGET_PLATFORM=rpi4-bookworm PIMELEON_PROFILE=production"
 	@echo ""
 
 # List available apps
@@ -59,7 +59,7 @@ build-ab2p:
 	fi
 
 build-docker: build-ab2p
-	@echo "Building platform: $(TARGET_PLATFORM)"
+	@echo "Building platform: $(TARGET_PLATFORM) [Profile: $(PIMELEON_PROFILE)]"
 	@if [ ! -d "apps/$(TARGET_PLATFORM)" ]; then \
 		echo "Error: Platform '$(TARGET_PLATFORM)' not found"; \
 		echo ""; \
@@ -69,7 +69,7 @@ build-docker: build-ab2p
 	@if [ "$(SKIP_DOCKER_BUILD)" != "1" ]; then \
 		docker compose build builder; \
 	fi
-	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PROFILE) docker compose run --rm builder
+	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PIMELEON_PROFILE) docker compose run --rm builder
 
 build-all:
 	@echo "Building all platforms..."
@@ -87,16 +87,16 @@ build-all:
 
 build-prod:
 	@echo "Building production image for $(TARGET_PLATFORM)..."
-	$(MAKE) build PROFILE=production
+	$(MAKE) build PIMELEON_PROFILE=production
 
 build-dev:
 	@echo "Building development image for $(TARGET_PLATFORM)..."
-	$(MAKE) build PROFILE=development
+	$(MAKE) build PIMELEON_PROFILE=development
 
 build-nocache: build-ab2p
 	@echo "Building $(TARGET_PLATFORM) (no cache)..."
 	docker compose build --no-cache builder
-	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PROFILE) docker compose run --rm builder
+	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PIMELEON_PROFILE) docker compose run --rm builder
 
 build-local: check-deps
 	@echo "Building Pimeleon image (local)..."

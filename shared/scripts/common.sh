@@ -1,5 +1,6 @@
 #!/bin/bash
 # Common functions for Pimeleon build scripts
+set -E
 
 # Project name for cache keys and output naming
 PIMELEON_PROJECT_NAME="${PIMELEON_PROJECT_NAME:-pimeleon}"
@@ -47,14 +48,16 @@ declare -a MOUNT_STACK=()
 
 # Safe remove helper - prevents accidental deletion outside build directory
 safe_rm() {
-    local path=$1
     local work_dir_base="/tmp/build"
     local output_dir_base="/output"
 
-    if [[ -z "$path" ]]; then
-        log_warn "safe_rm: empty path provided, ignoring"
+    if [[ $# -eq 0 ]]; then
+        log_warn "safe_rm: no paths provided, ignoring"
         return
     fi
+
+    for path in "$@"; do
+        if [[ -z "$path" ]]; then continue; fi
 
         # Only allow deletion within sanctioned directories
         if [[ "$path" == "${work_dir_base}"* ]] || \
@@ -63,31 +66,46 @@ safe_rm() {
            [[ -n "${OUTPUT_DIR:-}" && "$path" == "${OUTPUT_DIR}"* ]]; then
 
             # Proactively find and unmount any sub-mounts under this path
-            local nested_mounts
-            nested_mounts=$(findmnt -n -o TARGET -R "$path" 2>/dev/null | sort -r || true)
-            if [[ -n "$nested_mounts" ]]; then
-                log_warn "safe_rm: Found active mounts under $path, unmounting..."
-                for mnt in $nested_mounts; do
-                    sudo umount "$mnt" 2>/dev/null || sudo umount -l "$mnt" 2>/dev/null || true
-                done
+            # Only if path is a directory
+            if [[ -d "$path" ]]; then
+                local nested_mounts
+                nested_mounts=$(findmnt -n -o TARGET -R "$path" 2>/dev/null | sort -r || true)
+                if [[ -n "$nested_mounts" ]]; then
+                    log_warn "safe_rm: Found active mounts under $path, unmounting..."
+                    for mnt in $nested_mounts; do
+                        sudo umount "$mnt" 2>/dev/null || sudo umount -l "$mnt" 2>/dev/null || true
+                    done
+                fi
             fi
 
-            # We allow glob expansion here by not quoting $path in the final command        # but the check above ensures the prefix is safe.
-        # shellcheck disable=SC2086
-        sudo rm -rf $path
-    else
-        die "CRITICAL: Attempted to delete path outside sanctioned directories: $path"
-    fi
+            # We allow glob expansion here by not quoting $path in the final command
+            # shellcheck disable=SC2086
+            sudo rm -rf $path
+        else
+            die "CRITICAL: Attempted to delete path outside sanctioned directories: $path"
+        fi
+    done
 }
 # Cleanup function for trap handlers
 cleanup_on_exit() {
     local exit_code=$?
+    # Clear traps to prevent recursive calls during cleanup
+    trap - EXIT ERR INT TERM
     set +e # Don't exit on error during cleanup
+
+    # On failure (non-zero exit code)
+    if [[ $exit_code -ne 0 ]]; then
+        if [[ $exit_code -eq 130 ]]; then
+            log_warn "Build interrupted by user (Ctrl+C). Cleaning up..."
+        elif [[ $exit_code -eq 143 ]]; then
+            log_warn "Build terminated by signal (SIGTERM). Cleaning up..."
+        else
+            log_error "Failure detected (exit code: $exit_code). Cleaning up..."
+        fi
+    fi
 
     # Only cleanup if we have something to clean
     if [[ -n "$CLEANUP_MOUNT_POINT" ]] || [[ -n "$CLEANUP_LOOP_DEVICE" ]] || [[ ${#MOUNT_STACK[@]} -gt 0 ]]; then
-        log_warn "Cleanup triggered (exit code/signal: $exit_code)"
-
         # Cleanup chroot first if active
         if [[ "$CLEANUP_CHROOT_ACTIVE" == "true" ]]; then
             log_info "Cleaning up chroot before exit..."
@@ -101,18 +119,9 @@ cleanup_on_exit() {
         fi
     fi
 
-    # On failure (non-zero exit code)
     if [[ $exit_code -ne 0 ]]; then
-        if [[ $exit_code -eq 130 ]]; then
-            log_warn "Build interrupted by user (Ctrl+C). Cleaning up..."
-        elif [[ $exit_code -eq 143 ]]; then
-            log_warn "Build terminated by signal (SIGTERM). Cleaning up..."
-        fi
-
         if [[ -n "${LOG_FILE:-}" ]]; then
-            log_error "Failure detected (exit code: $exit_code). Detailed build log: ${LOG_FILE}"
-        else
-            log_info "Failure detected (exit code: $exit_code). Checking for partial image to remove..."
+            log_info "Detailed build log: ${LOG_FILE}"
         fi
         if [[ -n "${CLEANUP_IMAGE_PATH:-}" ]]; then
             if [[ -f "$CLEANUP_IMAGE_PATH" ]]; then
@@ -120,14 +129,9 @@ cleanup_on_exit() {
                 sudo rm -f "$CLEANUP_IMAGE_PATH" || true
                 sudo rm -f "${CLEANUP_IMAGE_PATH}.xz" || true
                 sudo rm -f "${CLEANUP_IMAGE_PATH}.sha256" || true
-            else
-                log_info "No partial image file found at $CLEANUP_IMAGE_PATH"
             fi
-        else
-            log_info "CLEANUP_IMAGE_PATH is not set, skipping image removal"
         fi
     fi
-
 
     # Exit with original code
     exit $exit_code
@@ -157,6 +161,33 @@ is_build_from_source_enabled() {
     local ansible_dir="${ANSIBLE_DIR:-/ansible}"
     local profile_path="${ansible_dir}/vars/common/profiles/${PIMELEON_PROFILE:-development}.yml"
     local versions_path="${ansible_dir}/vars/common/versions.yml"
+
+    # Tor source build logic:
+    # - Local: Build from source if PIMELEON_PROFILE=production
+    # - CI: Build from source ONLY if PIMELEON_PROFILE=production AND (tagged release OR merged to release/*)
+    if [[ "$service_name" == "tor" ]]; then
+        if [[ "${PIMELEON_PROFILE:-}" == "production" ]]; then
+            if [[ -n "${CI:-}" ]]; then
+                # 1. Check for tagged release
+                if [[ -n "${CI_COMMIT_TAG:-}" ]] || [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+                    return 0
+                fi
+                # 2. Check for release branch (current or merge target)
+                if [[ "${CI_COMMIT_REF_NAME:-}" == release/* ]] || \
+                   [[ "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}" == release/* ]] || \
+                   [[ "${GITHUB_REF_NAME:-}" == release/* ]] || \
+                   [[ "${GITHUB_BASE_REF:-}" == release/* ]]; then
+                    return 0
+                fi
+                # CI but not a sanctioned release path -> use APT
+                return 1
+            fi
+            # Local production build
+            return 0
+        fi
+        # Development profile or other -> use APT
+        return 1
+    fi
 
     if [[ ! -f "$profile_path" ]]; then
         die "FATAL: Profile file not found: $profile_path"
