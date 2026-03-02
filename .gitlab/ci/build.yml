@@ -22,14 +22,13 @@ setup:platform:
         PLATFORM=$(echo "$CI_COMMIT_TAG" | sed 's/-v[0-9].*//')
         PROFILE="production"
       elif [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ]; then
+        # MRs always use development profile to avoid slow source builds
         if [[ "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" =~ ^release/ ]]; then
           PLATFORM=$(echo "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" | sed 's|^release/||')
-          PROFILE="production"
         else
-          # For develop MRs, use development profile
           PLATFORM="rpi3-bookworm"
-          PROFILE="development"
         fi
+        PROFILE="development"
       elif [ "$CI_PIPELINE_SOURCE" == "web" ]; then
         PLATFORM="${TARGET_PLATFORM:-rpi3-bookworm}"
         PROFILE="${PIMELEON_PROFILE:-production}"
@@ -203,6 +202,8 @@ build:containers:
 # Platform build — triggered by push to release/* branches, version tags, MRs, and develop (dev profile)
 build:pimeleon:
   extends: .build-pimeleon
+  environment:
+    name: cicd/$PIMELEON_PROFILE
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_COMMIT_TAG'
