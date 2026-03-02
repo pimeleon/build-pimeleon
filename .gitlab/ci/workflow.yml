@@ -46,7 +46,10 @@ workflow:
     # Full pipeline on release branches (one branch per platform)
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       when: always
-    # Lint + scan only on develop
+    # Full pipeline on version tags (production release, tag format: {platform}-v{version})
+    - if: '$CI_COMMIT_TAG'
+      when: always
+    # Lint + scan + dev build on develop
     - if: '$CI_COMMIT_BRANCH == "develop"'
       when: always
     # MR events targeting develop or release branches
