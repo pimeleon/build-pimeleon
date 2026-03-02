@@ -1,9 +1,0 @@
----
-# Raspberry Pi 3B+ / Bookworm app-specific overrides
-# Extends shared/ansible/inventory/group_vars/raspberrypi_3bplus/main.yml
-
-# hostapd: require HT (802.11n) but do not advertise ht_capab on 3B+ (BCM43438)
-# BCM43438 does not reliably support HT40 in AP mode
-hostapd_require_ht: true
-hostapd_ht_enabled: false
-hostapd_ht_capab: ""
