@@ -139,9 +139,12 @@ main() {
     rm -rf "${WORK_DIR}"
 
     # Summary
-    local duration=$((SECONDS - start_time))
-    local minutes=$((duration / 60))
-    local seconds=$((duration % 60))
+    local duration
+    duration=$((SECONDS - start_time))
+    local minutes
+    minutes=$((duration / 60))
+    local seconds
+    seconds=$((duration % 60))
 
     echo ""
     log_success "Build completed successfully!"

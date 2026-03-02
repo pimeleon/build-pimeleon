@@ -57,7 +57,9 @@ safe_rm() {
     fi
 
     for path in "$@"; do
-        if [[ -z "$path" ]]; then continue; fi
+        if [[ -z "$path" ]]; then
+            continue
+        fi
 
         # Only allow deletion within sanctioned directories
         if [[ "$path" == "${work_dir_base}"* ]] || \
