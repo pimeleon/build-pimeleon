@@ -10,12 +10,14 @@
 test:smoke:
   extends: .docker-job
   stage: test
+  variables:
+    DOCKER_HOST: unix:///var/run/docker.sock
+  tags:
+    - linux
   needs:
     - job: setup:platform
       artifacts: true
     - job: build:pimeleon
-  tags:
-    - linux
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       variables:
@@ -49,12 +51,14 @@ test:smoke:
 test:integration:
   extends: .docker-job
   stage: test
+  variables:
+    DOCKER_HOST: unix:///var/run/docker.sock
+  tags:
+    - linux
   needs:
     - job: setup:platform
       artifacts: true
     - job: build:pimeleon
-  tags:
-    - linux
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       variables:
