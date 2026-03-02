@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+set -E
 
 # Pimeleon Build Script - Monorepo Version
 # Main entry point for building Pimeleon images
@@ -74,6 +75,14 @@ fi
 IMAGE_PATH="${OUTPUT_DIR}/${IMAGE_NAME}"
 LOG_FILE="${OUTPUT_DIR}/build-${TARGET_PLATFORM}-${BUILD_TIMESTAMP}.log"
 
+# Clean up old images for the same platform before starting to avoid clutter
+log_info "Cleaning up old images for ${TARGET_PLATFORM}..."
+# Using safe_rm to be consistent with project standards
+# pimeleon-{device}-*-{os}.img covers all version/commit variants
+safe_rm "${OUTPUT_DIR}/pimeleon-${DEVICE_NAME}-*-${OS_NAME}.img"*
+# Clean up old logs for this platform except the one we're about to create
+find "${OUTPUT_DIR}" -name "build-${TARGET_PLATFORM}-*.log" -not -name "$(basename "${LOG_FILE}")" -delete 2>/dev/null || true
+
 # Track image path for cleanup on failure
 export CLEANUP_IMAGE_PATH="${IMAGE_PATH}"
 
@@ -134,9 +143,6 @@ DEBUG="${DEBUG:-0}" /scripts/stage3-optimize.sh "${WORK_DIR}" "${IMAGE_PATH}"
 if [[ -n "${CI:-}" ]]; then
     log_section "Stage 4: Packaging image"
     /scripts/stage4-package.sh "${WORK_DIR}" "${IMAGE_PATH}"
-
-    log_section "Generating metadata"
-    generate_metadata "${IMAGE_PATH}"
 else
     log_info "Skipping Stage 4 (Packaging) and Metadata generation for local build"
 fi

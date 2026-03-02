@@ -276,6 +276,16 @@ cleanup_chroot "${MOUNT_POINT}"
 ROOT_USAGE=$(df -h "${MOUNT_POINT}" | tail -1 | awk '{print $3}')
 log_info "Root filesystem usage: ${ROOT_USAGE}"
 
+# Get version information
+log_info "Generating version info: ${IMAGE_PATH}.version.txt"
+cat > "${IMAGE_PATH}.version.txt" <<EOF
+Build Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+Raspbian Version: ${RASPBIAN_VERSION:-bookworm}
+Kernel Version: $(chroot_run "${MOUNT_POINT}" uname -r || echo "unknown")
+Pi Model: ${PIMELEON_RPI_MODEL:-3B+}
+Builder Version: 1.0.0
+EOF
+
 # Verify stage completion
 verify_stage 3 "${MOUNT_POINT}"
 
