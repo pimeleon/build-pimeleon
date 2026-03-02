@@ -97,8 +97,6 @@ build:containers:
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
     - when: never
-  environment:
-    name: cicd/$PIMELEON_PROFILE
   script:
     - |
       # Prioritize local Dockerfiles if they exist in the branch root
@@ -211,8 +209,6 @@ build:pimeleon:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.*)$/'
     - if: '$CI_COMMIT_BRANCH == "develop"'
-  environment:
-    name: cicd/$PIMELEON_PROFILE
 
 # Custom build — manually triggered via Web/API with configurable variables
 build:custom:
