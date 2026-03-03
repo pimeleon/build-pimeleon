@@ -9,6 +9,7 @@ profile_description: "Full-featured production build with all services"
 services_enabled:
   # Tier 1: Core
   networkd: true
+  wpa_supplicant: false
   hostapd: true
   dhcp_server: true
   dns_server: true
@@ -42,8 +43,8 @@ services_enabled:
 
 # Build from source overrides
 build_from_source:
-  pihole_ftl: true
-  hostapd: true
+  pihole_ftl: false
+  hostapd: false
   tor: true
 
 # Minimal packages for production (no debug tools)

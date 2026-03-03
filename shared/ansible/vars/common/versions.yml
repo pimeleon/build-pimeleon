@@ -97,23 +97,3 @@ checksums:
   dnscrypt_proxy: "sha256:auto"  # GitHub releases include checksums
   hostapd: "sha256:auto"  # w1.fi provides checksums
   pihole_ftl: "sha256:auto"  # GitHub releases include checksums
-
-# =============================================================================
-# BUILD FROM SOURCE FLAGS - Enable/disable source builds per service
-# =============================================================================
-
-build_from_source:
-  # Always build from source (security-critical)
-  tor: true
-  dnscrypt_proxy: true
-  pihole_ftl: true
-
-  # Optional source builds (enable for WPA3/latest features)
-  hostapd: true
-  wpa_supplicant: false  # Usually apt is sufficient
-
-  # APT preferred (well-maintained packages)
-  bind9: false
-  privoxy: false
-  nftables: false
-  fail2ban: false

@@ -23,97 +23,98 @@ LOOP_DEVICE="${CLEANUP_LOOP_DEVICE}"
 
 # Enable services (without chroot - create symlinks directly)
 # This runs after Ansible has installed and configured all services
-log_info "Enabling services"
+log_info "Enabling services based on profile configuration"
 
 MULTI_USER_WANTS="${MOUNT_POINT}/etc/systemd/system/multi-user.target.wants"
 sudo mkdir -p "${MULTI_USER_WANTS}"
 
-# Services list matching the working reference build
-SERVICES_TO_ENABLE=(
-    # Core infrastructure
-    "ssh"
-    "systemd-networkd"
-    "nftables"
-    "rsyslog"
-    "cron"
-    "fake-hwclock"
-    "e2scrub_reap"
-    "unattended-upgrades"
-    "atd"
-    "zramswap"
-    "sysstat"
-    "smartmontools"
-    "vnstat"
-    "atop"
-    "atopacct"
+# Map of systemd service name to profile key
+# Format: "service_name:profile_key" (profile_key 'none' means always enable)
+SERVICES_MAPPING=(
+    # Core infrastructure (mostly always enabled)
+    "ssh:ssh"
+    "systemd-networkd:networkd"
+    "nftables:firewall"
+    "rsyslog:none"
+    "cron:none"
+    "fake-hwclock:none"
+    "e2scrub_reap:none"
+    "unattended-upgrades:none"
+    "atd:none"
+    "zramswap:zram"
+    "dphys-swapfile:swapfile"
+    "sysstat:none"
+    "vnstat:none"
+    "atop:none"
+    "atopacct:none"
     # Network services
-    "hostapd"
-    "named"
-    "fail2ban"
-    "wpa_supplicant"
-    "avahi-daemon"
-    "network-optimization"
-    # Proxy services
-    "privoxy"
-    "squid"
-    "tor"
+    "hostapd:hostapd"
+    "isc-dhcp-server:dhcp_server"
+    "named:dns_server"
+    "fail2ban:fail2ban"
+    "wpa_supplicant:wpa_supplicant"
+    "avahi-daemon:avahi"
+    "network-optimization:none"
+    # Proxy & Adblock
+    "privoxy:privoxy"
+    "squid:squid"
+    "tor:tor"
+    "dnscrypt-proxy:dnscrypt_proxy"
+    "pihole-FTL:pihole"
     # Pimeleon application
-    "pimeleon-api"
-    "pimeleon-proxy"
-    "pim-setup"
-    "firstboot"
+    "pimeleon-api:pimeleon_api"
+    "pimeleon-proxy:pimeleon_api"
 )
 
-# Optional services - only enable if configured in profile
-# Uses is_service_enabled function from common.sh
-if is_service_enabled "dnscrypt_proxy"; then
-    SERVICES_TO_ENABLE+=("dnscrypt-proxy")
-fi
-if is_service_enabled "privoxy"; then
-    SERVICES_TO_ENABLE+=("privoxy")
-fi
-if is_service_enabled "squid"; then
-    SERVICES_TO_ENABLE+=("squid")
-fi
-if is_service_enabled "tor"; then
-    SERVICES_TO_ENABLE+=("tor@default")
-fi
-if is_service_enabled "pihole"; then
-    SERVICES_TO_ENABLE+=("pihole-FTL")
-fi
+for mapping in "${SERVICES_MAPPING[@]}"; do
+    service="${mapping%%:*}"
+    profile_key="${mapping#*:}"
 
-MULTI_USER_WANTS="${MOUNT_POINT}/etc/systemd/system/multi-user.target.wants"
-sudo mkdir -p "${MULTI_USER_WANTS}"
+    # Check if service should be enabled
+    if [[ "$profile_key" != "none" ]]; then
+        if ! is_service_enabled "$profile_key"; then
+            log_info "Service $service is disabled in profile, skipping."
+            continue
+        fi
+    fi
 
-for service in "${SERVICES_TO_ENABLE[@]}"; do
-    SERVICE_FILE=""
     SEARCH_NAME="${service}"
     if [[ "${service}" == *"@"* ]]; then
         SEARCH_NAME="${service%%@*}@"
     fi
 
-    # Robust discovery: Use find INSIDE the chroot to locate the service unit.
-    # This correctly handles Merged-/usr symlinks (/lib -> /usr/lib).
     log_info "Searching for service: ${service}"
 
-    # We use a helper variable to get the relative path from the chroot root
+    # Robust discovery: Use find INSIDE the chroot to locate the service unit.
     REL_SERVICE_PATH=$(chroot_run "${MOUNT_POINT}" find /lib/systemd/system /usr/lib/systemd/system /etc/systemd/system -name "${SEARCH_NAME}.service" -print -quit 2>/dev/null || true)
 
     if [[ -n "${REL_SERVICE_PATH}" ]]; then
         log_info "Enabling service: ${service} (found at ${REL_SERVICE_PATH})"
-        # Create symlink relative to the image's filesystem
+        # Create symlink relative to the image's filesystem in multi-user.target.wants
         sudo ln -sf "${REL_SERVICE_PATH}" "${MULTI_USER_WANTS}/${service}.service"
+
+        # Special handling for template instances (e.g., tor@default)
+        if [[ "${service}" == *"@"* ]]; then
+            master_service="${service%%@*}"
+            instance_name="${service#*@}"
+            wants_dir="${MOUNT_POINT}/etc/systemd/system/${master_service}.service.wants"
+            log_info "Creating template instance symlink for ${service} in ${wants_dir}"
+            sudo mkdir -p "${wants_dir}"
+            sudo ln -sf "${REL_SERVICE_PATH}" "${wants_dir}/${instance_name}.service"
+        fi
     else
-        # Fallback/Diagnostic
-        if [[ "${service}" == "pihole-FTL" ]]; then
-             log_info "Attempting legacy Pi-hole enablement..."
-             chroot_run "${MOUNT_POINT}" systemctl enable pihole-FTL 2>/dev/null || true
+        # Fallback/Diagnostic for legacy Pi-hole or specific cases
+        if [[ "${service}" == "pihole-FTL" ]] || [[ "${service}" == "isc-dhcp-server" ]]; then
+            log_info "Attempting legacy service enablement for ${service}..."
+            chroot_run "${MOUNT_POINT}" systemctl enable "${service}" 2>/dev/null || true
         else
-             log_warn "Service not found: ${service}. (Checked standard systemd paths in chroot)"
-             if [[ "${DEBUG:-0}" == "1" ]]; then
-                 log_info "DEBUG: Listing all service files in chroot for diagnostics:"
-                 chroot_run "${MOUNT_POINT}" find /lib/systemd/system /usr/lib/systemd/system /etc/systemd/system -name "*.service" | grep "${SEARCH_NAME}" || true
-             fi
+            # CRITICAL: Missing service that is supposed to be enabled is a fatal error
+            log_error "FATAL: Service not found: ${service}. (Checked standard systemd paths in chroot)"
+            if [[ "${DEBUG:-0}" == "1" ]]; then
+                log_info "DEBUG: Listing all service files in chroot for diagnostics:"
+                chroot_run "${MOUNT_POINT}" find /lib/systemd/system /usr/lib/systemd/system /etc/systemd/system -name "*.service" | grep "${SEARCH_NAME}" || true
+            fi
+            die "Build failed: Required service '${service}' not found in image."
         fi
     fi
 done
@@ -167,21 +168,28 @@ safe_rm "${MOUNT_POINT}/usr/share/lintian/*"
 
 # Remove unused locales except supported ones
 sudo find "${MOUNT_POINT}/usr/share/locale" -mindepth 1 -maxdepth 1 \
-    ! -name 'en*' ! -name 'es*' ! -name 'ru*' ! -name 'uk*' ! -name 'zh*' ! -name 'ko*' \
+    ! -name 'ar*' ! -name 'en*' ! -name 'es*' ! -name 'fa*' ! -name 'fr*' ! -name 'id*' ! -name 'pt*' ! -name 'ru*' ! -name 'tr*' ! -name 'uk*' ! -name 'zh*' ! -name 'ko*' \
     -exec rm -rf {} \; 2>/dev/null || true
 
 # Remove SSH host keys (will be regenerated on first boot)
 safe_rm "${MOUNT_POINT}/etc/ssh/ssh_host_*"
 
-# Configure locales (en_IE default, plus Spanish, Russian, Ukrainian, Chinese, Korean)
+# Configure locales
 log_info "Configuring locales"
 sudo tee "${MOUNT_POINT}/etc/locale.gen" > /dev/null <<EOF
+ar_SA.UTF-8 UTF-8
 en_IE.UTF-8 UTF-8
 en_US.UTF-8 UTF-8
 es_ES.UTF-8 UTF-8
+fa_IR.UTF-8 UTF-8
+fr_FR.UTF-8 UTF-8
+id_ID.UTF-8 UTF-8
+pt_BR.UTF-8 UTF-8
 ru_RU.UTF-8 UTF-8
+tr_TR.UTF-8 UTF-8
 uk_UA.UTF-8 UTF-8
 zh_CN.UTF-8 UTF-8
+zh_TW.UTF-8 UTF-8
 ko_KR.UTF-8 UTF-8
 EOF
 chroot_run "${MOUNT_POINT}" locale-gen
@@ -204,6 +212,8 @@ sudo tee "${MOUNT_POINT}/etc/systemd/system/firstboot.service" > /dev/null <<EOF
 [Unit]
 Description=First Boot Setup
 After=network.target
+Before=ssh.service
+Before=sshd.service
 ConditionPathExists=!/etc/firstboot.done
 
 [Service]
@@ -265,6 +275,16 @@ cleanup_chroot "${MOUNT_POINT}"
 ROOT_USAGE=$(df -h "${MOUNT_POINT}" | tail -1 | awk '{print $3}')
 log_info "Root filesystem usage: ${ROOT_USAGE}"
 
+# Get version information
+log_info "Generating version info: ${IMAGE_PATH}.version.txt"
+cat > "${IMAGE_PATH}.version.txt" <<EOF
+Build Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+Raspbian Version: ${RASPBIAN_VERSION:-bookworm}
+Kernel Version: $(chroot_run "${MOUNT_POINT}" uname -r || echo "unknown")
+Pi Model: ${PIMELEON_RPI_MODEL:-3B+}
+Builder Version: 1.0.0
+EOF
+
 # Verify stage completion
 verify_stage 3 "${MOUNT_POINT}"
 
@@ -278,7 +298,7 @@ unmount_image "${MOUNT_POINT}" "${LOOP_DEVICE}"
 
 # Shrink image if possible
 log_info "Checking if image can be shrunk"
-# Use a subshell to ensure cleanup of loop device even if commands fail
+# Use a sub-shell to ensure cleanup of loop device even if commands fail
 (
     LOOP_DEV=$(sudo losetup -f --show "${IMAGE_PATH}")
     # Setup trap for inner loop device

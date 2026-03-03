@@ -16,6 +16,7 @@ trap 'cleanup_on_exit' EXIT ERR INT TERM
 
 WORK_DIR=$1
 IMAGE_PATH=$2
+# CLEANUP_IMAGE_PATH="${IMAGE_PATH}"
 MOUNT_POINT="${WORK_DIR}/mount"
 BOOT_MOUNT="${WORK_DIR}/boot"
 IMAGE_NAME="pimeleon-${TARGET_PLATFORM:-rpi3-bookworm}"
@@ -36,10 +37,6 @@ BOOT_MOUNT="${MOUNT_POINT}/boot"
 # Setup chroot
 setup_chroot "${MOUNT_POINT}"
 
-# Protect resolv.conf from systemd-resolved dpkg hooks converting it to a dangling symlink
-# See: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1020277
-sudo chattr +i "${MOUNT_POINT}/etc/resolv.conf" 2>/dev/null || true
-
 # Configure APT cache for chroot environment early
 configure_chroot_apt_proxy "${MOUNT_POINT}"
 
@@ -55,15 +52,15 @@ migrate_apt_keyring "${MOUNT_POINT}"
 
 # Update package lists
 log_info "Updating package lists"
-chroot_run "${MOUNT_POINT}" apt-get -q update
-chroot_run "${MOUNT_POINT}" apt-get -qy upgrade
+chroot_run "${MOUNT_POINT}" apt-get update
+chroot_run "${MOUNT_POINT}" apt-get -y upgrade
 
 # Define package categories for better maintenance
 SYSTEM_PKGS=(
     "systemd" "systemd-sysv" "systemd-resolved" "udev" "dbus" "policykit-1"
     "locales" "locales-all" "tzdata" "fake-hwclock" "cron" "rsyslog" "logrotate"
     "sudo" "parted" "pkg-config" "ca-certificates" "apt-transport-https"
-    "openssh-server" "zram-tools" "dphys-swapfile"
+    "openssh-server" "zram-tools" "dphys-swapfile" "at"
 )
 
 SHELL_PKGS=(
@@ -79,7 +76,7 @@ NET_CORE_PKGS=(
 
 NET_ROUTER_PKGS=(
     "bridge-utils" "vlan" "ppp" "pppoeconf" "wireguard-tools"
-    "wireless-tools" "wireless-regdb" "rfkill" "wpasupplicant"
+    "wireless-tools" "wireless-regdb" "rfkill" "wpasupplicant" "iw"
     "isc-dhcp-server"
 )
 
@@ -89,7 +86,7 @@ MONITOR_PKGS=(
 )
 
 HARDWARE_PKGS=(
-    "usbutils" "lshw" "hdparm" "smartmontools" "ethtool"
+    "usbutils" "lshw" "hdparm" "ethtool"
 )
 
 BUILD_DEPS=(
@@ -98,16 +95,37 @@ BUILD_DEPS=(
     "python3-venv" "python3-apt" "nodejs"
 )
 
-# Install essential packages (full router stack)
-log_info "Installing essential packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
-    "${SYSTEM_PKGS[@]}" \
-    "${SHELL_PKGS[@]}" \
-    "${NET_CORE_PKGS[@]}" \
-    "${NET_ROUTER_PKGS[@]}" \
-    "${MONITOR_PKGS[@]}" \
-    "${HARDWARE_PKGS[@]}" \
-    "${BUILD_DEPS[@]}"
+# Install essential packages by category for better visibility
+log_info "Installing system core packages"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${SYSTEM_PKGS[@]}"
+
+log_info "Installing shell and utility packages"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${SHELL_PKGS[@]}"
+
+log_info "Installing core networking packages"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${NET_CORE_PKGS[@]}"
+
+log_info "Installing routing and wireless packages"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${NET_ROUTER_PKGS[@]}"
+
+log_info "Installing monitoring and diagnostics packages"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${MONITOR_PKGS[@]}"
+
+log_info "Installing hardware-specific packages"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${HARDWARE_PKGS[@]}"
+
+log_info "Installing build dependencies and runtime environments"
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${BUILD_DEPS[@]}"
+
+# Restore and protect resolv.conf (systemd-resolved might have converted it to a symlink)
+log_info "Restoring and protecting resolv.conf"
+sudo rm -f "${MOUNT_POINT}/etc/resolv.conf"
+sudo tee "${MOUNT_POINT}/etc/resolv.conf" > /dev/null <<EOF
+# DNS for chroot build environment (restored after package installation)
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+EOF
+sudo chattr +i "${MOUNT_POINT}/etc/resolv.conf" 2>/dev/null || true
 
 # Verify Python3 installation (required for Ansible)
 log_info "Verifying Python3 installation..."
@@ -120,24 +138,24 @@ log_info "Python3 installed: ${PYTHON_VER}"
 
 # Install WiFi firmware (may fail if non-free not available)
 log_info "Installing WiFi firmware"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     firmware-brcm80211 || log_warn "WiFi firmware not available, wireless may not work"
 
 # Install Pi-specific packages (kernel and firmware)
 log_info "Installing Raspberry Pi kernel and firmware"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     raspberrypi-kernel \
     raspberrypi-bootloader
 
 # Verify Pi boot firmware was installed to boot partition
 log_info "Verifying Pi boot firmware installation"
 FIRMWARE_OK=true
-[[ -f "${BOOT_MOUNT}/bootcode.bin" ]] || { log_warn "bootcode.bin not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/start.elf" ]] || { log_warn "start.elf not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/fixup.dat" ]] || { log_warn "fixup.dat not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/kernel7.img" ]] || { log_warn "kernel7.img not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/bcm2710-rpi-3-b-plus.dtb" ]] || { log_warn "Pi 3B+ device tree not found"; FIRMWARE_OK=false; }
-[[ -d "${BOOT_MOUNT}/overlays" ]] || { log_warn "Boot overlays not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/bootcode.bin" ]] || { log_error "bootcode.bin not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/start.elf" ]] || { log_error "start.elf not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/fixup.dat" ]] || { log_error "fixup.dat not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/kernel7.img" ]] || { log_error "kernel7.img not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/bcm2710-rpi-3-b-plus.dtb" ]] || { log_error "Pi 3B+ device tree not found"; FIRMWARE_OK=false; }
+[[ -d "${BOOT_MOUNT}/overlays" ]] || { log_error "Boot overlays not found"; FIRMWARE_OK=false; }
 if [[ "$FIRMWARE_OK" == "true" ]]; then
     log_info "All Pi boot firmware files verified"
 else
@@ -146,129 +164,32 @@ fi
 
 # Install basic networking tools (hostapd compiled from source separately)
 log_info "Installing basic networking tools"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     bridge-utils \
     isc-dhcp-server \
     rfkill \
     wireless-regdb \
     wpasupplicant
 
-# Build or install hostapd (if enabled)
-if is_service_enabled "hostapd" 2>/dev/null; then
-    if is_build_from_source_enabled "hostapd" 2>/dev/null; then
-        log_info "Building hostapd from source with WPA3/SAE support (Production mode)"
-        HOSTAPD_VERSION="hostap_2_10"
-        HOSTAPD_BUILD_DIR="${MOUNT_POINT}/tmp/hostapd-build"
-
-        # Clone hostap repository on builder host (has network access)
-        sudo mkdir -p "${HOSTAPD_BUILD_DIR}"
-        if [[ ! -d "${HOSTAPD_BUILD_DIR}/hostap" ]]; then
-            log_info "Cloning hostap repository (${HOSTAPD_VERSION})..."
-            sudo git clone --depth 1 --branch "${HOSTAPD_VERSION}" \
-                https://git.w1.fi/hostap.git "${HOSTAPD_BUILD_DIR}/hostap"
-        fi
-
-        # Copy build script into chroot
-        sudo cp /scripts/build-hostapd.sh "${MOUNT_POINT}/tmp/build-hostapd.sh"
-        sudo chmod +x "${MOUNT_POINT}/tmp/build-hostapd.sh"
-
-        # Build hostapd inside chroot (ARM cross-compilation via QEMU)
-        log_info "Compiling hostapd inside chroot (this may take a while)..."
-        chroot_run "${MOUNT_POINT}" /tmp/build-hostapd.sh
-
-        # Verify hostapd installed
-        if [[ -x "${MOUNT_POINT}/usr/local/bin/hostapd" ]]; then
-            log_info "hostapd compiled and installed successfully"
-            chroot_run "${MOUNT_POINT}" /usr/local/bin/hostapd -v 2>&1 | head -3 || true
-        else
-            die "hostapd compilation failed - binary not found"
-        fi
-
-        # Cleanup build artifacts
-        sudo rm -rf "${HOSTAPD_BUILD_DIR}"
-        sudo rm -f "${MOUNT_POINT}/tmp/build-hostapd.sh"
-    else
-        log_info "Installing hostapd from APT (Development mode)"
-        chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
-            hostapd
-    fi
-else
-    log_info "hostapd not enabled in profile, skipping installation"
-fi
-
-# Pi-hole Installation
-if is_service_enabled "pihole" 2>/dev/null; then
-    if is_build_from_source_enabled "pihole_ftl" 2>/dev/null; then
-        log_info "Building Pi-hole from source (Production mode)"
-        sudo cp /scripts/build-pihole-ftl.sh "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
-        sudo chmod +x "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
-        chroot_run "${MOUNT_POINT}" /tmp/build-pihole-ftl.sh
-        if [[ -x "${MOUNT_POINT}/usr/local/bin/pihole-FTL" ]]; then
-            log_info "Pi-hole FTL compiled and installed successfully"
-            chroot_run "${MOUNT_POINT}" /usr/local/bin/pihole-FTL --version || true
-        else
-            log_error "Pi-hole FTL compilation failed - binary not found"
-        fi
-        sudo rm -f "${MOUNT_POINT}/tmp/build-pihole-ftl.sh"
-    else
-        log_info "Installing Pi-hole using official installer (Development mode)"
-        # Pre-seed configuration for unattended install
-        sudo mkdir -p "${MOUNT_POINT}/etc/pihole"
-        sudo tee "${MOUNT_POINT}/etc/pihole/setupVars.conf" > /dev/null <<EOF
-PIHOLE_INTERFACE=eth1
-PIHOLE_DNS_1=127.0.0.1#5054
-INSTALL_WEB_INTERFACE=false
-INSTALL_WEB_SERVER=false
-LIGHTTPD_ENABLED=false
-QUERY_LOGGING=false
-INSTALL_FTL=true
-EOF
-        # Official simple install method
-        chroot_run "${MOUNT_POINT}" bash -c "curl -sSL https://install.pi-hole.net | bash /dev/stdin --unattended" || log_warn "Pi-hole installer returned non-zero (expected in chroot)"
-    fi
-else
-    log_info "Pi-hole not enabled in profile, skipping installation"
-fi
-
-# Build or install Tor (if enabled)
-if is_service_enabled "tor" 2>/dev/null; then
-    if is_build_from_source_enabled "tor" 2>/dev/null; then
-        log_info "Building Tor from source (Production mode)"
-        TOR_VERSION_VAL=$(grep "tor:" "${SHARED_ANSIBLE_DIR}/vars/common/versions.yml" | head -1 | awk '{print $2}' | tr -d '"')
-        sudo cp /scripts/build-tor.sh "${MOUNT_POINT}/tmp/build-tor.sh"
-        sudo chmod +x "${MOUNT_POINT}/tmp/build-tor.sh"
-        chroot_run "${MOUNT_POINT}" /tmp/build-tor.sh "${TOR_VERSION_VAL:-0.4.8.13}"
-        if [[ -x "${MOUNT_POINT}/usr/local/bin/tor" ]]; then
-            log_info "Tor compiled and installed successfully"
-            chroot_run "${MOUNT_POINT}" /usr/local/bin/tor --version | head -1 || true
-        else
-            die "Tor compilation failed - binary not found"
-        fi
-        sudo rm -f "${MOUNT_POINT}/tmp/build-tor.sh"
-    else
-        log_info "Installing Tor from APT (Development mode)"
-        chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
-            tor tor-geoipdb
-    fi
-else
-    log_info "Tor not enabled in profile, skipping installation"
-fi
-
+# Install core services (hostapd, Pi-hole, Tor) using library functions
+install_hostapd "${MOUNT_POINT}"
+install_pihole "${MOUNT_POINT}"
+install_tor "${MOUNT_POINT}"
 
 # Install DNS server packages (dnscrypt-proxy uses pre-built binary, not APT)
 log_info "Installing DNS server packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     bind9 \
     bind9utils
 
 # Install security packages
 log_info "Installing security packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     fail2ban
 
 # Install proxy packages
 log_info "Installing proxy packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qy --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     privoxy
 
 # Generate Privoxy filters from AdBlock lists (runs on x86, outputs to chroot)
@@ -276,7 +197,7 @@ log_info "Generating Privoxy ad-blocking filters"
 if [[ -x /scripts/generate-privoxy-filters.sh ]]; then
     /scripts/generate-privoxy-filters.sh "${MOUNT_POINT}"
 else
-    log_warn "Privoxy filter generator not found, skipping"
+    die "FATAL: Privoxy filter generator not found at /scripts/generate-privoxy-filters.sh"
 fi
 
 # Disable NetworkManager (Bookworm default) in favor of systemd-networkd
@@ -330,22 +251,26 @@ for group in gpio i2c spi; do
     chroot_run "${MOUNT_POINT}" groupadd -f -r "$group" || true
 done
 
-# Create Pimeleon service group and users
-log_info "Creating Pimeleon service group and users"
-chroot_run "${MOUNT_POINT}" groupadd -f -r pim
+# Create Pimeleon management user (UID/GID 1000 like default pi user)
+log_info "Creating pim management user"
+# Ensure pim group is GID 1000
+chroot_run "${MOUNT_POINT}" groupadd -f -g 1000 pim
+# Ensure pim user is UID 1000
+chroot_run "${MOUNT_POINT}" useradd --create-home -u 1000 -s /bin/zsh -g pim -G adm,dialout,cdrom,users,netdev,gpio,i2c,spi pim || true
+
+# Create Pimeleon service users (using same pim group)
+log_info "Creating Pimeleon service users"
 chroot_run "${MOUNT_POINT}" useradd -r -s /usr/sbin/nologin -g pim -d /opt/pimeleon/api pim-api || true
 chroot_run "${MOUNT_POINT}" useradd -r -s /usr/sbin/nologin -g pim -d /opt/pimeleon/proxy pim-proxy || true
 chroot_run "${MOUNT_POINT}" useradd -r -s /usr/sbin/nologin -g pim -d /var/lib/ngrok pim-ngrok || true
 
 # Verify users
 log_info "Verifying Pimeleon users"
+chroot_run "${MOUNT_POINT}" id pim || true
 chroot_run "${MOUNT_POINT}" id pim-api || true
 chroot_run "${MOUNT_POINT}" id pim-proxy || true
 chroot_run "${MOUNT_POINT}" id pim-ngrok || true
 
-# Create pim management user (full sudo via sudoers.d, not sudo group)
-log_info "Creating pim management user"
-chroot_run "${MOUNT_POINT}" useradd --create-home -s /bin/zsh -g pim -G adm,dialout,cdrom,users,netdev,gpio,i2c,spi pim || true
 # Ensure home directory exists (fallback if useradd -m fails)
 sudo mkdir -p "${MOUNT_POINT}/home/pim"
 chroot_run "${MOUNT_POINT}" chown pim:pim /home/pim
@@ -357,7 +282,7 @@ echo "${TEMP_PASSWORD}" | sudo tee "${OUTPUT_DIR}/pim-initial-password.txt" > /d
 sudo chmod 600 "${OUTPUT_DIR}/pim-initial-password.txt"
 log_warn "Initial password saved to: ${OUTPUT_DIR}/pim-initial-password.txt"
 
-# Create full sudo access for pim user (passwordless)
+# Create full sudo access for pim user (password-less)
 sudo mkdir -p "${MOUNT_POINT}/etc/sudoers.d"
 sudo chmod 755 "${MOUNT_POINT}/etc/sudoers.d"
 cat > /tmp/sudoers-pim << EOF
@@ -396,27 +321,17 @@ if ! curl -fsSL -o "${DOWNLOAD_DIR}/dnscrypt-proxy.tar.gz" "${DNSCRYPT_URL}"; th
     fi
 fi
 
-# Download Pi-hole FTL (ARM binary - fallback if not building from source)
-PIHOLE_ARCH="armhf-linux-gnu"
-if [[ "${RPI_ARCH}" == "arm64" ]]; then
-    PIHOLE_ARCH="aarch64-linux-gnu"
-fi
-log_info "Downloading Pi-hole FTL for ${PIHOLE_ARCH}"
-PIHOLE_URL="https://github.com/pi-hole/FTL/releases/latest/download/pihole-FTL-${PIHOLE_ARCH}"
-if ! curl -fsSL -o "${DOWNLOAD_DIR}/pihole-FTL" "${PIHOLE_URL}"; then
-    if is_service_enabled "pihole" 2>/dev/null; then
-        log_warn "Failed to download Pi-hole FTL binary from GitHub."
-    fi
-fi
-
-
 # Pi-hole FTL is built from source (see build-pihole-ftl.sh)
 # Tor is installed from official Tor Project repository (see tor-setup.yml)
 
 # Copy downloads into chroot for Ansible to find
 log_info "Copying downloads into chroot"
 sudo mkdir -p "${MOUNT_POINT}/tmp/pimeleon-downloads"
-sudo cp -r "${DOWNLOAD_DIR}"/* "${MOUNT_POINT}/tmp/pimeleon-downloads/" 2>/dev/null || true
+if [[ -n "$(ls -A "${DOWNLOAD_DIR}" 2>/dev/null)" ]]; then
+    sudo cp -r "${DOWNLOAD_DIR}"/* "${MOUNT_POINT}/tmp/pimeleon-downloads/"
+else
+    log_info "No files found in ${DOWNLOAD_DIR} to copy"
+fi
 sudo chmod -R 755 "${MOUNT_POINT}/tmp/pimeleon-downloads"
 
 # Install ngrok (for remote access tunneling)
@@ -424,9 +339,9 @@ log_info "Downloading ngrok"
 curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc 2>&1 | chroot_run "${MOUNT_POINT}" tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
 echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" 2>&1 | chroot_run "${MOUNT_POINT}" tee /etc/apt/sources.list.d/ngrok.list
 log_info "Installing ngrok for remote access tunneling"
-chroot_run "${MOUNT_POINT}" apt-get -q update
-chroot_run "${MOUNT_POINT}" apt-get -qy upgrade
-chroot_run "${MOUNT_POINT}" apt-get -qy install ngrok
+chroot_run "${MOUNT_POINT}" apt-get update
+chroot_run "${MOUNT_POINT}" apt-get -y upgrade
+chroot_run "${MOUNT_POINT}" apt-get -y install ngrok
 
 # =============================================================================
 # Clone and build Pimeleon Web UI from GitLab
@@ -481,6 +396,9 @@ fi
 log_info "Building Pimeleon UI and API (${PIMELEON_PROFILE:-development} mode, branch: ${PIMELEON_UI_BRANCH})..."
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
+# Ensure jose is present in the API package
+pnpm --filter "@pimeleon/api" add jose
+export CI=true
 NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm install --frozen-lockfile
 NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm build
 popd > /dev/null
@@ -517,17 +435,17 @@ if [[ -d "${PIMELEON_API_SRC}" ]] && [[ -f "${PIMELEON_API_SRC}/requirements.txt
     sudo rsync -a --exclude '__pycache__' --exclude '*.pyc' --exclude 'logs' --exclude 'venv' --exclude '.env' --exclude '.env.example' "${PIMELEON_API_SRC}/" "${PIMELEON_API_DEST}/"
     log_info "Python FastAPI server copied: $(du -sh "${PIMELEON_API_DEST}" | cut -f1)"
 else
-    log_warn "Python FastAPI server not found at ${PIMELEON_API_SRC}, skipping"
+    die "FATAL: Python FastAPI server not found at ${PIMELEON_API_SRC}"
 fi
 
 # Copy Nitro proxy if available
 if [[ -d "${PIMELEON_PROXY_SRC}" ]] && [[ -f "${PIMELEON_PROXY_SRC}/index.mjs" ]]; then
     log_info "Copying pre-built Pimeleon Nuxt proxy files"
     sudo mkdir -p "${PIMELEON_PROXY_DEST}"
-    sudo rsync -a --exclude 'node_modules' --exclude '.nuxt' --exclude 'logs' "${PIMELEON_PROXY_SRC}/" "${PIMELEON_PROXY_DEST}/"
+    sudo rsync -a --exclude '.nuxt' --exclude 'logs' "${PIMELEON_PROXY_SRC}/" "${PIMELEON_PROXY_DEST}/"
     log_info "Nitro proxy copied: $(du -sh "${PIMELEON_PROXY_DEST}" | cut -f1)"
 else
-    log_warn "Nitro proxy not found at ${PIMELEON_PROXY_SRC}, skipping"
+    die "FATAL: Nitro proxy not found at ${PIMELEON_PROXY_SRC}"
 fi
 
 # Copy Quasar SPA if available
@@ -537,7 +455,7 @@ if [[ -d "${PIMELEON_UI_SRC}" ]] && [[ -f "${PIMELEON_UI_SRC}/index.html" ]]; th
     sudo rsync -a --exclude 'node_modules' --exclude '.quasar' --exclude 'logs' "${PIMELEON_UI_SRC}/" "${PIMELEON_UI_DEST}/"
     log_info "Quasar SPA copied: $(du -sh "${PIMELEON_UI_DEST}" | cut -f1)"
 else
-    log_warn "Quasar SPA not found at ${PIMELEON_UI_SRC}, skipping"
+    die "FATAL: Quasar SPA not found at ${PIMELEON_UI_SRC}"
 fi
 
 # Set interim ownership to root:root for chroot operations
@@ -604,20 +522,24 @@ EOF
     if [[ -d "${SHARED_VARS_DIR}/common" ]]; then
         log_info "Loading shared common vars from: ${SHARED_VARS_DIR}/common"
         find "${SHARED_VARS_DIR}/common" -maxdepth 1 -not -name profiles -not -path "${SHARED_VARS_DIR}/common" \
-            -exec cp -R {} "${WORK_DIR}/group_vars/all/" \; 2>/dev/null || true
+            -exec cp -R {} "${WORK_DIR}/group_vars/all/" \;
     fi
 
     # Layer 2: Copy platform vars (raspberrypi family)
     if [[ -d "${SHARED_VARS_DIR}/platform/raspberrypi" ]]; then
         log_info "Loading platform vars from: ${SHARED_VARS_DIR}/platform/raspberrypi"
-        cp -R "${SHARED_VARS_DIR}/platform/raspberrypi/"* "${WORK_DIR}/group_vars/raspberrypi/" 2>/dev/null || true
+        if [[ -n "$(ls -A "${SHARED_VARS_DIR}/platform/raspberrypi/" 2>/dev/null)" ]]; then
+            cp -R "${SHARED_VARS_DIR}/platform/raspberrypi/"* "${WORK_DIR}/group_vars/raspberrypi/"
+        fi
     fi
 
     # Layer 3: Copy app-specific vars (highest priority - overrides shared)
     APP_VARS_DIR="${WORKSPACE_DIR:-/workspace}/apps/${TARGET_PLATFORM}/vars"
     if [[ -d "${APP_VARS_DIR}" ]]; then
         log_info "Loading app-specific vars from: ${APP_VARS_DIR}"
-        cp -R "${APP_VARS_DIR}/"* "${WORK_DIR}/group_vars/${PLATFORM_GROUP}/" 2>/dev/null || true
+        if [[ -n "$(ls -A "${APP_VARS_DIR}/" 2>/dev/null)" ]]; then
+            cp -R "${APP_VARS_DIR}/"* "${WORK_DIR}/group_vars/${PLATFORM_GROUP}/"
+        fi
     fi
 
     # Copy profile vars to all group
@@ -641,7 +563,7 @@ EOF
             "$playbook" 2>&1 | sudo tee -a "${ANSIBLE_LOG_FILE}" || die "Playbook failed: $playbook. See ${ANSIBLE_LOG_FILE} for details."
     done
 else
-    log_warn "No Ansible playbooks found at: ${PLAYBOOKS_DIR}"
+    die "FATAL: No Ansible playbooks found at: ${PLAYBOOKS_DIR}"
 fi
 
 # Copy custom configs if available
@@ -650,17 +572,17 @@ if [[ -d "${CONFIG_DIR}" ]]; then
 
     # Network configs
     if [[ -d "${CONFIG_DIR}/network" ]] && [[ -n "$(ls -A "${CONFIG_DIR}/network"/* 2>/dev/null)" ]]; then
-        sudo cp -R "${CONFIG_DIR}/network/"* "${MOUNT_POINT}/etc/network/" || true
+        sudo cp -R "${CONFIG_DIR}/network/"* "${MOUNT_POINT}/etc/network/"
     fi
 
     # Security configs
     if [[ -d "${CONFIG_DIR}/security" ]] && [[ -n "$(ls -A "${CONFIG_DIR}/security"/* 2>/dev/null)" ]]; then
-        sudo cp -R "${CONFIG_DIR}/security/"* "${MOUNT_POINT}/etc/" || true
+        sudo cp -R "${CONFIG_DIR}/security/"* "${MOUNT_POINT}/etc/"
     fi
 
     # Service configs
     if [[ -d "${CONFIG_DIR}/services" ]] && [[ -n "$(ls -A "${CONFIG_DIR}/services"/* 2>/dev/null)" ]]; then
-        sudo cp -R "${CONFIG_DIR}/services/"* "${MOUNT_POINT}/etc/" || true
+        sudo cp -R "${CONFIG_DIR}/services/"* "${MOUNT_POINT}/etc/"
     fi
 fi
 
@@ -670,17 +592,28 @@ if [[ -f "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy" ]]; then
     sudo rm -f "${MOUNT_POINT}/etc/apt/apt.conf.d/01proxy"
 fi
 
-# Configure static resolv.conf for production (BIND9 handles DNS)
+# Configure static resolv.conf for production
 # This must be done AFTER all network operations (git clone, apt, etc.)
 log_info "Configuring static DNS resolver for production"
 sudo chattr -i "${MOUNT_POINT}/etc/resolv.conf" 2>/dev/null || true
 sudo rm -f "${MOUNT_POINT}/etc/resolv.conf"
 sudo tee "${MOUNT_POINT}/etc/resolv.conf" > /dev/null <<EOF
-# Static DNS configuration - BIND9 on localhost
-nameserver 127.0.0.1
-options edns0 trust-ad
+# DNS for chroot build environment
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+# nameserver 127.0.0.1
 EOF
 sudo chmod 644 "${MOUNT_POINT}/etc/resolv.conf"
+
+# Get version information
+log_info "Generating version info: ${IMAGE_PATH}.version.txt"
+cat > "${IMAGE_PATH}.version.txt" <<EOF
+Build Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+Raspbian Version: ${RASPBIAN_VERSION:-bookworm}
+Kernel Version: $(chroot_run "${MOUNT_POINT}" uname -r || echo "unknown")
+Pi Model: ${PIMELEON_RPI_MODEL:-3B+}
+Builder Version: 1.0.0
+EOF
 
 # Verify stage completion
 verify_stage 2 "${MOUNT_POINT}"

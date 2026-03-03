@@ -14,3 +14,11 @@
     owner: root
     group: root
     mode: '0644'
+
+- name: Deploy IO scheduler udev rule for flash storage
+  ansible.builtin.template:
+    src: udev/60-io-scheduler.rules.j2
+    dest: /etc/udev/rules.d/60-io-scheduler.rules
+    owner: root
+    group: root
+    mode: '0644'

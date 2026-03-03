@@ -9,6 +9,7 @@ profile_description: "Full-featured development build with all services and debu
 services_enabled:
   # Tier 1: Core
   networkd: true
+  wpa_supplicant: false
   hostapd: true
   dhcp_server: true
   dns_server: true
@@ -39,12 +40,6 @@ services_enabled:
   postfix: false
   zram: true
   swapfile: true
-
-# Build from source overrides
-build_from_source:
-  pihole_ftl: false
-  hostapd: false
-  tor: false
 
 # Development packages - debug and diagnostic tools
 dev_packages:

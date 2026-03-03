@@ -53,17 +53,7 @@
           echo ""
           echo "  Welcome to Pimeleon - Your Privacy Gateway"
           echo "  Hostname: $(hostname) | IP: $(hostname -I 2>/dev/null | awk '{print $1}')"
-
-          # Auto-run setup wizard if not completed
-          if [[ ! -f /var/lib/pimeleon/.setup-complete ]]; then
-              echo ""
-              echo "  Configuring system. Please wait..."
-              echo "  Starting first-time setup wizard..."
-              sleep 2
-              sudo /usr/local/bin/pim-setup
-          elif [[ ! -f /var/lib/pimeleon/.pim-config.ran ]]; then
-              echo "  Run 'sudo pim-config' for configuration menu"
-          fi
+          echo "  Run 'pim-config' for configuration menu"
           echo ""
       fi
 
@@ -74,17 +64,11 @@
 
 - name: Deploy zshrc configuration
   ansible.builtin.template:
-    src: zshrc.j2
+    src: system/zshrc.j2
     dest: /home/pim/.zshrc
     owner: pim
     group: pim
     mode: '0644'
-
-- name: Ensure zshrc sources /etc/profile for MOTD support
-  ansible.builtin.lineinfile:
-    path: /home/pim/.zshrc
-    line: "[[ -f /etc/profile ]] && source /etc/profile"
-    insertbefore: BOF
 
 - name: Set zsh as default shell for pim user
   ansible.builtin.user:

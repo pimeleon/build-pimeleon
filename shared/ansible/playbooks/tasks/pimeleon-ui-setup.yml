@@ -116,6 +116,21 @@
     state: present
   when: pimeleon_ui_files.stat.exists | default(false)
 
+# Generate shared secrets once so API and proxy use identical values
+- name: Generate shared Pimeleon secrets
+  ansible.builtin.set_fact:
+    pimeleon_jwt_secret: "{{ lookup('password', '/dev/null length=64 chars=hexdigits') }}"
+    pimeleon_admin_password: "{{ lookup('password', '/dev/null length=16 chars=ascii_letters,digits') }}"
+  when: pimeleon_ui_files.stat.exists | default(false)
+
+- name: Validate generated secrets are non-empty
+  ansible.builtin.fail:
+    msg: "Secret generation failed - pimeleon_jwt_secret or pimeleon_admin_password is empty"
+  when:
+    - pimeleon_ui_files.stat.exists | default(false)
+    - (pimeleon_jwt_secret | default('') | length == 0) or
+      (pimeleon_admin_password | default('') | length == 0)
+
 # Create FastAPI .env file
 - name: Create Pimeleon FastAPI environment file
   ansible.builtin.copy:
@@ -134,10 +149,10 @@
       DATABASE_PATH=/opt/pimeleon/data/pimeleon.db
 
       # Authentication
-      JWT_SECRET={{ lookup('pipe', 'openssl rand -hex 32') }}
+      JWT_SECRET={{ pimeleon_jwt_secret }}
       JWT_EXPIRES_IN=24h
       ADMIN_USERNAME=admin
-      ADMIN_PASSWORD={{ lookup('pipe', 'openssl rand -base64 16 | tr -d /+= | head -c 16') }}
+      ADMIN_PASSWORD={{ pimeleon_admin_password }}
 
       # Paths
       PLUGIN_DIR=/opt/pimeleon/plugins
@@ -162,20 +177,27 @@
 
       # Static files
       STATIC_DIR=/opt/pimeleon/ui
+
+      # Authentication (shared with API - must match)
+      JWT_SECRET={{ pimeleon_jwt_secret }}
+      JWT_EXPIRES_IN=24h
+      ADMIN_USERNAME=admin
+      ADMIN_PASSWORD={{ pimeleon_admin_password }}
   when: pimeleon_ui_files.stat.exists | default(false)
 
 # Create FastAPI systemd service
 - name: Create Pimeleon FastAPI systemd service
   ansible.builtin.template:
-    src: pimeleon-api.service.j2
+    src: pimeleon/pimeleon-api.service.j2
     dest: /etc/systemd/system/pimeleon-api.service
     mode: '0644'
 
 # Create Nitro proxy systemd service
 - name: Create Pimeleon Proxy systemd service
   ansible.builtin.template:
-    src: pimeleon-proxy.service.j2
+    src: pimeleon/pimeleon-proxy.service.j2
     dest: /etc/systemd/system/pimeleon-proxy.service
     mode: '0644'
+
 
 # NOTE: Service enablement happens in stage3-optimize.sh (outside Ansible chroot context)

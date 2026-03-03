@@ -10,6 +10,12 @@
     mode: '0755'
   when: config_txt is defined
 
+- name: Remove deprecated elevator= kernel parameter from cmdline.txt
+  ansible.builtin.replace:
+    path: /boot/cmdline.txt
+    regexp: ' ?elevator=\S+'
+    replace: ''
+
 - name: Set system hostname
   ansible.builtin.hostname:
     name: pimeleon
@@ -70,10 +76,10 @@
       net.core.wmem_default = 1048576
       net.core.wmem_max = 4194304
 
-      # IPv6 - disable global forwarding, enable per-interface for LAN only
+      # IPv6 forwarding disabled globally; wlan0 forwarding set by systemd-networkd
+      # (IPForward=ipv6 in 10-wlan0.network) when the interface appears
       net.ipv6.conf.all.forwarding = 0
       net.ipv6.conf.default.forwarding = 0
-      net.ipv6.conf.{{ wifi_interface | default('wlan0') }}.forwarding = 1
 
       # IPv6 - disable on WAN interface (eth0)
       net.ipv6.conf.{{ wan_interface | default('eth0') }}.disable_ipv6 = 1
@@ -167,16 +173,6 @@
   ansible.builtin.apt:
     name: whiptail
     state: present
-
-# Deploy pim-setup first-boot wizard
-# Default config (if wizard not run): AP on wlan0 + DHCP client on eth0
-- name: Deploy pim-setup first-boot wizard
-  ansible.builtin.copy:
-    src: /configs/scripts/pim-setup
-    dest: /usr/local/bin/pim-setup
-    mode: '0755'
-    owner: root
-    group: root
 
 - name: Create pimeleon directory
   ansible.builtin.file:

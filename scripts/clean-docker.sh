@@ -117,8 +117,9 @@ docker container prune -f
 print_info "Removing unused Docker networks..."
 docker network prune -f
 
-print_info "Removing unused Docker images..."
-docker image prune -f
+print_info "Removing unused Docker images (preserving adblock2privoxy)..."
+# Keep pimeleon-adblock2privoxy:latest if it exists
+docker image prune -f --filter "label!=com.pimeleon.image=adblock2privoxy"
 
 # Cleanup build cache
 print_info "Clearing Docker build cache..."
@@ -245,10 +246,14 @@ else
     echo "🧹 Output directory cleaned - kept latest image, log, and password file"
 fi
 
+# Show if adblock2privoxy was found and preserved
+if docker image inspect pimeleon-adblock2privoxy:latest &>/dev/null; then
+    echo "✅ Docker image preserved: pimeleon-adblock2privoxy:latest"
+fi
+
 echo -e "${BLUE}🚀 Next Steps:${NC}"
-echo "1. Rebuild adblock dependency: ./scripts/build-ab2p.sh"
-echo "2. Rebuild containers: APT_CACHE_SERVER=192.168.76.5 docker compose build --no-cache builder"
-echo "3. Run build: TARGET_PLATFORM=rpi3-bookworm make build"
+echo "1. Rebuild containers: APT_CACHE_SERVER=192.168.76.5 docker compose build --no-cache builder"
+echo "2. Run build: TARGET_PLATFORM=rpi3-bookworm make build"
 echo ""
 echo "Or use the full command with cache server detection:"
-echo 'if timeout 1 bash -c "cat < /dev/null > /dev/tcp/192.168.76.5/3142" &>/dev/null; then export APT_CACHE_SERVER=192.168.76.5; fi && ./scripts/build-ab2p.sh && docker compose build --no-cache builder'
+echo 'if timeout 1 bash -c "cat < /dev/null > /dev/tcp/192.168.76.5/3142" &>/dev/null; then export APT_CACHE_SERVER=192.168.76.5; fi && docker compose build --no-cache builder'

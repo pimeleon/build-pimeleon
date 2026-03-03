@@ -38,10 +38,25 @@ base system root filesystems:
 A dedicated `warm-cache` stage in `.pre` ensures that build jobs start with a populated
 cache when possible, reducing build times by up to 10 minutes.
 
+### Branch-Local Overrides
+
+To allow for platform-specific divergence while maintaining a clean monorepo, the CI/CD pipeline
+prioritizes branch-local configuration files over shared ones. If these files exist in the branch
+root, they will be used instead of the defaults in `shared/`:
+
+- **Dockerfiles**: `./containers/{builder,tester}/Dockerfile` (falls back to `shared/containers/`)
+- **Ansible Playbooks**: `./ansible/playbooks/main.yml` (trigger for using the root `./ansible` directory)
+- **Service Configs**: `./configs/network/` (trigger for using the root `./configs` directory)
+- **Build Scripts**: `./scripts/build.sh` (trigger for using the root `./scripts` directory)
+
+This mechanism ensures that `develop` and other standard branches use the verified `shared/` logic,
+while release branches (e.g., `release/rpi4-bookworm`) can customize their build process as needed.
+
 ### Environment Handling
 
-- **Development**: Builds on `develop` or feature branches use the development environment.
-- **Production**: Builds triggered by version tags (e.g., `v1.2.3`) use the production environment.
+All builds in the Pimeleon CI/CD pipeline are executed in **Production Mode**. This ensures that
+all images, regardless of the branch, follow strict security hardening and service optimization
+standards.
 
 ### Custom Builds
 
@@ -52,7 +67,7 @@ the pipeline code, a `build:custom` job is available.
 - **Variables**:
   - `TARGET_PLATFORM`: Any valid combination (e.g., `rpi3-bullseye`).
   - `PIMELEON_IMAGE_SIZE`: Customize the output image size.
-  - `PIMELEON_PROFILE`: Switch between `development` and `production` service profiles.
+  - `PIMELEON_PROFILE`: Defaults to `production`.
   - `DEBUG`: Set to `1` for verbose build logs.
 
 ## GitHub Actions

@@ -40,6 +40,7 @@
     mode: "{{ item.mode }}"
   loop:
     - { path: /etc/pihole, mode: '0775' }
+    - { path: /etc/pihole/config_backups, mode: '0755' }
     - { path: /var/lib/pihole, mode: '0755' }
     - { path: /var/log/pihole, mode: '0755' }
     - { path: /run/pihole, mode: '0755' }
@@ -59,17 +60,6 @@
     - pihole_ftl_path != ""
   notify: Restart pihole-FTL
 
-- name: Create setupVars.conf for compatibility
-  ansible.builtin.template:
-    src: pihole/setupVars.conf.j2
-    dest: /etc/pihole/setupVars.conf
-    owner: pihole
-    group: pihole
-    mode: '0644'
-  when:
-    - services_enabled.pihole | default(false)
-    - pihole_ftl_path != ""
-
 - name: Create Pi-hole FTL systemd service
   ansible.builtin.template:
     src: pihole/pihole-FTL.service.j2
@@ -87,6 +77,7 @@
     src: "{{ pihole_ftl_path }}"
     dest: /usr/local/bin/pihole
     state: link
+    force: yes
   when:
     - services_enabled.pihole | default(false)
     - pihole_ftl_path != ""

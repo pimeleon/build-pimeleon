@@ -12,6 +12,7 @@ echo "Building adblock2privoxy image (this may take several minutes on first run
 docker build \
     -f Dockerfile.ab2p \
     -t pimeleon-adblock2privoxy:latest \
+    --label "com.pimeleon.image=adblock2privoxy" \
     .
 
 echo ""

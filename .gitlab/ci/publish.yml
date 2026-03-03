@@ -4,6 +4,7 @@
 
 # Upload platform image to the Generic Packages registry.
 # Version is computed from conventional commits using apps/{platform}/VERSION as baseline.
+# Only runs on production pipelines (release/* branches and version tags).
 publish:image:
   stage: publish
   tags:
@@ -11,14 +12,22 @@ publish:image:
   needs:
     - job: setup:platform
       artifacts: true
+    - job: build:pimeleon
+      artifacts: true
     - job: test:smoke
       artifacts: false
+      optional: true
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_COMMIT_TAG'
+  environment:
+    name: cicd/production
   script:
     - |
-      chmod +x ./shared/scripts/get-next-version.sh
-      VERSION=$(./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+      SCRIPTS_DIR="./shared/scripts"
+      [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
+      chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
+      VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
       echo "Publishing version ${VERSION} for ${TARGET_PLATFORM}"
       cd output
       for file in pimeleon-*.img.xz pimeleon-*.tar.gz; do
@@ -29,7 +38,49 @@ publish:image:
         fi
       done
 
-# Build MkDocs site and publish to GitLab Pages (release branches only)
+# Deploy compressed image to Cloudflare R2 (production releases only, not MR pipelines)
+deploy:r2:
+  stage: publish
+  image: amazon/aws-cli
+  tags:
+    - lightweight
+  needs:
+    - job: setup:platform
+      artifacts: true
+    - job: build:pimeleon
+      artifacts: true
+    - job: test:smoke
+      artifacts: false
+  rules:
+    - if: '$CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_BRANCH =~ /^release\//'
+      when: on_success
+    - if: '$CI_COMMIT_TAG'
+      when: on_success
+    - when: never
+  environment:
+    name: cicd/production
+  variables:
+    AWS_ACCESS_KEY_ID: $R2_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY: $R2_SECRET_ACCESS_KEY
+    AWS_DEFAULT_REGION: auto
+  script:
+    - |
+      SCRIPTS_DIR="./shared/scripts"
+      [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
+      chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
+      VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
+      UPLOAD_PREFIX="${TARGET_PLATFORM}/v${VERSION}"
+      echo "Deploying to R2: s3://${R2_BUCKET}/${UPLOAD_PREFIX}/"
+      cd output
+      for file in pimeleon-*.img.xz pimeleon-*.img.metadata.json; do
+        [ -f "$file" ] || continue
+        echo "Uploading $file..."
+        aws s3 cp "$file" "s3://${R2_BUCKET}/${UPLOAD_PREFIX}/$(basename $file)" \
+          --endpoint-url "${R2_ENDPOINT}" \
+          --no-progress
+      done
+
+# Build MkDocs site and publish to GitLab Pages (release branches and version tags)
 publish:pages:
   stage: publish
   image: python:3.11-slim
@@ -40,8 +91,10 @@ publish:pages:
       artifacts: true
     - job: test:smoke
       artifacts: false
+      optional: true
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_COMMIT_TAG'
   before_script:
     - echo "Acquire::http::Proxy \"http://${APT_PROXY}\";" > /etc/apt/apt.conf.d/01proxy
   script:
@@ -51,23 +104,3 @@ publish:pages:
   artifacts:
     paths:
       - public
-
-# Documentation preview for Merge Requests (artifact-based, no review environment)
-publish:docs-preview:
-  stage: publish
-  image: python:3.11-slim
-  tags:
-    - lightweight
-  needs: ["lint:yaml"]
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  before_script:
-    - echo "Acquire::http::Proxy \"http://${APT_PROXY}\";" > /etc/apt/apt.conf.d/01proxy
-  script:
-    - apt-get -qy update && apt-get -q install -y --no-install-recommends git
-    - pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin
-    - mkdocs build -d public
-  artifacts:
-    paths:
-      - public
-    expire_in: 1 week

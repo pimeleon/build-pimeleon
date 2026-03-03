@@ -12,7 +12,7 @@ Type=simple
 User=pihole
 Group=pihole
 
-ExecStart=/usr/local/bin/pihole-FTL no-daemon
+ExecStart={{ pihole_ftl_path }} no-daemon
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=30
@@ -29,7 +29,8 @@ ProtectSystem=full
 ProtectHome=yes
 PrivateTmp=yes
 NoNewPrivileges=no
-ReadWritePaths=/etc/pihole /var/lib/pihole /var/log/pihole /var/run/pihole
+RuntimeDirectory=pihole
+ReadWritePaths=/etc/pihole /var/lib/pihole /var/log/pihole
 
 [Install]
 WantedBy=multi-user.target

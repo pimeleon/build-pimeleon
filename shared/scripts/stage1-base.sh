@@ -190,36 +190,14 @@ fi
 log_info "Configuring basic boot files"
 sudo tee "${MOUNT_POINT}/boot/config.txt" > /dev/null <<EOF
 # Pimeleon Boot Configuration
+# Optimized for Raspberry Pi 3B+
 
 # Disable rainbow splash for clean boot
 disable_splash=1
 
-# uncomment if you get no picture on HDMI for a default "safe" mode
-#hdmi_safe=1
-
-# uncomment this if your display has a black border of unused pixels visible
-# and your display can output without overscan
-#disable_overscan=1
-
-# uncomment the following to adjust overscan. Use positive numbers if console
-# goes off screen, and negative if there is too much border
-#overscan_left=16
-#overscan_right=16
-#overscan_top=16
-#overscan_bottom=16
-
-# uncomment to force a console size. By default it will be display's size minus
-# overscan.
-#framebuffer_width=1280
-#framebuffer_height=720
-
-# uncomment if hdmi display is not detected and composite is being output
+# Display settings
 hdmi_force_hotplug=1
-
-# force a HDMI mode rather than DVI for better monitor compatibility
 hdmi_drive=2
-
-# increase signal to HDMI to prevent blanking
 config_hdmi_boost=4
 
 # Optimized performance settings
@@ -230,7 +208,7 @@ over_voltage=2
 dtparam=i2c_arm=on
 dtparam=spi=on
 
-# Enable KMS driver for GPU acceleration (required for some displays)
+# Enable KMS driver for GPU acceleration
 dtoverlay=vc4-fkms-v3d
 
 # Disable all multimedia and camera features

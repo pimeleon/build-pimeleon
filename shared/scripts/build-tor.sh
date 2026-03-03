@@ -17,20 +17,34 @@ cd "${BUILD_DIR}"
 echo "Installing build dependencies..."
 apt-get update -qq
 apt-get install -qy --no-install-recommends \
-    wget \
+    git \
     ca-certificates \
     build-essential \
     libevent-dev \
     libssl-dev \
     zlib1g-dev \
     libsystemd-dev \
-    pkg-config
+    pkg-config \
+    autoconf \
+    automake \
+    liblzma-dev \
+    libcap-dev
 
-# Download and extract Tor source
-echo "Downloading Tor source..."
-wget -q "https://dist.torproject.org/tor-${TOR_VERSION}.tar.gz"
-tar -xzf "tor-${TOR_VERSION}.tar.gz"
-cd "tor-${TOR_VERSION}"
+# Clone Tor source
+echo "Cloning Tor repository from GitLab..."
+git clone https://gitlab.torproject.org/tpo/core/tor.git "${BUILD_DIR}/tor"
+cd "${BUILD_DIR}/tor"
+
+# Checkout specific version if provided, otherwise use default branch (latest)
+if [[ "${TOR_VERSION}" != "latest" ]]; then
+    echo "Checking out version tor-${TOR_VERSION}..."
+    # Try to checkout tag, fallback to branch if tag doesn't exist
+    git checkout "tor-${TOR_VERSION}" 2>/dev/null || git checkout "${TOR_VERSION}" || echo "Warning: Could not checkout ${TOR_VERSION}, using default branch"
+fi
+
+# Generate build scripts
+echo "Running autogen.sh..."
+./autogen.sh
 
 # Configure and build
 echo "Configuring Tor..."

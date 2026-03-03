@@ -11,7 +11,7 @@ WorkingDirectory=/opt/pimeleon/proxy
 Environment=NODE_ENV={{ build_mode | default('development', true) }}
 Environment=HOST=127.0.0.1
 Environment=PORT={{ ui_proxy_port | default('3000', true) }}
-EnvironmentFile=-/opt/pimeleon/proxy/.env
+EnvironmentFile=/opt/pimeleon/proxy/.env
 ExecStart=/usr/bin/node index.mjs
 Restart=on-failure
 RestartSec=5
@@ -19,10 +19,10 @@ TimeoutStartSec=90
 TimeoutStopSec=30
 
 # Security hardening
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/log/pimeleon
+#NoNewPrivileges=true
+#ProtectSystem=strict
+#ProtectHome=true
+#ReadWritePaths=/var/log/pimeleon
 
 [Install]
 WantedBy=multi-user.target

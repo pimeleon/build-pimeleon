@@ -1,0 +1,4 @@
+# {{ ansible_managed }}
+# Set IO scheduler for flash storage (SD card, eMMC)
+# Replaces the deprecated elevator= kernel parameter
+ACTION=="add|change", KERNEL=="mmcblk[0-9]", ATTR{queue/scheduler}="mq-deadline"

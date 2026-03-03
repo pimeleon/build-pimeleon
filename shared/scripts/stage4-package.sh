@@ -36,15 +36,6 @@ setup_chroot "${MOUNT_POINT}"
 # Get package list
 chroot_run "${MOUNT_POINT}" dpkg -l > "${IMAGE_PATH}.packages.txt"
 
-# Get version information
-cat > "${IMAGE_PATH}.version.txt" <<EOF
-Build Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-Raspbian Version: ${RASPBIAN_VERSION:-bookworm}
-Kernel Version: $(chroot_run "${MOUNT_POINT}" uname -r || echo "unknown")
-Pi Model: ${PIMELEON_RPI_MODEL:-3B+}
-Builder Version: 1.0.0
-EOF
-
 cleanup_chroot "${MOUNT_POINT}"
 unmount_image "${MOUNT_POINT}" "${LOOP_DEVICE}"
 

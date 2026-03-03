@@ -4,7 +4,7 @@
 interface={{ wifi_interface | default('wlan0') }}
 driver=nl80211
 ssid={{ pimeleon_ap_name | default('Pimeleon') }}
-wpa_passphrase={{ wifi_passphrase | default('changeme123') }}
+wpa_passphrase={{ wifi_passphrase | default('changeme123!') }}
 country_code={{ wifi_country_code | default('US') }}
 # Disable 802.11d to prevent COUNTRY_UPDATE state cycling
 ieee80211d=0
@@ -37,11 +37,11 @@ logger_stdout_level={{ hostapd_log_level | default(2) }}
 
 # 802.11n support
 ieee80211n=1
-{% if hostapd_require_ht | default(true) %}
+{% if hostapd_require_ht | default(false) %}
 require_ht=1
-{% endif %}
-{% if hostapd_ht_capab is defined %}
+{% if hostapd_ht_enabled | default(false) %}
 ht_capab={{ hostapd_ht_capab }}
+{% endif %}
 {% endif %}
 
 {% if hostapd_vht_enabled | default(false) %}

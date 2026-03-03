@@ -114,6 +114,7 @@
     - /etc/dnscrypt-proxy
     - /var/log/dnscrypt-proxy
     - /var/cache/dnscrypt-proxy
+    - /var/cache/dnscrypt-proxy/public-resolvers.md
   when: services_enabled.dnscrypt_proxy | default(true)
 
 - name: Configure dnscrypt-proxy
