@@ -401,7 +401,8 @@ pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
 # Ensure jose is present in the API package
 pnpm --filter "@pimeleon/api" add jose
 export CI=true
-pnpm install --frozen-lockfile
+rm -rf node_modules
+NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm install --frozen-lockfile
 NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm build
 popd > /dev/null
 
