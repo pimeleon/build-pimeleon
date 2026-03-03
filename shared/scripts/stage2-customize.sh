@@ -398,11 +398,15 @@ fi
 log_info "Building Pimeleon UI and API (${PIMELEON_PROFILE:-development} mode, branch: ${PIMELEON_UI_BRANCH})..."
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
+# Point pnpm store to cache dir so packages are cached but node_modules is not
+sudo mkdir -p "${CACHE_DIR}/.pnpm-store" && sudo chown -R builder:builder "${CACHE_DIR}/.pnpm-store"
+pnpm config set store-dir "${CACHE_DIR}/.pnpm-store"
+# Clean stale node_modules before any pnpm operation to avoid ERR_PNPM_INCLUDED_DEPS_CONFLICT
+rm -rf node_modules
 # Ensure jose is present in the API package
 pnpm --filter "@pimeleon/api" add jose
 export CI=true
-rm -rf node_modules
-NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile
 NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm build
 popd > /dev/null
 
