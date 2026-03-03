@@ -383,6 +383,8 @@ fi
 # Clone or update repo
 if [[ -d "${PIMELEON_UI_BUILD_DIR}/.git" ]]; then
     log_info "Updating existing pimeleon-ui clone..."
+    # Discard any local changes (e.g. from pnpm add in previous build run)
+    git -C "${PIMELEON_UI_BUILD_DIR}" reset --hard HEAD
     # Fetch specific branch (shallow clones don't have remote tracking refs)
     git -C "${PIMELEON_UI_BUILD_DIR}" fetch origin "${PIMELEON_UI_BRANCH}"
     # Create/reset local branch from FETCH_HEAD (origin/branch doesn't exist in shallow clones)
@@ -399,7 +401,7 @@ pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
 # Ensure jose is present in the API package
 pnpm --filter "@pimeleon/api" add jose
 export CI=true
-NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile
 NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm build
 popd > /dev/null
 
