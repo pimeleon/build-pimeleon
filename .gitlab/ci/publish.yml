@@ -7,6 +7,7 @@
 # Only runs on production pipelines (release/* branches and version tags).
 publish:image:
   stage: publish
+  image: alpine/curl:latest
   tags:
     - lightweight
   needs:
