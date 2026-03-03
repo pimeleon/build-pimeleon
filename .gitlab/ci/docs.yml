@@ -23,11 +23,8 @@ publish-project-docs:
       changes:
         - docs/**/*
         - mkdocs.yml
-    # Run on release branch push (merge to release/*)
+    # Run on direct push to release/* (always, not just on docs changes)
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-      changes:
-        - docs/**/*
-        - mkdocs.yml
     # Run on MRs targeting develop or release branches
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
       changes:
@@ -71,6 +68,8 @@ trigger-docs-preview:
       changes:
         - docs/**/*
         - mkdocs.yml
+    # Trigger on direct push to release/* (always)
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     # Trigger on MRs targeting develop or release branches
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
       changes:
@@ -99,8 +98,5 @@ trigger-docs-production:
     name: documentation/production
     url: https://pimeleon.org
   rules:
-    # Trigger on any release branch push (merge to release/*)
+    # Trigger on direct push to release/* (always)
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-      changes:
-        - docs/**/*
-        - mkdocs.yml
