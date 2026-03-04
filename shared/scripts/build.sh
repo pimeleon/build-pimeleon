@@ -9,7 +9,6 @@ export PYTHONUNBUFFERED=1
 
 # Source common functions
 # shellcheck disable=SC1091
-# shellcheck disable=SC1091
 source /scripts/common.sh
 
 # Setup cleanup trap for error handling
@@ -39,6 +38,8 @@ BUILD_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 # Split TARGET_PLATFORM (e.g., rpi3-bookworm) into device and os
 DEVICE_NAME="${TARGET_PLATFORM%%-*}"
 OS_NAME="${TARGET_PLATFORM##*-}"
+# Build profile (can be overridden by environment)
+export PIMELEON_PROFILE="${PIMELEON_PROFILE:-development}"
 
 # Determine image name based on build type
 COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "dev")
@@ -54,40 +55,59 @@ get_git_tag_version() {
 }
 
 if [ -n "${PIMELEON_VERSION:-}" ]; then
-    IMAGE_VERSION="${PIMELEON_VERSION}"
-    # Release build (or tagged CI build): pimeleon-{device}-{version}-{os}.img
-    IMAGE_NAME="pimeleon-${DEVICE_NAME}-${IMAGE_VERSION}-${OS_NAME}.img"
-elif IMAGE_VERSION=$(get_git_tag_version); then
-    # Git tag build: pimeleon-{device}-{version}-{os}.img
-    IMAGE_NAME="pimeleon-${DEVICE_NAME}-${IMAGE_VERSION}-${OS_NAME}.img"
+    RAW_VERSION="${PIMELEON_VERSION}"
+elif RAW_VERSION=$(get_git_tag_version); then
+    : # RAW_VERSION is set by the function
 else
-    # Development build: pimeleon-{device}-{version}-{os}-{commit}.img
     # Calculate version from conventional commits
     if [ -f "/scripts/get-next-version.sh" ]; then
 # shellcheck disable=SC1091
         source /scripts/get-next-version.sh
-        IMAGE_VERSION=$(get_next_version "${TARGET_PLATFORM:-}")
+        RAW_VERSION=$(get_next_version "${TARGET_PLATFORM:-}")
     else
-        IMAGE_VERSION="0.0.0"
+        RAW_VERSION="0.0.0"
     fi
-    IMAGE_NAME="pimeleon-${DEVICE_NAME}-${IMAGE_VERSION}-${OS_NAME}-${COMMIT_HASH}.img"
 fi
+
+# Extract -chore suffix if present
+if [[ "${RAW_VERSION}" == *-chore ]]; then
+    CLEAN_VERSION="${RAW_VERSION%-chore}"
+    CHORE_SUFFIX="-chore"
+else
+    CLEAN_VERSION="${RAW_VERSION}"
+    CHORE_SUFFIX=""
+fi
+
+if [[ "${PIMELEON_PROFILE}" == "production" ]]; then
+    # Production: pimeleon-{version}-{device}-{os}.img (No chore suffix)
+    if [[ -n "${CI:-}" ]]; then
+        # CI Production Release: No SHA
+        IMAGE_NAME="pimeleon-${CLEAN_VERSION}-${DEVICE_NAME}-${OS_NAME}.img"
+    else
+        # Local Production Build: Include SHA for traceability
+        IMAGE_NAME="pimeleon-${CLEAN_VERSION}-${DEVICE_NAME}-${OS_NAME}-${COMMIT_HASH}.img"
+    fi
+else
+    # Development: pimeleon-{version}-{device}[-chore]-{os}-{sha}.img
+    IMAGE_NAME="pimeleon-${CLEAN_VERSION}-${DEVICE_NAME}${CHORE_SUFFIX}-${OS_NAME}-${COMMIT_HASH}.img"
+fi
+
+IMAGE_VERSION="${CLEAN_VERSION}${CHORE_SUFFIX}"
 IMAGE_PATH="${OUTPUT_DIR}/${IMAGE_NAME}"
 LOG_FILE="${OUTPUT_DIR}/build-${TARGET_PLATFORM}-${BUILD_TIMESTAMP}.log"
 
 # Clean up old images for the same platform before starting to avoid clutter
 log_info "Cleaning up old images for ${TARGET_PLATFORM}..."
 # Using safe_rm to be consistent with project standards
-# pimeleon-{device}-*-{os}.img covers all version/commit variants
-safe_rm "${OUTPUT_DIR}/pimeleon-${DEVICE_NAME}-*-${OS_NAME}.img"*
+# pimeleon-*-{device}[-chore]-{os}*.img covers both production and development variants
+safe_rm "${OUTPUT_DIR}/pimeleon-*-${DEVICE_NAME}*-${OS_NAME}"*.img*
 # Clean up old logs for this platform except the one we're about to create
 find "${OUTPUT_DIR}" -name "build-${TARGET_PLATFORM}-*.log" -not -name "$(basename "${LOG_FILE}")" -delete 2>/dev/null || true
 
 # Track image path for cleanup on failure
 export CLEANUP_IMAGE_PATH="${IMAGE_PATH}"
 
-# Build profile and APT cache (can be overridden by environment)
-export PIMELEON_PROFILE="${PIMELEON_PROFILE:-development}"
+# APT cache settings (can be overridden by environment)
 export RASPBIAN_MIRROR="${RASPBIAN_MIRROR:-http://archive.raspbian.org/raspbian/}"
 export APT_CACHE_SERVER="${APT_CACHE_SERVER:-}"
 export APT_CACHE_PORT="${APT_CACHE_PORT:-3142}"

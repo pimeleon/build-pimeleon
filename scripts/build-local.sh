@@ -36,8 +36,42 @@ export CACHE_DIR="${PROJECT_ROOT}/cache"
 export CONFIG_DIR="${PROJECT_ROOT}/configs"
 export ANSIBLE_DIR="${PROJECT_ROOT}/ansible"
 
-WORK_DIR="/tmp/pimeleon-build"
-IMAGE_NAME="pimeleon-$(date +%Y%m%d-%H%M%S).img"
+# Ensure TARGET_PLATFORM is set for versioning
+export TARGET_PLATFORM="${TARGET_PLATFORM:-rpi3-${RASPBIAN_VERSION:-bookworm}}"
+
+# Determine image name based on standardized logic
+COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "dev")
+DEVICE_NAME="${PIMELEON_RPI_MODEL:-3B+}"
+OS_NAME="${RASPBIAN_VERSION:-bookworm}"
+
+# Clean up device name for filename (e.g., 3B+ -> rpi3)
+DEVICE_NAME_CLEAN=$(echo "rpi${DEVICE_NAME}" | sed 's/+//' | tr '[:upper:]' '[:lower:]')
+
+# Calculate version
+if [[ -f "${BUILDER_SCRIPTS}/get-next-version.sh" ]]; then
+    source "${BUILDER_SCRIPTS}/get-next-version.sh"
+    RAW_VERSION=$(get_next_version "${TARGET_PLATFORM}")
+else
+    RAW_VERSION="0.0.0"
+fi
+
+# Extract -chore suffix if present
+if [[ "${RAW_VERSION}" == *-chore ]]; then
+    CLEAN_VERSION="${RAW_VERSION%-chore}"
+    CHORE_SUFFIX="-chore"
+else
+    CLEAN_VERSION="${RAW_VERSION}"
+    CHORE_SUFFIX=""
+fi
+
+if [[ "${PIMELEON_PROFILE}" == "production" ]]; then
+    # Local Production Build: Include SHA for traceability (no chore suffix)
+    IMAGE_NAME="pimeleon-${CLEAN_VERSION}-${DEVICE_NAME_CLEAN}-${OS_NAME}-${COMMIT_HASH}.img"
+else
+    # Development: pimeleon-{version}-{device}[-chore]-{os}-{sha}.img
+    IMAGE_NAME="pimeleon-${CLEAN_VERSION}-${DEVICE_NAME_CLEAN}${CHORE_SUFFIX}-${OS_NAME}-${COMMIT_HASH}.img"
+fi
+
 IMAGE_PATH="${OUTPUT_DIR}/${IMAGE_NAME}"
 LOG_FILE="${OUTPUT_DIR}/build-local-$(date +%Y%m%d-%H%M%S).log"
 

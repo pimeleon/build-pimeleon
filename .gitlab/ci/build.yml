@@ -150,7 +150,7 @@ build:containers:
       # Use the detected scripts directory for versioning as well
       chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
       BASE_VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
-      PIMELEON_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
+      PIMELEON_VERSION="${BASE_VERSION}"
       echo "Building version: ${PIMELEON_VERSION}"
     - |
       CONTAINER_ID=$(docker create \
