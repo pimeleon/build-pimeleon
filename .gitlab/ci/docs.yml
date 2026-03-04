@@ -7,7 +7,7 @@ publish-project-docs:
   stage: docs
   image: python:3.11-slim
   tags:
-    - lightweight
+    - nodejs
   needs:
     - job: "lint:yaml"
     - job: "build:pimeleon"
@@ -68,10 +68,8 @@ trigger-docs-preview:
       changes:
         - docs/**/*
         - mkdocs.yml
-    # Trigger on direct push to release/* (always)
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     # Trigger on MRs targeting develop or release branches
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
       changes:
         - docs/**/*
         - mkdocs.yml
