@@ -89,7 +89,7 @@ trigger-docs-production:
       optional: true
   trigger:
     project: pimeleon/pimeleon-site
-    branch: main
+    branch: master
   variables:
     TRIGGERED_BY: pimeleon-build
     SOURCE_BRANCH: $CI_COMMIT_BRANCH
