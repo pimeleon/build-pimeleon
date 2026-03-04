@@ -5,11 +5,15 @@ set -euo pipefail
 # Clean up and shrink the image
 
 # shellcheck disable=SC1091
-# shellcheck disable=SC1091
 source /scripts/common.sh
 
 # Setup cleanup trap for error handling
 trap 'cleanup_on_exit' EXIT ERR INT TERM
+
+# Validate parameters
+if [[ $# -ne 2 ]] || [[ -z "${1:-}" || -z "${2:-}" ]]; then
+    die "Usage: $0 <work_dir> <image_path>"
+fi
 
 WORK_DIR=$1
 IMAGE_PATH=$2
@@ -268,6 +272,9 @@ safe_rm "${MOUNT_POINT}/zero.file"
 # Remove APT cache proxy from final image
 remove_chroot_apt_proxy "${MOUNT_POINT}"
 
+# Collect version details while chroot is still active
+KERNEL_VERSION=$(chroot_run "${MOUNT_POINT}" uname -r || echo "unknown")
+
 # Cleanup chroot
 cleanup_chroot "${MOUNT_POINT}"
 
@@ -280,7 +287,7 @@ log_info "Generating version info: ${IMAGE_PATH}.version.txt"
 cat > "${IMAGE_PATH}.version.txt" <<EOF
 Build Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 Raspbian Version: ${RASPBIAN_VERSION:-bookworm}
-Kernel Version: $(chroot_run "${MOUNT_POINT}" uname -r || echo "unknown")
+Kernel Version: ${KERNEL_VERSION}
 Pi Model: ${PIMELEON_RPI_MODEL:-3B+}
 Builder Version: 1.0.0
 EOF

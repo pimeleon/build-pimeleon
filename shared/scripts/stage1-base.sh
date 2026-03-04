@@ -5,20 +5,19 @@ set -euo pipefail
 # Creates the base Raspbian image with partitions
 
 # shellcheck disable=SC1091
-# shellcheck disable=SC1091
 source /scripts/common.sh
 
 # Setup cleanup trap for error handling
 trap 'cleanup_on_exit' EXIT ERR INT TERM
 
+# Validate parameters
+if [[ $# -ne 3 ]] || [[ -z "${1:-}" || -z "${2:-}" || -z "${3:-}" ]]; then
+    die "Usage: $0 <work_dir> <image_path> <image_size>"
+fi
+
 WORK_DIR=$1
 IMAGE_PATH=$2
 IMAGE_SIZE=$3
-
-# Validate parameters
-if [[ -z "$WORK_DIR" || -z "$IMAGE_PATH" || -z "$IMAGE_SIZE" ]]; then
-    die "Usage: $0 <work_dir> <image_path> <image_size>"
-fi
 
 MOUNT_POINT="${WORK_DIR}/mount"
 CACHE_VERSION="v4"  # v2: python3-minimal, v3: modern GPG keyring (no apt-key), v4: legacy keyring migration

@@ -628,7 +628,7 @@ generate_metadata() {
     },
     "build_info": {
         "rpi_model": "${PIMELEON_RPI_MODEL:-3B+}",
-        "raspbian_version": "${RASPBIAN_VERSION:-buster}",
+        "raspbian_version": "${RASPBIAN_VERSION:-bookworm}",
         "builder_version": "1.0.0"
     }
 }

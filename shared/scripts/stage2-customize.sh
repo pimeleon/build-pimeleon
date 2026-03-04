@@ -5,14 +5,17 @@ set -euo pipefail
 # Install packages and apply configurations
 
 # shellcheck disable=SC1091
-# shellcheck disable=SC1091
 source /scripts/common.sh
-# shellcheck disable=SC1091
 # shellcheck disable=SC1091
 source /scripts/lib-services.sh
 
 # Setup cleanup trap for error handling
 trap 'cleanup_on_exit' EXIT ERR INT TERM
+
+# Validate parameters
+if [[ $# -ne 2 ]] || [[ -z "${1:-}" || -z "${2:-}" ]]; then
+    die "Usage: $0 <work_dir> <image_path>"
+fi
 
 WORK_DIR=$1
 IMAGE_PATH=$2
@@ -611,16 +614,6 @@ nameserver 1.1.1.1
 # nameserver 127.0.0.1
 EOF
 sudo chmod 644 "${MOUNT_POINT}/etc/resolv.conf"
-
-# Get version information
-log_info "Generating version info: ${IMAGE_PATH}.version.txt"
-cat > "${IMAGE_PATH}.version.txt" <<EOF
-Build Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-Raspbian Version: ${RASPBIAN_VERSION:-bookworm}
-Kernel Version: $(chroot_run "${MOUNT_POINT}" uname -r || echo "unknown")
-Pi Model: ${PIMELEON_RPI_MODEL:-3B+}
-Builder Version: 1.0.0
-EOF
 
 # Verify stage completion
 verify_stage 2 "${MOUNT_POINT}"

@@ -6,11 +6,14 @@ set -euo pipefail
 # All artifacts are placed directly in OUTPUT_DIR (no subdirectories)
 
 # shellcheck disable=SC1091
-# shellcheck disable=SC1091
 source /scripts/common.sh
 
 # Setup cleanup trap for error handling
 trap 'cleanup_on_exit' EXIT ERR INT TERM
+
+if [[ $# -ne 2 ]] || [[ -z "${1:-}" || -z "${2:-}" ]]; then
+    die "Usage: $0 <work_dir> <image_path>"
+fi
 
 WORK_DIR=$1
 IMAGE_PATH=$2
