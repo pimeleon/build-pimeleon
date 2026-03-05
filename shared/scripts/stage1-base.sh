@@ -124,7 +124,7 @@ else
     # Bootstrap base system without Pi-specific packages first
     # Include python3-minimal for Ansible compatibility
     # Exclude DHCP packages since systemd handles networking
-    sudo env "${DEBOOTSTRAP_ENV}" debootstrap --foreign --arch="${DEBOOTSTRAP_ARCH}" \
+    sudo env ${DEBOOTSTRAP_ENV} debootstrap --foreign --arch="${DEBOOTSTRAP_ARCH}" \
         --include=python3-minimal \
         --exclude=isc-dhcp-common,isc-dhcp-client \
         ${KEYRING_OPT} \
