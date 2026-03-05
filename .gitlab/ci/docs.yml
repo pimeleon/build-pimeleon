@@ -63,13 +63,14 @@ trigger-docs-preview:
     name: documentation/preview
     url: https://preview.pimeleon-docs.pages.dev
   rules:
-    # Trigger on direct push or merge to develop
+    # Trigger on direct push or merge to develop or release branches
     - if: '$CI_COMMIT_BRANCH == "develop"'
       changes:
         - docs/**/*
         - mkdocs.yml
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     # Trigger on MRs targeting develop or release branches
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
       changes:
         - docs/**/*
         - mkdocs.yml
