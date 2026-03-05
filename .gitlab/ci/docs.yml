@@ -53,7 +53,7 @@ trigger-docs-preview:
     - job: "test:integration"
       optional: true
   trigger:
-    project: pimeleon/pimeleon-site
+    project: pirouter/pimeleon-site
     branch: preview
   variables:
     TRIGGERED_BY: pimeleon-build
@@ -83,7 +83,7 @@ trigger-docs-production:
     - job: "test:integration"
       optional: true
   trigger:
-    project: pimeleon/pimeleon-site
+    project: pirouter/pimeleon-site
     branch: master
   variables:
     TRIGGERED_BY: pimeleon-build

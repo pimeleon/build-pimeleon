@@ -87,7 +87,7 @@ services:
       # WiFi AP name (for hostapd)
       - PIMELEON_AP_NAME=${PIMELEON_AP_NAME:-Pimeleon}
       # Pimeleon Web UI source
-      - PIMELEON_UI_REPO=${PIMELEON_UI_REPO:-https://gitlab.pimeleon.dev/pimeleon/pimeleon-ui.git}
+      - PIMELEON_UI_REPO=${PIMELEON_UI_REPO:-https://gitlab.pirouter.dev/pimeleon/pirouter-ui.git}
       - PIMELEON_UI_BRANCH=${PIMELEON_UI_BRANCH:-}
       - PIMELEON_UI_BUILD_TOKEN=${PIMELEON_UI_BUILD_TOKEN:-}
     privileged: true

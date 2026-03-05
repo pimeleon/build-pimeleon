@@ -358,7 +358,7 @@ git config --global http.lowSpeedTime 999999
 git config --global core.compression 0
 
 # Configurable via environment variables (see docker-compose.yml)
-PIMELEON_UI_REPO="${PIMELEON_UI_REPO:-https://gitlab.pimeleon.dev/pimeleon/pimeleon-ui.git}"
+PIMELEON_UI_REPO="${PIMELEON_UI_REPO:-https://gitlab.pirouter.dev/pimeleon/pirouter-ui.git}"
 
 # Branch: env var takes precedence, otherwise select based on profile
 if [[ -n "${PIMELEON_UI_BRANCH:-}" ]]; then
@@ -370,7 +370,7 @@ else
     PIMELEON_UI_BRANCH="master"
 fi
 
-PIMELEON_UI_BUILD_DIR="${CACHE_DIR}/pimeleon-ui"
+PIMELEON_UI_BUILD_DIR="${CACHE_DIR}/pirouter-ui"
 
 # Ensure build directory is writable (CI cache may be root-owned)
 sudo mkdir -p "${PIMELEON_UI_BUILD_DIR}"
@@ -385,7 +385,7 @@ fi
 
 # Clone or update repo
 if [[ -d "${PIMELEON_UI_BUILD_DIR}/.git" ]]; then
-    log_info "Updating existing pimeleon-ui clone..."
+    log_info "Updating existing Pimeleon web UI repository clone..."
     # Discard any local changes (e.g. from pnpm add in previous build run)
     git -C "${PIMELEON_UI_BUILD_DIR}" reset --hard HEAD
     # Fetch specific branch (shallow clones don't have remote tracking refs)
@@ -393,7 +393,7 @@ if [[ -d "${PIMELEON_UI_BUILD_DIR}/.git" ]]; then
     # Create/reset local branch from FETCH_HEAD (origin/branch doesn't exist in shallow clones)
     git -C "${PIMELEON_UI_BUILD_DIR}" checkout -B "${PIMELEON_UI_BRANCH}" FETCH_HEAD
 else
-    log_info "Cloning pimeleon-ui from ${PIMELEON_UI_REPO} (branch: ${PIMELEON_UI_BRANCH})..."
+    log_info "Cloning Pimeleon web UI from ${PIMELEON_UI_REPO} (branch: ${PIMELEON_UI_BRANCH})..."
     git clone --depth 1 --branch "${PIMELEON_UI_BRANCH}" "${PIMELEON_UI_REPO_AUTH}" "${PIMELEON_UI_BUILD_DIR}"
 fi
 

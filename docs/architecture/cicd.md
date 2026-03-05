@@ -103,5 +103,5 @@ Documentation is managed through a trigger mechanism:
 - **Preview**: Triggered on pushes to the `develop` branch.
 - **Production**: Triggered on stable release tags (`v*`).
 
-This triggers the `pimeleon/pimeleon-site` project to rebuild and publish the latest
+This triggers the `pirouter/pimeleon-site` project to rebuild and publish the latest
 documentation to [pimeleon.org](https://pimeleon.org).
