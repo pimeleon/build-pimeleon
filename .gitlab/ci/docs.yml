@@ -23,10 +23,10 @@ publish-project-docs:
       changes:
         - docs/**/*
         - mkdocs.yml
-    # Run ONLY on tags for production docs
-    - if: '$CI_COMMIT_TAG'
-    # Run on MRs targeting develop or release branches
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+    # Run on direct push or merge to release/* for production docs
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    # Run on MRs targeting release branches
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       changes:
         - docs/**/*
         - mkdocs.yml
@@ -93,5 +93,5 @@ trigger-docs-production:
     name: documentation/production
     url: https://pimeleon.org
   rules:
-    # Trigger ONLY on tags
-    - if: '$CI_COMMIT_TAG'
+    # Trigger on direct push or merge to release/* branches
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
