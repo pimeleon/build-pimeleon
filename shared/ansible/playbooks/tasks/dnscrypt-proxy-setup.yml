@@ -8,16 +8,15 @@
   register: dnscrypt_binary
   when: services_enabled.dnscrypt_proxy | default(false)
 
-- name: Skip dnscrypt-proxy setup if download not available
-  ansible.builtin.debug:
-    msg: >-
-      dnscrypt-proxy binary not found at /tmp/pimeleon-downloads/dnscrypt-proxy.tar.gz
-      - skipping setup
+- name: Install dnscrypt-proxy from APT (non-production profile, no registry binary)
+  ansible.builtin.apt:
+    name: dnscrypt-proxy
+    state: present
   when:
     - services_enabled.dnscrypt_proxy | default(false)
     - not (dnscrypt_binary.stat.exists | default(false))
 
-# All tasks below only run if download exists
+# All tasks below only run if registry binary was downloaded
 - name: Create dnscrypt-proxy user
   ansible.builtin.user:
     name: _dnscrypt-proxy

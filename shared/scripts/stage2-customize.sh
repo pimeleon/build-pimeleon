@@ -302,14 +302,19 @@ sudo mkdir -p "${DOWNLOAD_DIR}"
 sudo chmod 755 "${DOWNLOAD_DIR}"
 sudo chown "$(id -u):$(id -g)" "${DOWNLOAD_DIR}"
 
-# Fetch pre-built binaries from pi-router-apps registry
+# Fetch pre-built binaries from pi-router-apps registry (production only)
+# Non-production profiles fall back to APT sources via Ansible
 for pkg in dnscrypt-proxy; do
-    if ! fetch_pimeleon_apps "${pkg}" "${RPI_ARCH}" "${DOWNLOAD_DIR}"; then
-        if is_service_enabled "${pkg//-/_}" 2>/dev/null; then
-            die "Failed to fetch ${pkg} from pi-router-apps registry and it is enabled in this profile."
-        else
-            log_warn "Failed to fetch ${pkg} from registry; service is not enabled, continuing."
+    if [[ "${PIMELEON_PROFILE:-development}" == "production" ]]; then
+        if ! fetch_pimeleon_apps "${pkg}" "${RPI_ARCH}" "${DOWNLOAD_DIR}"; then
+            if is_service_enabled "${pkg//-/_}" 2>/dev/null; then
+                die "Failed to fetch ${pkg} from pi-router-apps registry and it is enabled in this profile."
+            else
+                log_warn "Failed to fetch ${pkg} from registry; service is not enabled, continuing."
+            fi
         fi
+    else
+        log_info "Profile '${PIMELEON_PROFILE:-development}': skipping registry fetch for ${pkg}, APT source will be used"
     fi
 done
 
