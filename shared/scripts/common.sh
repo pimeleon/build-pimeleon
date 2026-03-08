@@ -772,3 +772,45 @@ cache_put() {
     sudo cp "$source" "$cache_path"
     sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "$cache_path"
 }
+
+# Fetch a pre-built binary package from the pi-router-apps Generic Package Registry.
+# Usage: fetch_pimeleon_apps <package> <arch> <download_dir>
+# Saves as <download_dir>/<package>.tar.gz (matching existing Ansible task expectations).
+# Non-fatal: logs a warning and returns 1 on failure so the caller can decide.
+fetch_pimeleon_apps() {
+    local package="$1"
+    local arch="$2"
+    local download_dir="$3"
+    local project_id="${PIMELEON_APPS_PROJECT_ID:-0}"
+    local token="${PIMELEON_APPS_READ_TOKEN:-}"
+    local reg="https://gitlab.pirouter.dev/api/v4/projects/${project_id}/packages/generic"
+
+    if [[ "${project_id}" == "0" ]] || [[ -z "${project_id}" ]]; then
+        log_warn "PIMELEON_APPS_PROJECT_ID not set, skipping registry fetch for ${package}"
+        return 1
+    fi
+
+    local version
+    version=$(curl -fsSLk \
+        -H "PRIVATE-TOKEN: ${token}" \
+        "${reg}/${package}?per_page=1&order_by=created_at&sort=desc" 2>/dev/null \
+        | python3 -c "import json,sys; d=json.load(sys.stdin); v=next((p.get('version','') for p in d if p.get('version','').startswith('${arch}-')),''); print(v.replace('${arch}-','',1)) if v else None" \
+        2>/dev/null || true)
+
+    if [[ -z "${version}" ]]; then
+        log_warn "No published version found for ${package}/${arch} in pi-router-apps registry"
+        return 1
+    fi
+
+    local fname="${package}-${version}-${arch}-pimeleon.tar.gz"
+    local url="${reg}/${package}/${arch}-${version}/${fname}"
+    log_info "Fetching ${package} ${version} (${arch}) from pi-router-apps registry"
+
+    if curl -fsSLk -H "PRIVATE-TOKEN: ${token}" -o "${download_dir}/${package}.tar.gz" "${url}"; then
+        log_info "Fetched ${package} ${version} -> ${download_dir}/${package}.tar.gz"
+        return 0
+    else
+        log_warn "Failed to fetch ${package} from pi-router-apps registry"
+        return 1
+    fi
+}
