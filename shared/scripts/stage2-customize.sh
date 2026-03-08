@@ -314,30 +314,22 @@ sudo chmod 440 "${MOUNT_POINT}/etc/sudoers.d/010_pim-admin"
 # =============================================================================
 log_info "Downloading files for chroot installation"
 
-# Version numbers
-DNSCRYPT_VERSION="2.1.15"
-
 # Create download directory in cache (outside image to save space)
 DOWNLOAD_DIR="${CACHE_DIR}/pimeleon-downloads"
 sudo mkdir -p "${DOWNLOAD_DIR}"
 sudo chmod 755 "${DOWNLOAD_DIR}"
 sudo chown "$(id -u):$(id -g)" "${DOWNLOAD_DIR}"
 
-# Download dnscrypt-proxy (ARM binary - no source build needed)
-# Map RPI_ARCH to dnscrypt-proxy release naming: armhf->arm, arm64->arm64
-DNSCRYPT_ARCH="arm"
-if [[ "${RPI_ARCH}" == "arm64" ]]; then
-    DNSCRYPT_ARCH="arm64"
-fi
-log_info "Downloading dnscrypt-proxy ${DNSCRYPT_VERSION} for ${DNSCRYPT_ARCH}"
-DNSCRYPT_URL="https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${DNSCRYPT_VERSION}/dnscrypt-proxy-linux_${DNSCRYPT_ARCH}-${DNSCRYPT_VERSION}.tar.gz"
-if ! curl -fsSL -o "${DOWNLOAD_DIR}/dnscrypt-proxy.tar.gz" "${DNSCRYPT_URL}"; then
-    if is_service_enabled "dnscrypt_proxy" 2>/dev/null; then
-        die "Failed to download dnscrypt-proxy, which is enabled in the current profile."
-    else
-        log_warn "Failed to download dnscrypt-proxy, but it is not enabled. Continuing."
+# Fetch pre-built binaries from pi-router-apps registry
+for pkg in dnscrypt-proxy; do
+    if ! fetch_pimeleon_apps "${pkg}" "${RPI_ARCH}" "${DOWNLOAD_DIR}"; then
+        if is_service_enabled "${pkg//-/_}" 2>/dev/null; then
+            die "Failed to fetch ${pkg} from pi-router-apps registry and it is enabled in this profile."
+        else
+            log_warn "Failed to fetch ${pkg} from registry; service is not enabled, continuing."
+        fi
     fi
-fi
+done
 
 # Pi-hole FTL is built from source (see build-pihole-ftl.sh)
 # Tor is installed from official Tor Project repository (see tor-setup.yml)
