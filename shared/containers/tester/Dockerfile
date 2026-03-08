@@ -12,7 +12,7 @@ ARG CI=""
 # Configure APT resilience and proxy if in CI or development mode
 RUN if [ -n "$CI" ] || [ "$PIMELEON_PROFILE" = "development" ]; then \
     # Resilience settings for apt-cacher-ng proxy disconnections
-    echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
     echo 'Acquire::http::Pipeline-Depth "0";' >> /etc/apt/apt.conf.d/80-retries && \
     echo 'Acquire::http::Timeout "60";' >> /etc/apt/apt.conf.d/80-retries && \
     if [ -n "$APT_CACHE_SERVER" ]; then \

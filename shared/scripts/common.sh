@@ -565,7 +565,7 @@ Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
 Acquire::http::Timeout "120";
 Acquire::https::Timeout "120";
 # Resilience settings for apt-cacher-ng proxy disconnections
-Acquire::Retries "5";
+Acquire::Retries "3";
 Acquire::http::Pipeline-Depth "0";
 EOF
     fi
