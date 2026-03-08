@@ -86,7 +86,13 @@ build:containers:
       artifacts: true
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      changes:
+        - shared/containers/**/*
+        - containers/**/*
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+      changes:
+        - shared/containers/**/*
+        - containers/**/*
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
     - when: never
