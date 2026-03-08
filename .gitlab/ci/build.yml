@@ -10,6 +10,7 @@ setup:platform:
   tags:
     - lightweight
   rules:
+    - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "web"'
@@ -58,6 +59,7 @@ warm-cache:
     - job: setup:platform
       artifacts: true
   rules:
+    - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "web"'
@@ -85,18 +87,15 @@ build:containers:
     - job: setup:platform
       artifacts: true
   rules:
+    - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       changes:
         - shared/containers/**/*
         - containers/**/*
-        - .gitlab/ci/build.yml
-        - .gitlab-ci.yml
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       changes:
         - shared/containers/**/*
         - containers/**/*
-        - .gitlab/ci/build.yml
-        - .gitlab-ci.yml
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
     - when: never
@@ -115,13 +114,13 @@ build:containers:
         --build-arg APT_CACHE_SERVER=${APT_PROXY%:*} \
         --build-arg APT_CACHE_PORT=${APT_PROXY##*:} \
         --build-arg CI=${CI} \
-        --build-arg PIMELEON_PROFILE=${PIMELEON_PROFILE:-development} \
+        --build-arg PIMELEON_PROFILE=${PIMELEON_PROFILE} \
         -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest -f "$BUILDER_DF" .
       docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest \
         --build-arg APT_CACHE_SERVER=${APT_PROXY%:*} \
         --build-arg APT_CACHE_PORT=${APT_PROXY##*:} \
         --build-arg CI=${CI} \
-        --build-arg PIMELEON_PROFILE=${PIMELEON_PROFILE:-development} \
+        --build-arg PIMELEON_PROFILE=${PIMELEON_PROFILE} \
         -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest -f "$TESTER_DF" "$(dirname "$TESTER_DF")"
     - docker push --quiet $BUILD_IMAGE
     - docker push --quiet ${CI_REGISTRY_IMAGE}/builder:latest
@@ -147,7 +146,10 @@ build:containers:
     policy: pull
   script:
     - set -e
-    - 'echo "Building Pimeleon image for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."'
+    - |
+      TARGET_PLATFORM="${TARGET_PLATFORM:-rpi3-bookworm}"
+      PIMELEON_PROFILE="${PIMELEON_PROFILE:-production}"
+      echo "Building Pimeleon image for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."
     - mkdir -p output cache
     - |
       # Compute mount paths - prioritize shared as baseline, allow branch-local overrides
@@ -186,6 +188,8 @@ build:containers:
         -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
         -e APT_CACHE_PORT="${APT_PROXY##*:}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
+        -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID}" \
+        -e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN}" \
         "$BUILD_IMAGE")
       docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/
       docker cp "${CONFIGS_DIR}/." "$CONTAINER_ID":/configs/
@@ -225,6 +229,7 @@ build:containers:
 build:pimeleon:
   extends: .build-pimeleon
   rules:
+    - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
 
@@ -232,6 +237,12 @@ build:pimeleon:
 build:custom:
   extends: .docker-job
   stage: build
+  needs:
+    - job: setup:platform
+      artifacts: true
+    - job: warm-cache
+    - job: build:containers
+      optional: true
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: manual
@@ -242,7 +253,10 @@ build:custom:
     policy: pull-push
   script:
     - set -e
-    - 'echo "Custom build for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."'
+    - |
+      TARGET_PLATFORM="${TARGET_PLATFORM:-rpi3-bookworm}"
+      PIMELEON_PROFILE="${PIMELEON_PROFILE:-production}"
+      echo "Custom build for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."
     - mkdir -p output cache
     - |
       # Compute mount paths - prioritize shared as baseline, allow branch-local overrides
@@ -276,6 +290,8 @@ build:custom:
         -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
         -e APT_CACHE_PORT="${APT_PROXY##*:}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
+        -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID}" \
+        -e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN}" \
         "$BUILD_IMAGE")
       docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/
       docker cp "${CONFIGS_DIR}/." "$CONTAINER_ID":/configs/

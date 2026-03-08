@@ -59,6 +59,9 @@ services:
       # APT cache (TrueNAS apt-cacher-ng)
       - APT_CACHE_SERVER=${APT_CACHE_SERVER:-192.168.76.5}
       - APT_CACHE_PORT=${APT_CACHE_PORT:-3142}
+      # pi-router-apps package registry
+      - PIMELEON_APPS_PROJECT_ID=${PIMELEON_APPS_PROJECT_ID:-20}
+      - PIMELEON_APPS_READ_TOKEN=${PIMELEON_APPS_READ_TOKEN:-}
       # Network configuration - LAN
       - LAN_NETWORK=${LAN_NETWORK:-192.168.43.0/24}
       - LAN_GATEWAY=${LAN_GATEWAY:-192.168.43.1}
