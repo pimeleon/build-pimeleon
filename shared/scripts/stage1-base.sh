@@ -116,7 +116,7 @@ else
 
     # Configure proxy environment for debootstrap if available
     DEBOOTSTRAP_ENV=""
-    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+    if should_use_apt_proxy; then
         log_info "Configuring APT proxy for debootstrap: ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
         DEBOOTSTRAP_ENV="http_proxy=http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142} HTTP_PROXY=http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
     fi

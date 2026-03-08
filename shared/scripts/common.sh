@@ -531,10 +531,31 @@ verify_stage() {
     log_info "Stage $stage verified successfully."
 }
 
+# Check if APT proxy should be used based on profile and environment
+should_use_apt_proxy() {
+    # If APT_CACHE_SERVER is not set, we can't use proxy
+    if [[ -z "${APT_CACHE_SERVER:-}" ]]; then
+        return 1
+    fi
+
+    # Check for CI/CD environment (always use proxy to speed up CI)
+    if [[ -n "${CI:-}" ]] || [[ -n "${GITLAB_CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        return 0
+    fi
+
+    # Check for development profile (use proxy locally)
+    if [[ "${PIMELEON_PROFILE:-production}" == "development" ]]; then
+        return 0
+    fi
+
+    # Otherwise (e.g., PIMELEON_PROFILE=production locally), skip proxy
+    return 1
+}
+
 # Configure APT cache for chroot environment
 configure_chroot_apt_proxy() {
     local mount_point=$1
-    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+    if should_use_apt_proxy; then
         log_info "Configuring APT cache for chroot: ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
         sudo mkdir -p "${mount_point}/etc/apt/apt.conf.d"
         sudo tee "${mount_point}/etc/apt/apt.conf.d/01proxy" > /dev/null <<EOF
@@ -543,7 +564,9 @@ Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
 # Longer timeouts for slow cache/upstream responses
 Acquire::http::Timeout "120";
 Acquire::https::Timeout "120";
-Acquire::Retries "3";
+# Resilience settings for apt-cacher-ng proxy disconnections
+Acquire::Retries "5";
+Acquire::http::Pipeline-Depth "0";
 EOF
     fi
 }

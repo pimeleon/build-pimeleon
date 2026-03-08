@@ -39,7 +39,7 @@ BUILD_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 DEVICE_NAME="${TARGET_PLATFORM%%-*}"
 OS_NAME="${TARGET_PLATFORM##*-}"
 # Build profile (can be overridden by environment)
-export PIMELEON_PROFILE="${PIMELEON_PROFILE:-development}"
+export PIMELEON_PROFILE="${PIMELEON_PROFILE:-production}"
 
 # Determine image name based on build type
 COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "dev")

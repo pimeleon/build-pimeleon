@@ -43,12 +43,21 @@ setup_chroot "${MOUNT_POINT}"
 # Configure APT cache for chroot environment early
 configure_chroot_apt_proxy "${MOUNT_POINT}"
 
-# Update sources.list with current mirror (overrides cached base image)
-log_info "Updating APT sources to use: ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/}"
-sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
+# Update sources.list based on architecture (mirrors stage1-base.sh logic)
+if [[ "${RPI_ARCH:-armhf}" == "arm64" ]]; then
+    log_info "Updating APT sources for arm64: using Debian repositories"
+    sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
+deb http://deb.debian.org/debian ${RASPBIAN_VERSION:-bookworm} main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian-security ${RASPBIAN_VERSION:-bookworm}-security main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian ${RASPBIAN_VERSION:-bookworm}-updates main contrib non-free non-free-firmware
+EOF
+else
+    log_info "Updating APT sources for armhf: using Raspbian at ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/}"
+    sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
 deb ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/} ${RASPBIAN_VERSION:-bookworm} main contrib non-free rpi
 deb-src ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/} ${RASPBIAN_VERSION:-bookworm} main contrib non-free rpi
 EOF
+fi
 
 # Fix APT keyring deprecation warning (migrate from legacy trusted.gpg)
 migrate_apt_keyring "${MOUNT_POINT}"
@@ -153,12 +162,18 @@ chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
 # Verify Pi boot firmware was installed to boot partition
 log_info "Verifying Pi boot firmware installation"
 FIRMWARE_OK=true
-[[ -f "${BOOT_MOUNT}/bootcode.bin" ]] || { log_error "bootcode.bin not found"; FIRMWARE_OK=false; }
 [[ -f "${BOOT_MOUNT}/start.elf" ]] || { log_error "start.elf not found"; FIRMWARE_OK=false; }
 [[ -f "${BOOT_MOUNT}/fixup.dat" ]] || { log_error "fixup.dat not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/kernel7.img" ]] || { log_error "kernel7.img not found"; FIRMWARE_OK=false; }
-[[ -f "${BOOT_MOUNT}/bcm2710-rpi-3-b-plus.dtb" ]] || { log_error "Pi 3B+ device tree not found"; FIRMWARE_OK=false; }
 [[ -d "${BOOT_MOUNT}/overlays" ]] || { log_error "Boot overlays not found"; FIRMWARE_OK=false; }
+# Architecture-specific kernel and device tree files
+if [[ "${RPI_ARCH:-armhf}" == "arm64" ]]; then
+    [[ -f "${BOOT_MOUNT}/kernel8.img" ]] || { log_error "kernel8.img not found (arm64)"; FIRMWARE_OK=false; }
+    [[ -f "${BOOT_MOUNT}/bcm2711-rpi-4-b.dtb" ]] || { log_error "Pi 4B device tree not found"; FIRMWARE_OK=false; }
+else
+    [[ -f "${BOOT_MOUNT}/bootcode.bin" ]] || { log_error "bootcode.bin not found"; FIRMWARE_OK=false; }
+    [[ -f "${BOOT_MOUNT}/kernel7.img" ]] || { log_error "kernel7.img not found (armhf)"; FIRMWARE_OK=false; }
+    [[ -f "${BOOT_MOUNT}/bcm2710-rpi-3-b-plus.dtb" ]] || { log_error "Pi 3B+ device tree not found"; FIRMWARE_OK=false; }
+fi
 if [[ "$FIRMWARE_OK" == "true" ]]; then
     log_info "All Pi boot firmware files verified"
 else
@@ -496,7 +511,7 @@ if [[ -d "${PLAYBOOKS_DIR}" ]] && [[ -n "$(ls -A "${PLAYBOOKS_DIR}"/*.yml 2>/dev
 
     # Create temporary inventory with platform group membership
     proxy_vars=""
-    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+    if should_use_apt_proxy; then
         proxy_url="http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
         proxy_vars="http_proxy=\"${proxy_url}\"
 https_proxy=\"${proxy_url}\"

@@ -14,12 +14,20 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Build arguments for APT cache configuration
 ARG APT_CACHE_SERVER
 ARG APT_CACHE_PORT="3142"
+ARG PIMELEON_PROFILE="production"
+ARG CI=""
 
-# Configure APT cache if server is provided
-RUN if [ -n "$APT_CACHE_SERVER" ]; then \
-    echo "Acquire::http::Proxy \"http://${APT_CACHE_SERVER}:${APT_CACHE_PORT}\";" > /etc/apt/apt.conf.d/01proxy && \
-    echo "Acquire::https::Proxy \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy && \
-    echo "Using APT cache at ${APT_CACHE_SERVER}:${APT_CACHE_PORT}"; \
+# Configure APT resilience and proxy if in CI or development mode
+RUN if [ -n "$CI" ] || [ "$PIMELEON_PROFILE" = "development" ]; then \
+    # Resilience settings for apt-cacher-ng proxy disconnections
+    echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Pipeline-Depth "0";' >> /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "60";' >> /etc/apt/apt.conf.d/80-retries && \
+    if [ -n "$APT_CACHE_SERVER" ]; then \
+        echo "Acquire::http::Proxy \"http://${APT_CACHE_SERVER}:${APT_CACHE_PORT}\";" > /etc/apt/apt.conf.d/01proxy && \
+        echo "Acquire::https::Proxy \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy && \
+        echo "Using APT cache at ${APT_CACHE_SERVER}:${APT_CACHE_PORT}"; \
+    fi; \
     fi
 
 # Install base dependencies and build tools
