@@ -416,16 +416,28 @@ fi
 log_info "Building Pimeleon UI and API (${PIMELEON_PROFILE:-development} mode, branch: ${PIMELEON_UI_BRANCH})..."
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
-# Point pnpm store to cache dir so packages are cached but node_modules is not
-sudo mkdir -p "${CACHE_DIR}/.pnpm-store" && sudo chown -R builder:builder "${CACHE_DIR}/.pnpm-store"
-pnpm config set store-dir "${CACHE_DIR}/.pnpm-store"
+# Configure pnpm caching and proxy based on build profile
+if should_use_apt_proxy; then
+    # Development/CI: persistent pnpm store cache and npm proxy for faster iteration
+    log_info "pnpm: development mode - using cache at ${CACHE_DIR}/.pnpm-store and proxy at ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+    sudo mkdir -p "${CACHE_DIR}/.pnpm-store" && sudo chown -R builder:builder "${CACHE_DIR}/.pnpm-store"
+    pnpm config set store-dir "${CACHE_DIR}/.pnpm-store"
+    pnpm config set proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+    pnpm config set https-proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+else
+    # Production: no cache, no proxy — clean reproducible builds
+    log_info "pnpm: production mode - no cache, no proxy"
+    pnpm config delete store-dir 2>/dev/null || true
+    pnpm config delete proxy 2>/dev/null || true
+    pnpm config delete https-proxy 2>/dev/null || true
+fi
 # Clean stale node_modules before any pnpm operation to avoid ERR_PNPM_INCLUDED_DEPS_CONFLICT
 rm -rf node_modules
 # Ensure jose is present in the API package
 pnpm --filter "@pimeleon/api" add jose
 export CI=true
 pnpm install --frozen-lockfile
-NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm build
+NODE_ENV="${PIMELEON_PROFILE:-production}" pnpm build
 popd > /dev/null
 
 # =============================================================================

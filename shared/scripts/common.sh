@@ -603,9 +603,9 @@ chroot_run() {
     local chroot_dir=$1
     shift
 
-    # Construct proxy environment if available
+    # Construct proxy environment if profile/CI warrants it
     local -a proxy_args=()
-    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+    if should_use_apt_proxy; then
         local proxy_url="http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
         proxy_args=(
             "http_proxy=${proxy_url}"
