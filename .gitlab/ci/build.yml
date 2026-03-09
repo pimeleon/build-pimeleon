@@ -81,6 +81,34 @@ warm-cache:
         echo "Cache not found, will be created by build:pimeleon"
       fi
 
+# Check whether builder and tester images already exist in the registry
+check:containers:
+  extends: .docker-job
+  stage: .pre
+  rules:
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      changes:
+        - shared/containers/**/*
+        - containers/**/*
+        - apps/**/*
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: always
+    - when: never
+  script:
+    - |
+      if docker manifest inspect "${CI_REGISTRY_IMAGE}/builder:latest" >/dev/null 2>&1 && \
+         docker manifest inspect "${CI_REGISTRY_IMAGE}/tester:latest" >/dev/null 2>&1; then
+        echo "CONTAINERS_EXIST=true" >> containers.env
+        echo "Builder and tester images already in registry — build will be skipped"
+      else
+        echo "CONTAINERS_EXIST=false" >> containers.env
+        echo "Images not found in registry — build required"
+      fi
+  artifacts:
+    reports:
+      dotenv: containers.env
+
 # Build builder and tester Docker images when container sources change
 build:containers:
   extends: .docker-job
@@ -95,16 +123,9 @@ build:containers:
     # Always allow manual trigger from web if they don't exist
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: on_success
-    # Trigger on tags or release branch changes
+    # Trigger on tags or release branch changes (includes merged MRs)
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-      changes:
-        - shared/containers/**/*
-        - containers/**/*
-        - apps/**/*
-        - docker-compose.yml
-    # Trigger on MRs to release branches
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       changes:
         - shared/containers/**/*
         - containers/**/*
