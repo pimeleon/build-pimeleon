@@ -40,12 +40,39 @@ setup_chroot "${MOUNT_POINT}"
 # Configure APT cache for chroot environment early
 configure_chroot_apt_proxy "${MOUNT_POINT}"
 
-# Update sources.list with current mirror (overrides cached base image)
-log_info "Updating APT sources to use: ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/}"
-sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
+# Update sources.list to ensure it matches current configuration (even if using old base cache)
+log_info "Updating APT sources"
+if [[ "${RPI_ARCH:-armhf}" == "arm64" ]]; then
+    # arm64: standard Debian repos + non-free-firmware for bookworm+
+    sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
+deb http://deb.debian.org/debian ${RASPBIAN_VERSION:-bookworm} main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian-security ${RASPBIAN_VERSION:-bookworm}-security main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian ${RASPBIAN_VERSION:-bookworm}-updates main contrib non-free non-free-firmware
+EOF
+else
+    # armhf: Raspbian repos
+    sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
 deb ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/} ${RASPBIAN_VERSION:-bookworm} main contrib non-free rpi
 deb-src ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/} ${RASPBIAN_VERSION:-bookworm} main contrib non-free rpi
 EOF
+
+    # Ensure Raspbian keyring is present for verification
+    if [ ! -f "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" ]; then
+        log_info "Installing Raspbian archive keyring"
+        wget -qO- http://archive.raspbian.org/raspbian.public.key | \
+            gpg --dearmor | \
+            sudo tee "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" > /dev/null
+        sudo chmod 644 "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg"
+    fi
+fi
+
+# Ensure raspi.list is also present (Raspberry Pi Foundation repo)
+if [ ! -f "${MOUNT_POINT}/etc/apt/sources.list.d/raspi.list" ]; then
+    log_info "Restoring raspi.list"
+    sudo tee "${MOUNT_POINT}/etc/apt/sources.list.d/raspi.list" > /dev/null <<EOF
+deb [signed-by=/etc/apt/keyrings/raspberrypi-archive-keyring.gpg] http://archive.raspberrypi.com/debian/ ${RASPBIAN_VERSION:-bookworm} main
+EOF
+fi
 
 # Fix APT keyring deprecation warning (migrate from legacy trusted.gpg)
 migrate_apt_keyring "${MOUNT_POINT}"
