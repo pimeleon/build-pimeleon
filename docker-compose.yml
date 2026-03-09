@@ -10,8 +10,6 @@ services:
       args:
         APT_CACHE_SERVER: ${APT_CACHE_SERVER:-192.168.76.5}
         APT_CACHE_PORT: ${APT_CACHE_PORT:-3142}
-        PIMELEON_PROFILE: ${PIMELEON_PROFILE:-development}
-        CI: ${CI:-}
     container_name: pimeleon-builder
     init: true
     stop_signal: SIGTERM
@@ -116,8 +114,6 @@ services:
       args:
         APT_CACHE_SERVER: ${APT_CACHE_SERVER:-192.168.76.5}
         APT_CACHE_PORT: ${APT_CACHE_PORT:-3142}
-        PIMELEON_PROFILE: ${PIMELEON_PROFILE:-development}
-        CI: ${CI:-}
     container_name: pimeleon-tester
     privileged: true
     volumes:
@@ -159,8 +155,6 @@ services:
       args:
         APT_CACHE_SERVER: ${APT_CACHE_SERVER:-192.168.76.5}
         APT_CACHE_PORT: ${APT_CACHE_PORT:-3142}
-        PIMELEON_PROFILE: ${PIMELEON_PROFILE:-development}
-        CI: ${CI:-}
     container_name: pimeleon-dev
     volumes:
       - .:/workspace

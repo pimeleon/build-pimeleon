@@ -64,14 +64,13 @@ repos:
         stages: [pre-push]
         args: ['dir', '.', '--verbose', '--redact']
 
-  # Code Quality Benchmark (on commit)
+  # Code Quality Benchmark (pre-push only)
   - repo: local
     hooks:
       - id: quality-benchmark
         name: Code Quality Benchmark
         entry: ./scripts/quality-benchmark.sh
         language: script
-        stages: [pre-commit]
+        stages: [pre-push]
         pass_filenames: false
         always_run: true
-        verbose: true

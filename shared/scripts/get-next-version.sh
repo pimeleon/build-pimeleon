@@ -17,10 +17,10 @@ get_next_version() {
     base_version=""
     git_range=""
 
-    # 1. Try git tags first
+    # 1. Try git tags first (legacy behavior)
     current_tag=""
     if [ -n "$platform" ]; then
-        current_tag=$(git tag -l "${platform}-v*" --sort=-v:refname 2>/dev/null | head -1) || current_tag=""
+        current_tag=$(git tag -l "*-${platform}" --sort=-v:refname 2>/dev/null | head -1) || current_tag=""
     fi
     if [ -z "$current_tag" ]; then
         current_tag=$(git describe --tags --abbrev=0 2>/dev/null) || current_tag=""
@@ -28,8 +28,10 @@ get_next_version() {
 
     if [ -n "$current_tag" ]; then
         # Extract version from tag
-        base_version=$(echo "$current_tag" | sed "s/^${platform}-v//")
-        base_version=$(echo "$base_version" | sed 's/^v//')
+        base_version=$(echo "$current_tag" | sed 's/^v//')
+        if [ -n "$platform" ]; then
+            base_version=$(echo "$base_version" | sed "s/-${platform}\$//")
+        fi
         git_range="${current_tag}..HEAD"
     else
         # 2. Fall back to VERSION file
@@ -102,7 +104,7 @@ get_next_version() {
             patch=$((patch + 1))
         else
             # No releasable commits since last version change
-            echo "${major}.${minor}.${patch}-chore"
+            echo "${major}.${minor}.${patch}-dev"
             return
         fi
 

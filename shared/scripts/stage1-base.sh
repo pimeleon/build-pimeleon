@@ -5,19 +5,20 @@ set -euo pipefail
 # Creates the base Raspbian image with partitions
 
 # shellcheck disable=SC1091
+# shellcheck disable=SC1091
 source /scripts/common.sh
 
 # Setup cleanup trap for error handling
 trap 'cleanup_on_exit' EXIT ERR INT TERM
 
-# Validate parameters
-if [[ $# -ne 3 ]] || [[ -z "${1:-}" || -z "${2:-}" || -z "${3:-}" ]]; then
-    die "Usage: $0 <work_dir> <image_path> <image_size>"
-fi
-
 WORK_DIR=$1
 IMAGE_PATH=$2
 IMAGE_SIZE=$3
+
+# Validate parameters
+if [[ -z "$WORK_DIR" || -z "$IMAGE_PATH" || -z "$IMAGE_SIZE" ]]; then
+    die "Usage: $0 <work_dir> <image_path> <image_size>"
+fi
 
 MOUNT_POINT="${WORK_DIR}/mount"
 CACHE_VERSION="v4"  # v2: python3-minimal, v3: modern GPG keyring (no apt-key), v4: legacy keyring migration
@@ -116,7 +117,7 @@ else
 
     # Configure proxy environment for debootstrap if available
     DEBOOTSTRAP_ENV=""
-    if should_use_apt_proxy; then
+    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
         log_info "Configuring APT proxy for debootstrap: ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
         DEBOOTSTRAP_ENV="http_proxy=http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142} HTTP_PROXY=http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
     fi
@@ -124,7 +125,7 @@ else
     # Bootstrap base system without Pi-specific packages first
     # Include python3-minimal for Ansible compatibility
     # Exclude DHCP packages since systemd handles networking
-    sudo env ${DEBOOTSTRAP_ENV} debootstrap --foreign --arch="${DEBOOTSTRAP_ARCH}" \
+    sudo env "${DEBOOTSTRAP_ENV}" debootstrap --foreign --arch="${DEBOOTSTRAP_ARCH}" \
         --include=python3-minimal \
         --exclude=isc-dhcp-common,isc-dhcp-client \
         ${KEYRING_OPT} \
