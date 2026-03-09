@@ -92,6 +92,7 @@ check:containers:
         - shared/containers/**/*
         - containers/**/*
         - apps/**/*
+        - docker-compose.yml
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
     - when: never
@@ -220,7 +221,7 @@ build:containers:
         -e PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
         -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
-        -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID}" \
+        -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID:-20}" \
         -e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN}" \
         "$BUILD_IMAGE")
       docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/
@@ -320,7 +321,7 @@ build:custom:
         -e PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
         -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
-        -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID}" \
+        -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID:-20}" \
         -e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN}" \
         "$BUILD_IMAGE")
       docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/

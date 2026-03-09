@@ -18,8 +18,20 @@ publish-project-docs:
       optional: true
 
   rules:
-    # Run on release branch push (merge to release/*)
+    # Run on develop branch push or MRs targeting develop
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
+    # Run on release branch push or MRs targeting release/*
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       changes:
         - docs/**/*
@@ -64,6 +76,9 @@ trigger-docs-preview:
   rules:
     # Trigger on direct push to develop or MRs targeting develop
     - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
       changes:
         - docs/**/*
@@ -91,8 +106,12 @@ trigger-docs-production:
     name: documentation/production
     url: https://pimeleon.org
   rules:
-    # Trigger on any release branch push (merge to release/*)
+    # Trigger on direct push to release branches or MRs targeting release/*
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       changes:
         - docs/**/*
         - mkdocs.yml
