@@ -68,7 +68,7 @@ Clients → BIND9 (53) → Pi-hole (5553) → dnscrypt-proxy (5054) → Internet
 | Service | Package | Port | Role |
 |---------|---------|------|------|
 | nginx | nginx | 80/443/8443 | Web server, reverse proxy |
-| pimeleon-api | custom | 5000 | REST API (Flask) |
+| pi-router-api | custom | 5000 | REST API (Flask) |
 | ddclient | ddclient | - | Dynamic DNS updates |
 
 ### Tier 5: File Sharing (Development)
@@ -91,8 +91,8 @@ Clients → BIND9 (53) → Pi-hole (5553) → dnscrypt-proxy (5054) → Internet
 
 | Service | Location | Description |
 |---------|----------|-------------|
-| pimeleon-api | /opt/pimeleon/api | Flask REST API |
-| pi-power-monitor | /opt/pimeleon | Power monitoring daemon |
+| pi-router-api | /opt/pi-router/api | Flask REST API |
+| pi-power-monitor | /opt/pi-router | Power monitoring daemon |
 
 ## Firewall Configuration (nftables)
 
@@ -121,7 +121,7 @@ Clients → BIND9 (53) → Pi-hole (5553) → dnscrypt-proxy (5054) → Internet
 
 | Setting | Value |
 |---------|-------|
-| Domain | pimeleon.dev |
+| Domain | pirouter.dev |
 | Wired LAN Pool | 192.168.42.100-254 |
 | WiFi Pool | 192.168.42.100-254 |
 | DNS Server | 192.168.42.1 |
@@ -168,7 +168,7 @@ Clients → BIND9 (53) → Pi-hole (5553) → dnscrypt-proxy (5054) → Internet
 | dnscrypt-proxy | ✅ | ✅ |
 | privoxy | ✅ | ✅ |
 | nginx | ✅ | ✅ |
-| pimeleon-api | ✅ | ✅ |
+| pi-router-api | ✅ | ✅ |
 | ddclient | ✅ | ✅ |
 | squid | ✅ | ❌ |
 | tor | ✅ | ❌ |

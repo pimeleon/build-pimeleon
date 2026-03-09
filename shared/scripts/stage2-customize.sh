@@ -5,17 +5,14 @@ set -euo pipefail
 # Install packages and apply configurations
 
 # shellcheck disable=SC1091
+# shellcheck disable=SC1091
 source /scripts/common.sh
+# shellcheck disable=SC1091
 # shellcheck disable=SC1091
 source /scripts/lib-services.sh
 
 # Setup cleanup trap for error handling
 trap 'cleanup_on_exit' EXIT ERR INT TERM
-
-# Validate parameters
-if [[ $# -ne 2 ]] || [[ -z "${1:-}" || -z "${2:-}" ]]; then
-    die "Usage: $0 <work_dir> <image_path>"
-fi
 
 WORK_DIR=$1
 IMAGE_PATH=$2
@@ -43,19 +40,37 @@ setup_chroot "${MOUNT_POINT}"
 # Configure APT cache for chroot environment early
 configure_chroot_apt_proxy "${MOUNT_POINT}"
 
-# Update sources.list based on architecture (mirrors stage1-base.sh logic)
+# Update sources.list to ensure it matches current configuration (even if using old base cache)
+log_info "Updating APT sources"
 if [[ "${RPI_ARCH:-armhf}" == "arm64" ]]; then
-    log_info "Updating APT sources for arm64: using Debian repositories"
+    # arm64: standard Debian repos + non-free-firmware for bookworm+
     sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
 deb http://deb.debian.org/debian ${RASPBIAN_VERSION:-bookworm} main contrib non-free non-free-firmware
 deb http://deb.debian.org/debian-security ${RASPBIAN_VERSION:-bookworm}-security main contrib non-free non-free-firmware
 deb http://deb.debian.org/debian ${RASPBIAN_VERSION:-bookworm}-updates main contrib non-free non-free-firmware
 EOF
 else
-    log_info "Updating APT sources for armhf: using Raspbian at ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/}"
+    # armhf: Raspbian repos
     sudo tee "${MOUNT_POINT}/etc/apt/sources.list" > /dev/null <<EOF
 deb ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/} ${RASPBIAN_VERSION:-bookworm} main contrib non-free rpi
 deb-src ${RASPBIAN_MIRROR:-http://raspbian.raspberrypi.com/raspbian/} ${RASPBIAN_VERSION:-bookworm} main contrib non-free rpi
+EOF
+
+    # Ensure Raspbian keyring is present for verification
+    if [ ! -f "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" ]; then
+        log_info "Installing Raspbian archive keyring"
+        wget -qO- http://archive.raspbian.org/raspbian.public.key | \
+            gpg --dearmor | \
+            sudo tee "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" > /dev/null
+        sudo chmod 644 "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg"
+    fi
+fi
+
+# Ensure raspi.list is also present (Raspberry Pi Foundation repo)
+if [ ! -f "${MOUNT_POINT}/etc/apt/sources.list.d/raspi.list" ]; then
+    log_info "Restoring raspi.list"
+    sudo tee "${MOUNT_POINT}/etc/apt/sources.list.d/raspi.list" > /dev/null <<EOF
+deb [signed-by=/etc/apt/keyrings/raspberrypi-archive-keyring.gpg] http://archive.raspberrypi.com/debian/ ${RASPBIAN_VERSION:-bookworm} main
 EOF
 fi
 
@@ -162,18 +177,12 @@ chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
 # Verify Pi boot firmware was installed to boot partition
 log_info "Verifying Pi boot firmware installation"
 FIRMWARE_OK=true
+[[ -f "${BOOT_MOUNT}/bootcode.bin" ]] || { log_error "bootcode.bin not found"; FIRMWARE_OK=false; }
 [[ -f "${BOOT_MOUNT}/start.elf" ]] || { log_error "start.elf not found"; FIRMWARE_OK=false; }
 [[ -f "${BOOT_MOUNT}/fixup.dat" ]] || { log_error "fixup.dat not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/kernel7.img" ]] || { log_error "kernel7.img not found"; FIRMWARE_OK=false; }
+[[ -f "${BOOT_MOUNT}/bcm2710-rpi-3-b-plus.dtb" ]] || { log_error "Pi 3B+ device tree not found"; FIRMWARE_OK=false; }
 [[ -d "${BOOT_MOUNT}/overlays" ]] || { log_error "Boot overlays not found"; FIRMWARE_OK=false; }
-# Architecture-specific kernel and device tree files
-if [[ "${RPI_ARCH:-armhf}" == "arm64" ]]; then
-    [[ -f "${BOOT_MOUNT}/kernel8.img" ]] || { log_error "kernel8.img not found (arm64)"; FIRMWARE_OK=false; }
-    [[ -f "${BOOT_MOUNT}/bcm2711-rpi-4-b.dtb" ]] || { log_error "Pi 4B device tree not found"; FIRMWARE_OK=false; }
-else
-    [[ -f "${BOOT_MOUNT}/bootcode.bin" ]] || { log_error "bootcode.bin not found"; FIRMWARE_OK=false; }
-    [[ -f "${BOOT_MOUNT}/kernel7.img" ]] || { log_error "kernel7.img not found (armhf)"; FIRMWARE_OK=false; }
-    [[ -f "${BOOT_MOUNT}/bcm2710-rpi-3-b-plus.dtb" ]] || { log_error "Pi 3B+ device tree not found"; FIRMWARE_OK=false; }
-fi
 if [[ "$FIRMWARE_OK" == "true" ]]; then
     log_info "All Pi boot firmware files verified"
 else
@@ -397,7 +406,7 @@ fi
 
 # Clone or update repo
 if [[ -d "${PIMELEON_UI_BUILD_DIR}/.git" ]]; then
-    log_info "Updating existing Pimeleon web UI repository clone..."
+    log_info "Updating existing pirouter-ui clone..."
     # Discard any local changes (e.g. from pnpm add in previous build run)
     git -C "${PIMELEON_UI_BUILD_DIR}" reset --hard HEAD
     # Fetch specific branch (shallow clones don't have remote tracking refs)
@@ -405,7 +414,7 @@ if [[ -d "${PIMELEON_UI_BUILD_DIR}/.git" ]]; then
     # Create/reset local branch from FETCH_HEAD (origin/branch doesn't exist in shallow clones)
     git -C "${PIMELEON_UI_BUILD_DIR}" checkout -B "${PIMELEON_UI_BRANCH}" FETCH_HEAD
 else
-    log_info "Cloning Pimeleon web UI from ${PIMELEON_UI_REPO} (branch: ${PIMELEON_UI_BRANCH})..."
+    log_info "Cloning pirouter-ui from ${PIMELEON_UI_REPO} (branch: ${PIMELEON_UI_BRANCH})..."
     git clone --depth 1 --branch "${PIMELEON_UI_BRANCH}" "${PIMELEON_UI_REPO_AUTH}" "${PIMELEON_UI_BUILD_DIR}"
 fi
 
@@ -413,25 +422,28 @@ fi
 log_info "Building Pimeleon UI and API (${PIMELEON_PROFILE:-development} mode, branch: ${PIMELEON_UI_BRANCH})..."
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
+
 # Configure pnpm caching and proxy based on build profile
 if should_use_apt_proxy; then
     # Development/CI: persistent pnpm store cache and npm proxy for faster iteration
     log_info "pnpm: development mode - using cache at ${CACHE_DIR}/.pnpm-store and proxy at ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
-    sudo mkdir -p "${CACHE_DIR}/.pnpm-store" && sudo chown -R builder:builder "${CACHE_DIR}/.pnpm-store"
     pnpm config set store-dir "${CACHE_DIR}/.pnpm-store"
     pnpm config set proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
     pnpm config set https-proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
 else
-    # Production: no cache, no proxy — clean reproducible builds
-    log_info "pnpm: production mode - no cache, no proxy"
-    pnpm config delete store-dir 2>/dev/null || true
-    pnpm config delete proxy 2>/dev/null || true
-    pnpm config delete https-proxy 2>/dev/null || true
+    # Production: clean build without shared store or proxy
+    log_info "pnpm: production mode - clean build"
+    pnpm config delete store-dir
+    pnpm config delete proxy
+    pnpm config delete https-proxy
 fi
-# Clean stale node_modules before any pnpm operation to avoid ERR_PNPM_INCLUDED_DEPS_CONFLICT
+
+# Always start with clean node_modules to avoid store mismatch (ERR_PNPM_UNEXPECTED_STORE)
+# or included dependencies conflicts (ERR_PNPM_INCLUDED_DEPS_CONFLICT)
 rm -rf node_modules
+
 # Ensure jose is present in the API package
-pnpm --filter "@pimeleon/api" add jose
+pnpm --filter "@pi-router/api" add jose
 export CI=true
 pnpm install --frozen-lockfile
 NODE_ENV="${PIMELEON_PROFILE:-production}" pnpm build
@@ -520,7 +532,7 @@ if [[ -d "${PLAYBOOKS_DIR}" ]] && [[ -n "$(ls -A "${PLAYBOOKS_DIR}"/*.yml 2>/dev
 
     # Create temporary inventory with platform group membership
     proxy_vars=""
-    if should_use_apt_proxy; then
+    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
         proxy_url="http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
         proxy_vars="http_proxy=\"${proxy_url}\"
 https_proxy=\"${proxy_url}\"
@@ -638,6 +650,16 @@ nameserver 1.1.1.1
 # nameserver 127.0.0.1
 EOF
 sudo chmod 644 "${MOUNT_POINT}/etc/resolv.conf"
+
+# Get version information
+log_info "Generating version info: ${IMAGE_PATH}.version.txt"
+cat > "${IMAGE_PATH}.version.txt" <<EOF
+Build Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+Raspbian Version: ${RASPBIAN_VERSION:-bookworm}
+Kernel Version: $(chroot_run "${MOUNT_POINT}" uname -r || echo "unknown")
+Pi Model: ${PIMELEON_RPI_MODEL:-3B+}
+Builder Version: 1.0.0
+EOF
 
 # Verify stage completion
 verify_stage 2 "${MOUNT_POINT}"
