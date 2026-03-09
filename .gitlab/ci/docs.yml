@@ -18,14 +18,17 @@ publish-project-docs:
       optional: true
 
   rules:
-    # Run on develop branch push
+    # Run on develop branch push or MRs targeting develop
     - if: '$CI_COMMIT_BRANCH == "develop"'
       changes:
         - docs/**/*
         - mkdocs.yml
-    # Run on direct push or merge to release/* for production docs
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
+    # Run on release branch push or MRs targeting release/*
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    # Run on MRs targeting release branches
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       changes:
         - docs/**/*
@@ -68,10 +71,9 @@ trigger-docs-preview:
     name: documentation/preview
     url: https://preview.pimeleon-docs.pages.dev
   rules:
-    # Trigger on direct push or merge to release branches
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    # Trigger on MRs targeting release branches
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+    # Trigger on direct push to develop or MRs targeting develop
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
       changes:
         - docs/**/*
         - mkdocs.yml
@@ -89,7 +91,7 @@ trigger-docs-production:
       optional: true
   trigger:
     project: pirouter/pimeleon-site
-    branch: master
+    branch: main
   variables:
     TRIGGERED_BY: pimeleon-build
     SOURCE_BRANCH: $CI_COMMIT_BRANCH
@@ -98,5 +100,9 @@ trigger-docs-production:
     name: documentation/production
     url: https://pimeleon.org
   rules:
-    # Trigger on direct push or merge to release/* branches
+    # Trigger on direct push to release branches or MRs targeting release/*
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+      changes:
+        - docs/**/*
+        - mkdocs.yml
