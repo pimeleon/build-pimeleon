@@ -7,7 +7,7 @@ publish-project-docs:
   stage: docs
   image: python:3.11-slim
   tags:
-    - nodejs
+    - lightweight
   needs:
     - job: "lint:yaml"
     - job: "build:pimeleon"
@@ -18,12 +18,7 @@ publish-project-docs:
       optional: true
 
   rules:
-    # Run on develop branch push
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes:
-        - docs/**/*
-        - mkdocs.yml
-    # Run on direct push or merge to release/* for production docs
+    # Run on release branch push (merge to release/*)
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     # Run on MRs targeting release branches
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
@@ -89,7 +84,7 @@ trigger-docs-production:
       optional: true
   trigger:
     project: pirouter/pimeleon-site
-    branch: master
+    branch: main
   variables:
     TRIGGERED_BY: pimeleon-build
     SOURCE_BRANCH: $CI_COMMIT_BRANCH
@@ -98,5 +93,8 @@ trigger-docs-production:
     name: documentation/production
     url: https://pimeleon.org
   rules:
-    # Trigger on direct push or merge to release/* branches
+    # Trigger on any release branch push (merge to release/*)
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      changes:
+        - docs/**/*
+        - mkdocs.yml

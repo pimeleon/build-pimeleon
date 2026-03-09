@@ -12,6 +12,7 @@ setup:platform:
   rules:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_COMMIT_TAG'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "web"'
   script:
@@ -61,6 +62,7 @@ warm-cache:
   rules:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_COMMIT_TAG'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "web"'
   cache:
@@ -79,6 +81,34 @@ warm-cache:
         echo "Cache not found, will be created by build:pimeleon"
       fi
 
+# Check whether builder and tester images already exist in the registry
+check:containers:
+  extends: .docker-job
+  stage: .pre
+  rules:
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      changes:
+        - shared/containers/**/*
+        - containers/**/*
+        - apps/**/*
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: always
+    - when: never
+  script:
+    - |
+      if docker manifest inspect "${CI_REGISTRY_IMAGE}/builder:latest" >/dev/null 2>&1 && \
+         docker manifest inspect "${CI_REGISTRY_IMAGE}/tester:latest" >/dev/null 2>&1; then
+        echo "CONTAINERS_EXIST=true" >> containers.env
+        echo "Builder and tester images already in registry — build will be skipped"
+      else
+        echo "CONTAINERS_EXIST=false" >> containers.env
+        echo "Images not found in registry — build required"
+      fi
+  artifacts:
+    reports:
+      dotenv: containers.env
+
 # Build builder and tester Docker images when container sources change
 build:containers:
   extends: .docker-job
@@ -86,18 +116,23 @@ build:containers:
   needs:
     - job: setup:platform
       artifacts: true
+    - job: check:containers
+      artifacts: true
   rules:
+    # Skip if containers already exist in registry
+    - if: '$CONTAINERS_EXIST == "true"'
+      when: never
+    # Always allow manual trigger from web if they don't exist
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: on_success
+    # Trigger on tags or release branch changes (includes merged MRs)
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       changes:
         - shared/containers/**/*
         - containers/**/*
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
-      changes:
-        - shared/containers/**/*
-        - containers/**/*
-    - if: '$CI_PIPELINE_SOURCE == "web"'
-      when: always
+        - apps/**/*
+        - docker-compose.yml
     - when: never
   script:
     - |
@@ -169,7 +204,7 @@ build:containers:
       # Use the detected scripts directory for versioning as well
       chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
       BASE_VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
-      PIMELEON_VERSION="${BASE_VERSION}"
+      PIMELEON_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
       echo "Building version: ${PIMELEON_VERSION}"
     - |
       CONTAINER_ID=$(docker create \
@@ -183,10 +218,7 @@ build:containers:
         -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
         -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
         -e PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
-        -e CI_COMMIT_REF_NAME="${CI_COMMIT_REF_NAME}" \
-        -e CI_COMMIT_TAG="${CI_COMMIT_TAG}" \
         -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
-        -e APT_CACHE_PORT="${APT_PROXY##*:}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
         -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID}" \
         -e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN}" \
@@ -231,6 +263,7 @@ build:pimeleon:
   rules:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_COMMIT_TAG'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
 
 # Custom build — manually triggered via Web/API with configurable variables
@@ -285,10 +318,7 @@ build:custom:
         -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
         -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
         -e PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
-        -e CI_COMMIT_REF_NAME="${CI_COMMIT_REF_NAME}" \
-        -e CI_COMMIT_TAG="${CI_COMMIT_TAG}" \
         -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
-        -e APT_CACHE_PORT="${APT_PROXY##*:}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
         -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID}" \
         -e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN}" \

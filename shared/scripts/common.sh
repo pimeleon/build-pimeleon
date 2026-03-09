@@ -223,6 +223,27 @@ sys.exit(0 if val == True else 1)
     fi
 }
 
+# Check if the build should use the APT cache proxy and persistent caches
+should_use_apt_proxy() {
+    # If APT_CACHE_SERVER is not set, we can't use proxy
+    if [[ -z "${APT_CACHE_SERVER:-}" ]]; then
+        return 1
+    fi
+
+    # Check for CI/CD environment (always use proxy to speed up CI)
+    if [[ -n "${CI:-}" ]] || [[ -n "${GITLAB_CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        return 0
+    fi
+
+    # For local builds, only use proxy if explicitly requested via PIMELEON_PROFILE=development
+    # or if we are not in production mode.
+    if [[ "${PIMELEON_PROFILE:-}" != "production" ]]; then
+        return 0
+    fi
+
+    return 1
+}
+
 # Cleanup stale mounts from previous failed builds
 cleanup_stale_mounts() {
     log_info "Checking for stale mounts from previous builds..."
@@ -531,27 +552,6 @@ verify_stage() {
     log_info "Stage $stage verified successfully."
 }
 
-# Check if APT proxy should be used based on profile and environment
-should_use_apt_proxy() {
-    # If APT_CACHE_SERVER is not set, we can't use proxy
-    if [[ -z "${APT_CACHE_SERVER:-}" ]]; then
-        return 1
-    fi
-
-    # Check for CI/CD environment (always use proxy to speed up CI)
-    if [[ -n "${CI:-}" ]] || [[ -n "${GITLAB_CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-        return 0
-    fi
-
-    # Check for development profile (use proxy locally)
-    if [[ "${PIMELEON_PROFILE:-production}" == "development" ]]; then
-        return 0
-    fi
-
-    # Otherwise (e.g., PIMELEON_PROFILE=production locally), skip proxy
-    return 1
-}
-
 # Configure APT cache for chroot environment
 configure_chroot_apt_proxy() {
     local mount_point=$1
@@ -564,9 +564,7 @@ Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
 # Longer timeouts for slow cache/upstream responses
 Acquire::http::Timeout "120";
 Acquire::https::Timeout "120";
-# Resilience settings for apt-cacher-ng proxy disconnections
 Acquire::Retries "3";
-Acquire::http::Pipeline-Depth "0";
 EOF
     fi
 }
@@ -603,9 +601,9 @@ chroot_run() {
     local chroot_dir=$1
     shift
 
-    # Construct proxy environment if profile/CI warrants it
+    # Construct proxy environment if available
     local -a proxy_args=()
-    if should_use_apt_proxy; then
+    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
         local proxy_url="http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
         proxy_args=(
             "http_proxy=${proxy_url}"
@@ -651,7 +649,7 @@ generate_metadata() {
     },
     "build_info": {
         "rpi_model": "${PIMELEON_RPI_MODEL:-3B+}",
-        "raspbian_version": "${RASPBIAN_VERSION:-bookworm}",
+        "raspbian_version": "${RASPBIAN_VERSION:-buster}",
         "builder_version": "1.0.0"
     }
 }

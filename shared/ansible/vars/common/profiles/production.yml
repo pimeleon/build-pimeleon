@@ -28,7 +28,7 @@ services_enabled:
 
   # Tier 4: Web & API
   nginx: true
-  pimeleon_api: true
+  pi_router_api: true
   ddclient: true
 
   # Tier 5: File Sharing

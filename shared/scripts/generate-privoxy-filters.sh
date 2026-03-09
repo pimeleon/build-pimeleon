@@ -6,6 +6,7 @@ set -euo pipefail
 # Caches generated filters to avoid regenerating on every build
 
 # shellcheck disable=SC1091
+# shellcheck disable=SC1091
 source /scripts/common.sh
 
 MOUNT_POINT=$1
