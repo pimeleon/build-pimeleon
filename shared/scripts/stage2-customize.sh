@@ -198,10 +198,11 @@ chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
     wireless-regdb \
     wpasupplicant
 
-# Install core services (hostapd, Pi-hole, Tor) using library functions
+# Install core services (hostapd, Pi-hole, Tor, dnscrypt-proxy) using library functions
 install_hostapd "${MOUNT_POINT}"
 install_pihole "${MOUNT_POINT}"
 install_tor "${MOUNT_POINT}"
+install_dnscrypt_proxy "${MOUNT_POINT}"
 
 # Install DNS server packages (dnscrypt-proxy uses pre-built binary, not APT)
 log_info "Installing DNS server packages"
@@ -328,22 +329,6 @@ DOWNLOAD_DIR="${CACHE_DIR}/pimeleon-downloads"
 sudo mkdir -p "${DOWNLOAD_DIR}"
 sudo chmod 755 "${DOWNLOAD_DIR}"
 sudo chown "$(id -u):$(id -g)" "${DOWNLOAD_DIR}"
-
-# Fetch pre-built binaries from pi-router-apps registry (production only)
-# Non-production profiles fall back to APT sources via Ansible
-for pkg in dnscrypt-proxy; do
-    if [[ "${PIMELEON_PROFILE:-development}" == "production" ]]; then
-        if ! fetch_pimeleon_apps "${pkg}" "${RPI_ARCH}" "${DOWNLOAD_DIR}"; then
-            if is_service_enabled "${pkg//-/_}" 2>/dev/null; then
-                die "Failed to fetch ${pkg} from pi-router-apps registry and it is enabled in this profile."
-            else
-                log_warn "Failed to fetch ${pkg} from registry; service is not enabled, continuing."
-            fi
-        fi
-    else
-        log_info "Profile '${PIMELEON_PROFILE:-development}': skipping registry fetch for ${pkg}, APT source will be used"
-    fi
-done
 
 # Pi-hole FTL is built from source (see build-pihole-ftl.sh)
 # Tor is installed from official Tor Project repository (see tor-setup.yml)

@@ -130,3 +130,31 @@ install_tor() {
         log_info "Tor not enabled in profile, skipping installation"
     fi
 }
+
+# Install dnscrypt-proxy (source or apt)
+install_dnscrypt_proxy() {
+    local mount_point=$1
+    if is_service_enabled "dnscrypt_proxy" 2>/dev/null; then
+        if [[ "${PIMELEON_PROFILE:-}" == "production" ]]; then
+            log_info "Building dnscrypt-proxy from source (Production mode)"
+            local dnscrypt_version_val
+            local ansible_dir="${ANSIBLE_DIR:-/ansible}"
+            dnscrypt_version_val=$(grep "dnscrypt_proxy:" "${ansible_dir}/vars/common/versions.yml" | head -1 | awk '{print $2}' | tr -d '"')
+            sudo cp /scripts/build-dnscrypt-proxy.sh "${mount_point}/tmp/build-dnscrypt-proxy.sh"
+            sudo chmod +x "${mount_point}/tmp/build-dnscrypt-proxy.sh"
+            chroot_run "${mount_point}" /tmp/build-dnscrypt-proxy.sh "${dnscrypt_version_val:-2.1.5}"
+            if [[ -x "${mount_point}/usr/local/bin/dnscrypt-proxy" ]]; then
+                log_info "dnscrypt-proxy compiled and installed successfully"
+                chroot_run "${mount_point}" /usr/local/bin/dnscrypt-proxy -version
+            else
+                die "dnscrypt-proxy compilation failed - binary not found"
+            fi
+            safe_rm "${mount_point}/tmp/build-dnscrypt-proxy.sh"
+        else
+            log_info "Installing dnscrypt-proxy from APT (Development mode)"
+            chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends dnscrypt-proxy"
+        fi
+    else
+        log_info "dnscrypt-proxy not enabled in profile, skipping installation"
+    fi
+}
