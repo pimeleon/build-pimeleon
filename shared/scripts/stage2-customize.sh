@@ -407,6 +407,8 @@ fi
 # Clone or update repo
 if [[ -d "${PIMELEON_UI_BUILD_DIR}/.git" ]]; then
     log_info "Updating existing pirouter-ui clone..."
+    # Discard any local changes (e.g. from pnpm add in previous build run)
+    git -C "${PIMELEON_UI_BUILD_DIR}" reset --hard HEAD
     # Fetch specific branch (shallow clones don't have remote tracking refs)
     git -C "${PIMELEON_UI_BUILD_DIR}" fetch origin "${PIMELEON_UI_BRANCH}"
     # Create/reset local branch from FETCH_HEAD (origin/branch doesn't exist in shallow clones)
@@ -420,11 +422,31 @@ fi
 log_info "Building Pimeleon UI and API (${PIMELEON_PROFILE:-development} mode, branch: ${PIMELEON_UI_BRANCH})..."
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
+
+# Configure pnpm caching and proxy based on build profile
+if should_use_apt_proxy; then
+    # Development/CI: persistent pnpm store cache and npm proxy for faster iteration
+    log_info "pnpm: development mode - using cache at ${CACHE_DIR}/.pnpm-store and proxy at ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+    pnpm config set store-dir "${CACHE_DIR}/.pnpm-store"
+    pnpm config set proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+    pnpm config set https-proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+else
+    # Production: clean build without shared store or proxy
+    log_info "pnpm: production mode - clean build"
+    pnpm config delete store-dir
+    pnpm config delete proxy
+    pnpm config delete https-proxy
+fi
+
+# Always start with clean node_modules to avoid store mismatch (ERR_PNPM_UNEXPECTED_STORE)
+# or included dependencies conflicts (ERR_PNPM_INCLUDED_DEPS_CONFLICT)
+rm -rf node_modules
+
 # Ensure jose is present in the API package
 pnpm --filter "@pi-router/api" add jose
 export CI=true
-NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm install --frozen-lockfile
-NODE_ENV="${PIMELEON_PROFILE:-development}" pnpm build
+pnpm install --frozen-lockfile
+NODE_ENV="${PIMELEON_PROFILE:-production}" pnpm build
 popd > /dev/null
 
 # =============================================================================

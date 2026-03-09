@@ -223,6 +223,27 @@ sys.exit(0 if val == True else 1)
     fi
 }
 
+# Check if the build should use the APT cache proxy and persistent caches
+should_use_apt_proxy() {
+    # If APT_CACHE_SERVER is not set, we can't use proxy
+    if [[ -z "${APT_CACHE_SERVER:-}" ]]; then
+        return 1
+    fi
+
+    # Check for CI/CD environment (always use proxy to speed up CI)
+    if [[ -n "${CI:-}" ]] || [[ -n "${GITLAB_CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        return 0
+    fi
+
+    # For local builds, only use proxy if explicitly requested via PIMELEON_PROFILE=development
+    # or if we are not in production mode.
+    if [[ "${PIMELEON_PROFILE:-}" != "production" ]]; then
+        return 0
+    fi
+
+    return 1
+}
+
 # Cleanup stale mounts from previous failed builds
 cleanup_stale_mounts() {
     log_info "Checking for stale mounts from previous builds..."
@@ -534,7 +555,7 @@ verify_stage() {
 # Configure APT cache for chroot environment
 configure_chroot_apt_proxy() {
     local mount_point=$1
-    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+    if should_use_apt_proxy; then
         log_info "Configuring APT cache for chroot: ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
         sudo mkdir -p "${mount_point}/etc/apt/apt.conf.d"
         sudo tee "${mount_point}/etc/apt/apt.conf.d/01proxy" > /dev/null <<EOF
