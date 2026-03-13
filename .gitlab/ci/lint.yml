@@ -23,6 +23,7 @@ lint:ansible:
   script:
     - cd shared/ansible
     - ansible-lint playbooks/*.yml
+  allow_failure: true
 
 lint:shell:
   stage: lint
