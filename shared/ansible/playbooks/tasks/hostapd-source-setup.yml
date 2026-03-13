@@ -16,7 +16,6 @@
     state: link
   when:
     - services_enabled.hostapd | default(true)
-    - not (build_from_source | default({})).hostapd | default(false)
 
 - name: Create hostapd config directory
   ansible.builtin.file:

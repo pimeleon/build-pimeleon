@@ -9,6 +9,10 @@ PIMELEON_PROJECT_NAME="${PIMELEON_PROJECT_NAME:-pimeleon}"
 PIMELEON_USER="${PIMELEON_USER:-$(id -u)}"
 PIMELEON_GROUP="${PIMELEON_GROUP:-docker}"
 
+# Directory configuration
+CACHE_DIR="${CACHE_DIR:-/cache}"
+DOWNLOAD_DIR="${CACHE_DIR}/pimeleon-downloads"
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -151,72 +155,6 @@ is_service_enabled() {
 
     # Use Python for robust YAML parsing (available in builder image)
     if python3 -c "import yaml; import os; profile = yaml.safe_load(open('$profile_path')) if os.path.exists('$profile_path') else {}; exit(0 if profile.get('services_enabled', {}).get('$service_name') == True else 1)" 2>/dev/null; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Check if a service should be built from source in the current profile
-is_build_from_source_enabled() {
-    local service_name=$1
-    local ansible_dir="${ANSIBLE_DIR:-/ansible}"
-    local profile_path="${ansible_dir}/vars/common/profiles/${PIMELEON_PROFILE:-development}.yml"
-    local versions_path="${ansible_dir}/vars/common/versions.yml"
-
-    # Tor source build logic:
-    # - Local: Build from source if PIMELEON_PROFILE=production
-    # - CI: Build from source ONLY if PIMELEON_PROFILE=production AND (tagged release OR merged to release/*)
-    if [[ "$service_name" == "tor" ]]; then
-        if [[ "${PIMELEON_PROFILE:-}" == "production" ]]; then
-            if [[ -n "${CI:-}" ]]; then
-                # 1. Check for tagged release
-                if [[ -n "${CI_COMMIT_TAG:-}" ]] || [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
-                    return 0
-                fi
-                # 2. Check for release branch (current or merge target)
-                if [[ "${CI_COMMIT_REF_NAME:-}" == release/* ]] || \
-                   [[ "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}" == release/* ]] || \
-                   [[ "${GITHUB_REF_NAME:-}" == release/* ]] || \
-                   [[ "${GITHUB_BASE_REF:-}" == release/* ]]; then
-                    return 0
-                fi
-                # CI but not a sanctioned release path -> use APT
-                return 1
-            fi
-            # Local production build
-            return 0
-        fi
-        # Development profile or other -> use APT
-        return 1
-    fi
-
-    if [[ ! -f "$profile_path" ]]; then
-        die "FATAL: Profile file not found: $profile_path"
-    fi
-
-    # Check profile first, then fallback to versions.yml
-    if python3 -c "
-import yaml
-import sys
-import os
-
-def get_val(path, section, key):
-    try:
-        if not os.path.exists(path): return None
-        with open(path, 'r') as f:
-            data = yaml.safe_load(f)
-            return data.get(section, {}).get(key)
-    except Exception: return None
-
-# Try profile override
-val = get_val('$profile_path', 'build_from_source', '$service_name')
-if val is not None: sys.exit(0 if val == True else 1)
-
-# Fallback to versions.yml
-val = get_val('$versions_path', 'build_from_source', '$service_name')
-sys.exit(0 if val == True else 1)
-" 2>/dev/null; then
         return 0
     else
         return 1
@@ -811,4 +749,53 @@ fetch_pimeleon_apps() {
         log_warn "Failed to fetch ${package} from pi-router-apps registry"
         return 1
     fi
+}
+
+# Get a pre-built binary package from either local cache or GitLab registry.
+# Local builds: Prioritize ${PIMELEON_APPS_LOCAL_PATH} (mounted volume).
+# CI builds: Prioritize GitLab Generic Package Registry.
+# Usage: get_pimeleon_apps_artifact <package> <arch> <download_dir>
+get_pimeleon_apps_artifact() {
+    local package="$1"
+    local arch="$2"
+    local download_dir="$3"
+    local local_path="${PIMELEON_APPS_LOCAL_PATH:-/workspace/pi-router-apps}"
+
+    # 1. CI environment: Always use registry first to ensure freshness
+    if [[ -n "${CI:-}" ]] || [[ -n "${GITLAB_CI:-}" ]]; then
+        log_info "CI environment detected, prioritizing GitLab registry for ${package}"
+        if fetch_pimeleon_apps "$package" "$arch" "$download_dir"; then
+            return 0
+        fi
+    fi
+
+    # 2. Local environment: Prioritize local cache if directory exists
+    if [[ -d "${local_path}" ]]; then
+        log_info "Checking local apps cache for ${package} in ${local_path}"
+        # Expected local format: ${package}/${arch}/${package}.tar.gz
+        # or simplified: ${package}.tar.gz in package dir
+        local local_file
+        if [[ -f "${local_path}/${package}/${arch}/${package}.tar.gz" ]]; then
+            local_file="${local_path}/${package}/${arch}/${package}.tar.gz"
+        elif [[ -f "${local_path}/${package}/${package}.tar.gz" ]]; then
+            local_file="${local_path}/${package}/${package}.tar.gz"
+        fi
+
+        if [[ -n "${local_file:-}" ]]; then
+            log_info "Using local artifact: ${local_file}"
+            sudo cp "${local_file}" "${download_dir}/${package}.tar.gz"
+            return 0
+        fi
+        log_warn "Artifact for ${package} (${arch}) not found in local path ${local_path}"
+    fi
+
+    # 3. Fallback: If not CI, or local failed, try registry
+    if [[ -z "${CI:-}" ]] && [[ -z "${GITLAB_CI:-}" ]]; then
+        log_info "Falling back to GitLab registry for ${package}"
+        if fetch_pimeleon_apps "$package" "$arch" "$download_dir"; then
+            return 0
+        fi
+    fi
+
+    return 1
 }
