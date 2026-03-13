@@ -370,138 +370,182 @@ chroot_run "${MOUNT_POINT}" apt-get -y install ngrok
 # =============================================================================
 # Install Pimeleon Web UI and API
 # =============================================================================
-log_info "Building Pimeleon Web UI from GitLab..."
-
-# Fix for 504 Gateway Timeout and SSL issues with local GitLab
-git config --global http.sslVerify false
-git config --global http.lowSpeedLimit 0
-git config --global http.lowSpeedTime 999999
-git config --global core.compression 0
-
-# Configurable via environment variables (see docker-compose.yml)
-PIMELEON_UI_REPO="${PIMELEON_UI_REPO:-https://gitlab.pirouter.dev/pimeleon/pirouter-ui.git}"
-
-# Branch: env var takes precedence, otherwise select based on profile
-if [[ -n "${PIMELEON_UI_BRANCH:-}" ]]; then
-    # Use explicitly configured branch
-    :
-elif [[ "${PIMELEON_PROFILE:-development}" == "development" ]]; then
-    PIMELEON_UI_BRANCH="staging"
-else
-    PIMELEON_UI_BRANCH="master"
-fi
-
-PIMELEON_UI_BUILD_DIR="${CACHE_DIR}/pirouter-ui"
-
-# Ensure build directory is writable (CI cache may be root-owned)
-sudo mkdir -p "${PIMELEON_UI_BUILD_DIR}"
-sudo chown "$(id -u):$(id -g)" "${PIMELEON_UI_BUILD_DIR}"
-
-# Construct authenticated URL if token is available
-if [[ -n "${PIMELEON_UI_BUILD_TOKEN:-}" ]]; then
-    PIMELEON_UI_REPO_AUTH="${PIMELEON_UI_REPO/https:\/\//https:\/\/oauth2:${PIMELEON_UI_BUILD_TOKEN}@}"
-else
-    PIMELEON_UI_REPO_AUTH="${PIMELEON_UI_REPO}"
-fi
-
-# Clone or update repo
-if [[ -d "${PIMELEON_UI_BUILD_DIR}/.git" ]]; then
-    log_info "Updating existing pirouter-ui clone..."
-    # Discard any local changes (e.g. from pnpm add in previous build run)
-    git -C "${PIMELEON_UI_BUILD_DIR}" reset --hard HEAD
-    # Fetch specific branch (shallow clones don't have remote tracking refs)
-    git -C "${PIMELEON_UI_BUILD_DIR}" fetch origin "${PIMELEON_UI_BRANCH}"
-    # Create/reset local branch from FETCH_HEAD (origin/branch doesn't exist in shallow clones)
-    git -C "${PIMELEON_UI_BUILD_DIR}" checkout -B "${PIMELEON_UI_BRANCH}" FETCH_HEAD
-else
-    log_info "Cloning pirouter-ui from ${PIMELEON_UI_REPO} (branch: ${PIMELEON_UI_BRANCH})..."
-    git clone --depth 1 --branch "${PIMELEON_UI_BRANCH}" "${PIMELEON_UI_REPO_AUTH}" "${PIMELEON_UI_BUILD_DIR}"
-fi
-
-# Build UI and API using pnpm (Node.js 22 installed in builder image)
-log_info "Building Pimeleon UI and API (${PIMELEON_PROFILE:-development} mode, branch: ${PIMELEON_UI_BRANCH})..."
-export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
-
-# Configure pnpm caching and proxy based on build profile
-if should_use_apt_proxy; then
-    # Development/CI: persistent pnpm store cache and npm proxy for faster iteration
-    log_info "pnpm: development mode - using cache at ${CACHE_DIR}/.pnpm-store and proxy at ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
-    pnpm config set store-dir "${CACHE_DIR}/.pnpm-store"
-    pnpm config set proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
-    pnpm config set https-proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
-else
-    # Production: clean build without shared store or proxy
-    log_info "pnpm: production mode - clean build"
-    pnpm config delete store-dir
-    pnpm config delete proxy
-    pnpm config delete https-proxy
-fi
-
-# Always start with clean node_modules to avoid store mismatch (ERR_PNPM_UNEXPECTED_STORE)
-# or included dependencies conflicts (ERR_PNPM_INCLUDED_DEPS_CONFLICT)
-rm -rf node_modules
-
-# Ensure jose is present in the API package
-pnpm --filter "@pi-router/api" add jose
-export CI=true
-pnpm install --frozen-lockfile
-NODE_ENV="${PIMELEON_PROFILE:-production}" pnpm build
-popd > /dev/null
-
-# =============================================================================
-# Copy Pimeleon UI/API files to chroot (if available)
-# =============================================================================
-log_info "Copying Pimeleon UI/API files (if available)"
-
-# Determine source paths from built artifacts
-PIMELEON_UI_SRC="${PIMELEON_UI_BUILD_DIR}/apps/ui/dist/spa"
-PIMELEON_PROXY_SRC="${PIMELEON_UI_BUILD_DIR}/apps/api/.output/server"
-
-# FastAPI source (Python - no build step)
-if [[ -d "${PIMELEON_UI_BUILD_DIR}/apps/api-fastapi" ]]; then
-    PIMELEON_API_SRC="${PIMELEON_UI_BUILD_DIR}/apps/api-fastapi"
-    log_info "Pimeleon FastAPI found at ${PIMELEON_API_SRC}"
-else
-    PIMELEON_API_SRC="${CONFIG_DIR}/services/api-fastapi"
-fi
-
-log_info "Pimeleon UI source: ${PIMELEON_UI_SRC}"
-log_info "Pimeleon Proxy source: ${PIMELEON_PROXY_SRC}"
+log_info "Installing Pimeleon Web UI and API..."
 
 # Destination paths inside chroot image
 PIMELEON_API_DEST="${MOUNT_POINT}/opt/pimeleon/api"
 PIMELEON_PROXY_DEST="${MOUNT_POINT}/opt/pimeleon/proxy"
 PIMELEON_UI_DEST="${MOUNT_POINT}/opt/pimeleon/ui"
 
-# Copy FastAPI server if available
-if [[ -d "${PIMELEON_API_SRC}" ]] && [[ -f "${PIMELEON_API_SRC}/requirements.txt" ]]; then
-    log_info "Copying Pimeleon Python FastAPI server files"
-    sudo mkdir -p "${PIMELEON_API_DEST}"
-    sudo rsync -a --exclude '__pycache__' --exclude '*.pyc' --exclude 'logs' --exclude 'venv' --exclude '.env' --exclude '.env.example' "${PIMELEON_API_SRC}/" "${PIMELEON_API_DEST}/"
-    log_info "Python FastAPI server copied: $(du -sh "${PIMELEON_API_DEST}" | cut -f1)"
-else
-    die "FATAL: Python FastAPI server not found at ${PIMELEON_API_SRC}"
+# Try to fetch from artifact (local cache or registry)
+UI_FETCHED=false
+if [[ "${PIMELEON_PROFILE:-}" == "production" ]]; then
+    log_info "Attempting to fetch pirouter-ui artifact..."
+    sudo mkdir -p "${DOWNLOAD_DIR}"
+    if get_pimeleon_apps_artifact "pirouter-ui" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+        log_info "Fetched pirouter-ui artifact. Extracting..."
+        EXTRACT_DIR="/tmp/pirouter-ui-extract"
+        sudo rm -rf "${EXTRACT_DIR}"
+        mkdir -p "${EXTRACT_DIR}"
+        sudo tar -xzf "${DOWNLOAD_DIR}/pirouter-ui.tar.gz" -C "${EXTRACT_DIR}"
+
+        # Copy extracted files to destinations
+        # Expected layout in tarball:
+        # apps/ui/dist/spa/ -> ui/
+        # apps/api/.output/server/ -> proxy/
+        # apps/api-fastapi/ -> api/
+
+        if [[ -d "${EXTRACT_DIR}/apps/ui/dist/spa" ]]; then
+            sudo mkdir -p "${PIMELEON_UI_DEST}"
+            sudo rsync -a "${EXTRACT_DIR}/apps/ui/dist/spa/" "${PIMELEON_UI_DEST}/"
+            log_info "UI extracted from registry artifact"
+        fi
+
+        if [[ -d "${EXTRACT_DIR}/apps/api/.output/server" ]]; then
+            sudo mkdir -p "${PIMELEON_PROXY_DEST}"
+            sudo rsync -a "${EXTRACT_DIR}/apps/api/.output/server/" "${PIMELEON_PROXY_DEST}/"
+            log_info "Proxy extracted from registry artifact"
+        fi
+
+        if [[ -d "${EXTRACT_DIR}/apps/api-fastapi" ]]; then
+            sudo mkdir -p "${PIMELEON_API_DEST}"
+            sudo rsync -a --exclude '__pycache__' "${EXTRACT_DIR}/apps/api-fastapi/" "${PIMELEON_API_DEST}/"
+            log_info "API extracted from registry artifact"
+        fi
+
+        sudo rm -rf "${EXTRACT_DIR}"
+        UI_FETCHED=true
+    fi
 fi
 
-# Copy Nitro proxy if available
-if [[ -d "${PIMELEON_PROXY_SRC}" ]] && [[ -f "${PIMELEON_PROXY_SRC}/index.mjs" ]]; then
-    log_info "Copying pre-built Pimeleon Nuxt proxy files"
-    sudo mkdir -p "${PIMELEON_PROXY_DEST}"
-    sudo rsync -a --exclude '.nuxt' --exclude 'logs' "${PIMELEON_PROXY_SRC}/" "${PIMELEON_PROXY_DEST}/"
-    log_info "Nitro proxy copied: $(du -sh "${PIMELEON_PROXY_DEST}" | cut -f1)"
-else
-    die "FATAL: Nitro proxy not found at ${PIMELEON_PROXY_SRC}"
-fi
+if [[ "$UI_FETCHED" == "false" ]]; then
+    log_info "Falling back to cloning and building Pimeleon Web UI from GitLab..."
+    # Fix for 504 Gateway Timeout and SSL issues with local GitLab
+    git config --global http.sslVerify false
+    git config --global http.lowSpeedLimit 0
+    git config --global http.lowSpeedTime 999999
+    git config --global core.compression 0
 
-# Copy Quasar SPA if available
-if [[ -d "${PIMELEON_UI_SRC}" ]] && [[ -f "${PIMELEON_UI_SRC}/index.html" ]]; then
-    log_info "Copying pre-built Pimeleon Quasar UI files"
-    sudo mkdir -p "${PIMELEON_UI_DEST}"
-    sudo rsync -a --exclude 'node_modules' --exclude '.quasar' --exclude 'logs' "${PIMELEON_UI_SRC}/" "${PIMELEON_UI_DEST}/"
-    log_info "Quasar SPA copied: $(du -sh "${PIMELEON_UI_DEST}" | cut -f1)"
-else
-    die "FATAL: Quasar SPA not found at ${PIMELEON_UI_SRC}"
+    # Configurable via environment variables (see docker-compose.yml)
+    PIMELEON_UI_REPO="${PIMELEON_UI_REPO:-https://gitlab.pirouter.dev/pimeleon/pirouter-ui.git}"
+
+    # Branch: env var takes precedence, otherwise select based on profile
+    if [[ -n "${PIMELEON_UI_BRANCH:-}" ]]; then
+        # Use explicitly configured branch
+        :
+    elif [[ "${PIMELEON_PROFILE:-development}" == "development" ]]; then
+        PIMELEON_UI_BRANCH="staging"
+    else
+        PIMELEON_UI_BRANCH="master"
+    fi
+
+    PIMELEON_UI_BUILD_DIR="${CACHE_DIR}/pirouter-ui"
+
+    # Ensure build directory is writable (CI cache may be root-owned)
+    sudo mkdir -p "${PIMELEON_UI_BUILD_DIR}"
+    sudo chown "$(id -u):$(id -g)" "${PIMELEON_UI_BUILD_DIR}"
+
+    # Construct authenticated URL if token is available
+    if [[ -n "${PIMELEON_UI_BUILD_TOKEN:-}" ]]; then
+        PIMELEON_UI_REPO_AUTH="${PIMELEON_UI_REPO/https:\/\//https:\/\/oauth2:${PIMELEON_UI_BUILD_TOKEN}@}"
+    else
+        PIMELEON_UI_REPO_AUTH="${PIMELEON_UI_REPO}"
+    fi
+
+    # Clone or update repo
+    if [[ -d "${PIMELEON_UI_BUILD_DIR}/.git" ]]; then
+        log_info "Updating existing pirouter-ui clone..."
+        # Discard any local changes (e.g. from pnpm add in previous build run)
+        git -C "${PIMELEON_UI_BUILD_DIR}" reset --hard HEAD
+        # Fetch specific branch (shallow clones don't have remote tracking refs)
+        git -C "${PIMELEON_UI_BUILD_DIR}" fetch origin "${PIMELEON_UI_BRANCH}"
+        # Create/reset local branch from FETCH_HEAD (origin/branch doesn't exist in shallow clones)
+        git -C "${PIMELEON_UI_BUILD_DIR}" checkout -B "${PIMELEON_UI_BRANCH}" FETCH_HEAD
+    else
+        log_info "Cloning pirouter-ui from ${PIMELEON_UI_REPO} (branch: ${PIMELEON_UI_BRANCH})..."
+        git clone --depth 1 --branch "${PIMELEON_UI_BRANCH}" "${PIMELEON_UI_REPO_AUTH}" "${PIMELEON_UI_BUILD_DIR}"
+    fi
+
+    # Build UI and API using pnpm (Node.js 22 installed in builder image)
+    log_info "Building Pimeleon UI and API (${PIMELEON_PROFILE:-development} mode, branch: ${PIMELEON_UI_BRANCH})..."
+    export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+    pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
+
+    # Configure pnpm caching and proxy based on build profile
+    if should_use_apt_proxy; then
+        # Development/CI: persistent pnpm store cache and npm proxy for faster iteration
+        log_info "pnpm: development mode - using cache at ${CACHE_DIR}/.pnpm-store and proxy at ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+        pnpm config set store-dir "${CACHE_DIR}/.pnpm-store"
+        pnpm config set proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+        pnpm config set https-proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+    else
+        # Production: clean build without shared store or proxy
+        log_info "pnpm: production mode - clean build"
+        pnpm config delete store-dir
+        pnpm config delete proxy
+        pnpm config delete https-proxy
+    fi
+
+    # Always start with clean node_modules to avoid store mismatch (ERR_PNPM_UNEXPECTED_STORE)
+    # or included dependencies conflicts (ERR_PNPM_INCLUDED_DEPS_CONFLICT)
+    rm -rf node_modules
+
+    # Ensure jose is present in the API package
+    pnpm --filter "@pi-router/api" add jose
+    export CI=true
+    pnpm install --frozen-lockfile
+    NODE_ENV="${PIMELEON_PROFILE:-production}" pnpm build
+    popd > /dev/null
+
+    # =============================================================================
+    # Copy Pimeleon UI/API files to chroot (if available)
+    # =============================================================================
+    log_info "Copying Pimeleon UI/API files (if available)"
+
+    # Determine source paths from built artifacts
+    PIMELEON_UI_SRC="${PIMELEON_UI_BUILD_DIR}/apps/ui/dist/spa"
+    PIMELEON_PROXY_SRC="${PIMELEON_UI_BUILD_DIR}/apps/api/.output/server"
+
+    # FastAPI source (Python - no build step)
+    if [[ -d "${PIMELEON_UI_BUILD_DIR}/apps/api-fastapi" ]]; then
+        PIMELEON_API_SRC="${PIMELEON_UI_BUILD_DIR}/apps/api-fastapi"
+        log_info "Pimeleon FastAPI found at ${PIMELEON_API_SRC}"
+    else
+        PIMELEON_API_SRC="${CONFIG_DIR}/services/api-fastapi"
+    fi
+
+    log_info "Pimeleon UI source: ${PIMELEON_UI_SRC}"
+    log_info "Pimeleon Proxy source: ${PIMELEON_PROXY_SRC}"
+
+    # Copy FastAPI server if available
+    if [[ -d "${PIMELEON_API_SRC}" ]] && [[ -f "${PIMELEON_API_SRC}/requirements.txt" ]]; then
+        log_info "Copying Pimeleon Python FastAPI server files"
+        sudo mkdir -p "${PIMELEON_API_DEST}"
+        sudo rsync -a --exclude '__pycache__' --exclude '*.pyc' --exclude 'logs' --exclude 'venv' --exclude '.env' --exclude '.env.example' "${PIMELEON_API_SRC}/" "${PIMELEON_API_DEST}/"
+        log_info "Python FastAPI server copied: $(du -sh "${PIMELEON_API_DEST}" | cut -f1)"
+    else
+        die "FATAL: Python FastAPI server not found at ${PIMELEON_API_SRC}"
+    fi
+
+    # Copy Nitro proxy if available
+    if [[ -d "${PIMELEON_PROXY_SRC}" ]] && [[ -f "${PIMELEON_PROXY_SRC}/index.mjs" ]]; then
+        log_info "Copying pre-built Pimeleon Nuxt proxy files"
+        sudo mkdir -p "${PIMELEON_PROXY_DEST}"
+        sudo rsync -a --exclude '.nuxt' --exclude 'logs' "${PIMELEON_PROXY_SRC}/" "${PIMELEON_PROXY_DEST}/"
+        log_info "Nitro proxy copied: $(du -sh "${PIMELEON_PROXY_DEST}" | cut -f1)"
+    else
+        die "FATAL: Nitro proxy not found at ${PIMELEON_PROXY_SRC}"
+    fi
+
+    # Copy Quasar SPA if available
+    if [[ -d "${PIMELEON_UI_SRC}" ]] && [[ -f "${PIMELEON_UI_SRC}/index.html" ]]; then
+        log_info "Copying pre-built Pimeleon Quasar UI files"
+        sudo mkdir -p "${PIMELEON_UI_DEST}"
+        sudo rsync -a --exclude 'node_modules' --exclude '.quasar' --exclude 'logs' "${PIMELEON_UI_SRC}/" "${PIMELEON_UI_DEST}/"
+        log_info "Quasar SPA copied: $(du -sh "${PIMELEON_UI_DEST}" | cut -f1)"
+    else
+        die "FATAL: Quasar SPA not found at ${PIMELEON_UI_SRC}"
+    fi
 fi
 
 # Set interim ownership to root:root for chroot operations
