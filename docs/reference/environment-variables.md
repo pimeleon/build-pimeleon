@@ -37,8 +37,7 @@ Complete reference for all configuration environment variables.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `APT_CACHE_SERVER` | *(none)* | APT cache server IP (e.g., `192.168.76.5`) |
-| `APT_CACHE_PORT` | `3142` | APT cache port (apt-cacher-ng default) |
+| `APT_PROXY` | *(none)* | APT proxy server (`host:port`, e.g., `192.168.76.5:3142`) |
 
 ## CI/CD Variables
 
@@ -71,7 +70,7 @@ PIMELEON_RPI_MODEL=4B RASPBIAN_VERSION=bookworm docker compose run --rm builder
 ```bash
 PIMELEON_RPI_MODEL=3B+ \
 RASPBIAN_VERSION=bullseye \
-APT_CACHE_SERVER=192.168.76.5 \
+APT_PROXY=192.168.76.5:3142 \
 docker compose run --rm builder
 ```
 
@@ -83,7 +82,7 @@ PIMELEON_RPI_MODEL=4B \
 PIMELEON_IMAGE_SIZE=8G \
 PIMELEON_INITIAL_PASSWORD=mysecurepass \
 RASPBIAN_VERSION=bookworm \
-APT_CACHE_SERVER=192.168.76.5 \
+APT_PROXY=192.168.76.5:3142 \
 docker compose run --rm builder
 ```
 
