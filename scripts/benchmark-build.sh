@@ -83,12 +83,11 @@ collect_system_info() {
         apt_cache_server="disabled"
         apt_cache_available="false"
     else
-        # Auto-detect or use provided APT cache server
-        if [[ -z "${APT_CACHE_SERVER:-}" ]]; then
+        # Auto-detect or use provided APT proxy
+        if [[ -z "${APT_PROXY:-}" ]]; then
             # Try to auto-detect TrueNAS APT cache (TCP check)
             if timeout 1 bash -c "cat < /dev/null > /dev/tcp/192.168.76.5/3142" 2>/dev/null; then
-                export APT_CACHE_SERVER=192.168.76.5
-                export APT_CACHE_PORT=3142
+                export APT_PROXY="192.168.76.5:3142"
                 apt_cache_server="192.168.76.5:3142"
                 apt_cache_available="true"
                 echo -e "${GREEN}[BENCHMARK]${NC} Auto-detected TrueNAS APT cache: $apt_cache_server"
@@ -98,8 +97,10 @@ collect_system_info() {
                 echo -e "${YELLOW}[BENCHMARK]${NC} No APT cache detected, using direct downloads"
             fi
         else
-            apt_cache_server="${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
-            if timeout 1 bash -c "cat < /dev/null > /dev/tcp/${APT_CACHE_SERVER}/${APT_CACHE_PORT:-3142}" 2>/dev/null; then
+            apt_cache_server="${APT_PROXY}"
+            local apt_host="${APT_PROXY%:*}"
+            local apt_port="${APT_PROXY##*:}"
+            if timeout 1 bash -c "cat < /dev/null > /dev/tcp/${apt_host}/${apt_port}" 2>/dev/null; then
                 apt_cache_available="true"
                 echo -e "${GREEN}[BENCHMARK]${NC} Using APT cache: $apt_cache_server"
             else

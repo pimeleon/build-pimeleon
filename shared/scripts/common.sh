@@ -161,25 +161,9 @@ is_service_enabled() {
     fi
 }
 
-# Check if the build should use the APT cache proxy and persistent caches
-should_use_apt_proxy() {
-    # If APT_CACHE_SERVER is not set, we can't use proxy
-    if [[ -z "${APT_CACHE_SERVER:-}" ]]; then
-        return 1
-    fi
-
-    # Check for CI/CD environment (always use proxy to speed up CI)
-    if [[ -n "${CI:-}" ]] || [[ -n "${GITLAB_CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-        return 0
-    fi
-
-    # For local builds, only use proxy if explicitly requested via PIMELEON_PROFILE=development
-    # or if we are not in production mode.
-    if [[ "${PIMELEON_PROFILE:-}" != "production" ]]; then
-        return 0
-    fi
-
-    return 1
+# Check if APT proxy is configured (set APT_PROXY=host:port to enable)
+has_apt_proxy() {
+    [[ -n "${APT_PROXY:-}" ]]
 }
 
 # Cleanup stale mounts from previous failed builds
@@ -441,10 +425,12 @@ validate_build_environment() {
 
     # Verify network connectivity (Prioritize Cache Server, then Internet)
     local reachable=false
-    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
+    if has_apt_proxy; then
+        local apt_host="${APT_PROXY%:*}"
+        local apt_port="${APT_PROXY##*:}"
         # Try to connect to the APT Cache port (TCP)
-        if timeout 1 bash -c "cat < /dev/null > /dev/tcp/${APT_CACHE_SERVER}/${APT_CACHE_PORT:-3142}" 2>/dev/null; then
-            log_info "APT Cache Server (${APT_CACHE_SERVER}) is reachable."
+        if timeout 1 bash -c "cat < /dev/null > /dev/tcp/${apt_host}/${apt_port}" 2>/dev/null; then
+            log_info "APT proxy (${APT_PROXY}) is reachable."
             reachable=true
         fi
     fi
@@ -456,8 +442,8 @@ validate_build_environment() {
             log_info "Internet connectivity detected."
             reachable=true
         else
-            if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
-                log_warn "Neither APT Cache Server (${APT_CACHE_SERVER}) nor Internet are reachable. Build might fail."
+            if has_apt_proxy; then
+                log_warn "Neither APT proxy (${APT_PROXY}) nor Internet are reachable. Build might fail."
             else
                 log_warn "No internet connectivity detected. Package installation might fail."
             fi
@@ -493,12 +479,12 @@ verify_stage() {
 # Configure APT cache for chroot environment
 configure_chroot_apt_proxy() {
     local mount_point=$1
-    if should_use_apt_proxy; then
-        log_info "Configuring APT cache for chroot: ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+    if has_apt_proxy; then
+        log_info "Configuring APT cache for chroot: ${APT_PROXY}"
         sudo mkdir -p "${mount_point}/etc/apt/apt.conf.d"
         sudo tee "${mount_point}/etc/apt/apt.conf.d/01proxy" > /dev/null <<EOF
 # APT Cache Configuration for Build Process
-Acquire::http::Proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}";
+Acquire::http::Proxy "http://${APT_PROXY}";
 # Longer timeouts for slow cache/upstream responses
 Acquire::http::Timeout "120";
 Acquire::https::Timeout "120";
@@ -541,8 +527,8 @@ chroot_run() {
 
     # Construct proxy environment if available
     local -a proxy_args=()
-    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
-        local proxy_url="http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+    if has_apt_proxy; then
+        local proxy_url="http://${APT_PROXY}"
         proxy_args=(
             "http_proxy=${proxy_url}"
             "https_proxy=${proxy_url}"

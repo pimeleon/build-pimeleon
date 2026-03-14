@@ -26,8 +26,7 @@ export PIMELEON_IMAGE_SIZE="${PIMELEON_IMAGE_SIZE:-4G}"
 export PIMELEON_PROFILE="${PIMELEON_PROFILE:-development}"
 export RASPBIAN_VERSION="${RASPBIAN_VERSION:-bullseye}"
 export RASPBIAN_MIRROR="${RASPBIAN_MIRROR:-http://mirrordirector.raspbian.org/raspbian/}"
-export APT_CACHE_SERVER="${APT_CACHE_SERVER:-}"
-export APT_CACHE_PORT="${APT_CACHE_PORT:-3142}"
+export APT_PROXY="${APT_PROXY:-}"
 export DEBIAN_FRONTEND=noninteractive
 
 # Directories

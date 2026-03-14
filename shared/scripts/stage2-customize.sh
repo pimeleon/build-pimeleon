@@ -471,16 +471,14 @@ if [[ "$UI_FETCHED" == "false" ]]; then
     export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
     pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
 
-    # Configure pnpm caching and proxy based on build profile
-    if should_use_apt_proxy; then
-        # Development/CI: persistent pnpm store cache and npm proxy for faster iteration
-        log_info "pnpm: development mode - using cache at ${CACHE_DIR}/.pnpm-store and proxy at ${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+    # Configure pnpm caching and proxy if APT_PROXY is set
+    if has_apt_proxy; then
+        log_info "pnpm: using cache at ${CACHE_DIR}/.pnpm-store and proxy at ${APT_PROXY}"
         pnpm config set store-dir "${CACHE_DIR}/.pnpm-store"
-        pnpm config set proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
-        pnpm config set https-proxy "http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+        pnpm config set proxy "http://${APT_PROXY}"
+        pnpm config set https-proxy "http://${APT_PROXY}"
     else
-        # Production: clean build without shared store or proxy
-        log_info "pnpm: production mode - clean build"
+        log_info "pnpm: no proxy configured"
         pnpm config delete store-dir
         pnpm config delete proxy
         pnpm config delete https-proxy
@@ -576,8 +574,8 @@ if [[ -d "${PLAYBOOKS_DIR}" ]] && [[ -n "$(ls -A "${PLAYBOOKS_DIR}"/*.yml 2>/dev
 
     # Create temporary inventory with platform group membership
     proxy_vars=""
-    if [[ -n "${APT_CACHE_SERVER:-}" ]]; then
-        proxy_url="http://${APT_CACHE_SERVER}:${APT_CACHE_PORT:-3142}"
+    if has_apt_proxy; then
+        proxy_url="http://${APT_PROXY}"
         proxy_vars="http_proxy=\"${proxy_url}\"
 https_proxy=\"${proxy_url}\"
 no_proxy=\"localhost,127.0.0.1,local\""

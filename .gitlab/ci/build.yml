@@ -144,14 +144,12 @@ build:containers:
       echo "Using tester Dockerfile: ${TESTER_DF}"
 
       docker build --cache-from ${CI_REGISTRY_IMAGE}/builder:latest \
-        --build-arg APT_CACHE_SERVER=${APT_PROXY%:*} \
-        --build-arg APT_CACHE_PORT=${APT_PROXY##*:} \
+        --build-arg APT_PROXY=${APT_PROXY} \
         --build-arg CI=${CI} \
         --build-arg PIMELEON_PROFILE=${PIMELEON_PROFILE} \
         -t $BUILD_IMAGE -t ${CI_REGISTRY_IMAGE}/builder:latest -f "$BUILDER_DF" .
       docker build --cache-from ${CI_REGISTRY_IMAGE}/tester:latest \
-        --build-arg APT_CACHE_SERVER=${APT_PROXY%:*} \
-        --build-arg APT_CACHE_PORT=${APT_PROXY##*:} \
+        --build-arg APT_PROXY=${APT_PROXY} \
         --build-arg CI=${CI} \
         --build-arg PIMELEON_PROFILE=${PIMELEON_PROFILE} \
         -t $TEST_IMAGE -t ${CI_REGISTRY_IMAGE}/tester:latest -f "$TESTER_DF" "$(dirname "$TESTER_DF")"
@@ -216,7 +214,7 @@ build:containers:
         -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
         -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
         -e PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
-        -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
+        -e APT_PROXY="${APT_PROXY}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
         -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID}" \
         -e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN}" \
@@ -331,7 +329,7 @@ build:custom:
         -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
         -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
         -e PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
-        -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
+        -e APT_PROXY="${APT_PROXY}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
         -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID}" \
         -e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN}" \

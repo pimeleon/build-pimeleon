@@ -12,15 +12,14 @@ FROM debian:12-slim AS base
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Build arguments for APT cache configuration
-ARG APT_CACHE_SERVER
-ARG APT_CACHE_PORT="3142"
+# Build argument for APT cache proxy (host:port format)
+ARG APT_PROXY
 
-# Configure APT cache if server is provided
-RUN if [ -n "$APT_CACHE_SERVER" ]; then \
-    echo "Acquire::http::Proxy \"http://${APT_CACHE_SERVER}:${APT_CACHE_PORT}\";" > /etc/apt/apt.conf.d/01proxy && \
+# Configure APT cache if proxy is provided
+RUN if [ -n "$APT_PROXY" ]; then \
+    echo "Acquire::http::Proxy \"http://${APT_PROXY}\";" > /etc/apt/apt.conf.d/01proxy && \
     echo "Acquire::https::Proxy \"DIRECT\";" >> /etc/apt/apt.conf.d/01proxy && \
-    echo "Using APT cache at ${APT_CACHE_SERVER}:${APT_CACHE_PORT}"; \
+    echo "Using APT cache at ${APT_PROXY}"; \
     fi
 
 # Install base dependencies and build tools
