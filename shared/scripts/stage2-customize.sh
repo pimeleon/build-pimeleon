@@ -79,8 +79,8 @@ migrate_apt_keyring "${MOUNT_POINT}"
 
 # Update package lists
 log_info "Updating package lists"
-chroot_run "${MOUNT_POINT}" apt-get update
-chroot_run "${MOUNT_POINT}" apt-get -y upgrade
+chroot_run "${MOUNT_POINT}" apt-get -qq update
+chroot_run "${MOUNT_POINT}" apt-get -qq -y upgrade
 
 # Define package categories for better maintenance
 SYSTEM_PKGS=(
@@ -124,25 +124,25 @@ BUILD_DEPS=(
 
 # Install essential packages by category for better visibility
 log_info "Installing system core packages"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${SYSTEM_PKGS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${SYSTEM_PKGS[@]}"
 
 log_info "Installing shell and utility packages"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${SHELL_PKGS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${SHELL_PKGS[@]}"
 
 log_info "Installing core networking packages"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${NET_CORE_PKGS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${NET_CORE_PKGS[@]}"
 
 log_info "Installing routing and wireless packages"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${NET_ROUTER_PKGS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${NET_ROUTER_PKGS[@]}"
 
 log_info "Installing monitoring and diagnostics packages"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${MONITOR_PKGS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${MONITOR_PKGS[@]}"
 
 log_info "Installing hardware-specific packages"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${HARDWARE_PKGS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${HARDWARE_PKGS[@]}"
 
 log_info "Installing build dependencies and runtime environments"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends "${BUILD_DEPS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${BUILD_DEPS[@]}"
 
 # Restore and protect resolv.conf (systemd-resolved might have converted it to a symlink)
 log_info "Restoring and protecting resolv.conf"
@@ -165,12 +165,12 @@ log_info "Python3 installed: ${PYTHON_VER}"
 
 # Install WiFi firmware (may fail if non-free not available)
 log_info "Installing WiFi firmware"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     firmware-brcm80211 || log_warn "WiFi firmware not available, wireless may not work"
 
 # Install Pi-specific packages (kernel and firmware)
 log_info "Installing Raspberry Pi kernel and firmware"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     raspberrypi-kernel \
     raspberrypi-bootloader
 
@@ -191,7 +191,7 @@ fi
 
 # Install basic networking tools
 log_info "Installing basic networking tools"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     bridge-utils \
     isc-dhcp-server \
     rfkill \
@@ -205,18 +205,18 @@ install_tor "${MOUNT_POINT}"
 
 # Install DNS server packages (dnscrypt-proxy uses pre-built binary, not APT)
 log_info "Installing DNS server packages"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     bind9 \
     bind9utils
 
 # Install security packages
 log_info "Installing security packages"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     fail2ban
 
 # Install proxy packages
 log_info "Installing proxy packages"
-chroot_run "${MOUNT_POINT}" apt-get install -y --no-install-recommends \
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     privoxy
 
 # Generate Privoxy filters from AdBlock lists (runs on x86, outputs to chroot)
@@ -363,9 +363,9 @@ log_info "Downloading ngrok"
 curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc 2>&1 | chroot_run "${MOUNT_POINT}" tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
 echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" 2>&1 | chroot_run "${MOUNT_POINT}" tee /etc/apt/sources.list.d/ngrok.list
 log_info "Installing ngrok for remote access tunneling"
-chroot_run "${MOUNT_POINT}" apt-get update
-chroot_run "${MOUNT_POINT}" apt-get -y upgrade
-chroot_run "${MOUNT_POINT}" apt-get -y install ngrok
+chroot_run "${MOUNT_POINT}" apt-get -qq update
+chroot_run "${MOUNT_POINT}" apt-get -qq -y upgrade
+chroot_run "${MOUNT_POINT}" apt-get -qq -y install ngrok
 
 # =============================================================================
 # Install Pimeleon Web UI and API
@@ -639,7 +639,7 @@ EOF
     # Run playbooks with platform, version, app, and profile extra-vars
     for playbook in "${PLAYBOOKS_DIR}"/*.yml; do
         log_info "Running playbook: $(basename "$playbook")"
-        sudo -E ansible-playbook -v \
+        sudo -E ansible-playbook \
             -i "${WORK_DIR}/inventory" \
             --extra-vars "platform_model=${PIMELEON_RPI_MODEL:-3B+}" \
             --extra-vars "rpi_arch=${RPI_ARCH:-armhf}" \
