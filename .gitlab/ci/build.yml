@@ -218,10 +218,11 @@ build:containers:
         -e PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
         -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
-        - e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID}"
-        - e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN}"
-
+        -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID}" \
+        -e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN}" \
         "$BUILD_IMAGE")
+      # Persist container ID for after_script cleanup on cancel/timeout
+      echo "$CONTAINER_ID" > .build_container_id
       docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/
       docker cp "${CONFIGS_DIR}/." "$CONTAINER_ID":/configs/
       docker cp "${ANSIBLE_DIR}/." "$CONTAINER_ID":/ansible/
@@ -231,17 +232,29 @@ build:containers:
       if [ "${EXIT_CODE}" -ne 0 ]; then
         echo "Error: Build container failed with exit code ${EXIT_CODE}"
         docker cp "$CONTAINER_ID":/output/. output/ || true
-        docker rm "$CONTAINER_ID"
+        docker rm -f "$CONTAINER_ID" || true
+        rm -f .build_container_id
         exit 1
       fi
       echo "Extracting artifacts from container..."
       docker cp "$CONTAINER_ID":/output/. output/
-      docker rm "$CONTAINER_ID" || true
+      docker rm -f "$CONTAINER_ID" || true
+      rm -f .build_container_id
     - echo "Build output:"
     - ls -la output/
     # Ensure artifacts were actually produced
     - '[ "$(ls -A output/*.img 2>/dev/null)" ] || (echo "Error: No image artifacts found in output/" && exit 1)'
     - chown -R "$(id -u):$(id -g)" output/ || true
+  after_script:
+    - |
+      # Cleanup orphaned build container on job cancel/timeout/failure
+      if [ -f .build_container_id ]; then
+        CID=$(cat .build_container_id)
+        echo "Cleaning up build container: $CID"
+        docker stop -t 10 "$CID" 2>/dev/null || true
+        docker rm -f "$CID" 2>/dev/null || true
+        rm -f .build_container_id
+      fi
   artifacts:
     when: always
     paths:
@@ -320,10 +333,11 @@ build:custom:
         -e PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
         -e APT_CACHE_SERVER="${APT_PROXY%:*}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN}" \
-        - e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID}"
-        - e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN}"
-
+        -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID}" \
+        -e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN}" \
         "$BUILD_IMAGE")
+      # Persist container ID for after_script cleanup on cancel/timeout
+      echo "$CONTAINER_ID" > .build_container_id
       docker cp "${SCRIPTS_DIR}/." "$CONTAINER_ID":/scripts/
       docker cp "${CONFIGS_DIR}/." "$CONTAINER_ID":/configs/
       docker cp "${ANSIBLE_DIR}/." "$CONTAINER_ID":/ansible/
@@ -331,14 +345,26 @@ build:custom:
       EXIT_CODE=$(docker inspect "$CONTAINER_ID" --format='{{.State.ExitCode}}')
       if [ "${EXIT_CODE}" -ne 0 ]; then
         docker cp "$CONTAINER_ID":/output/. output/ || true
-        docker rm "$CONTAINER_ID"
+        docker rm -f "$CONTAINER_ID" || true
+        rm -f .build_container_id
         exit 1
       fi
       docker cp "$CONTAINER_ID":/output/. output/
-      docker rm "$CONTAINER_ID" || true
+      docker rm -f "$CONTAINER_ID" || true
+      rm -f .build_container_id
     - ls -la output/
     - '[ "$(ls -A output/*.img 2>/dev/null)" ] || (echo "Error: No image artifacts found in output/" && exit 1)'
     - chown -R "$(id -u):$(id -g)" output/ || true
+  after_script:
+    - |
+      # Cleanup orphaned build container on job cancel/timeout/failure
+      if [ -f .build_container_id ]; then
+        CID=$(cat .build_container_id)
+        echo "Cleaning up build container: $CID"
+        docker stop -t 10 "$CID" 2>/dev/null || true
+        docker rm -f "$CID" 2>/dev/null || true
+        rm -f .build_container_id
+      fi
   artifacts:
     paths:
       - output/*.img.xz
