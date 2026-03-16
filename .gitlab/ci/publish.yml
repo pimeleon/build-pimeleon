@@ -29,7 +29,9 @@ publish:image:
 # Deploy compressed image to Cloudflare R2 (production releases only, not MR pipelines)
 deploy:r2:
   stage: publish
-  image: amazon/aws-cli
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
   tags:
     - lightweight
   needs:
