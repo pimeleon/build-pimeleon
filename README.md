@@ -192,8 +192,7 @@ pimeleon-build/
 | `TARGET_PLATFORM=` | `rpi3-bookworm` | App to build (determines device, arch, debian) |
 | `PIMELEON_PROFILE` | `development` | Build profile (`development`, `production`) |
 | `PIMELEON_IMAGE_SIZE` | `4G` | Output image size |
-| `APT_CACHE_SERVER` | - | APT cache server IP (e.g., `192.168.76.5`) |
-| `APT_CACHE_PORT` | `3142` | APT cache server port |
+| `APT_PROXY` | - | APT proxy server (`host:port`, e.g., `192.168.76.5:3142`) |
 
 **Derived from app name** (e.g., `rpi3-bookworm`):
 
@@ -224,7 +223,7 @@ make build-prod APP=rpi3-bookworm
 make build-all
 
 # With APT cache for faster builds
-APT_CACHE_SERVER=192.168.76.5 make build APP=rpi3-bookworm
+APT_PROXY=192.168.76.5:3142 make build APP=rpi3-bookworm
 
 # Custom image size
 PIMELEON_IMAGE_SIZE=8G make build APP=rpi3-bookworm
@@ -267,7 +266,7 @@ sudo apt install binfmt-support qemu-user-static
 ping 192.168.76.5
 
 # Use direct downloads if cache unavailable
-unset APT_CACHE_SERVER
+unset APT_PROXY
 docker compose run --rm builder
 ```
 

@@ -11,7 +11,6 @@ lint:yaml:
     - pip install --quiet yamllint
   script:
     - yamllint -c .yamllint .
-  allow_failure: true
 
 lint:ansible:
   stage: lint
@@ -20,9 +19,10 @@ lint:ansible:
     - python
   before_script:
     - pip install --quiet ansible-lint
+    - ansible-galaxy collection install -r shared/ansible/requirements.yml
   script:
-    - ansible-lint shared/ansible/playbooks/*.yml
-  allow_failure: true
+    - cd shared/ansible
+    - ansible-lint playbooks/*.yml
 
 lint:shell:
   stage: lint
@@ -31,4 +31,3 @@ lint:shell:
     - linux
   script:
     - find . -name "*.sh" -type f -exec shellcheck {} \;
-  allow_failure: true

@@ -77,7 +77,7 @@
     src: "{{ pihole_ftl_path }}"
     dest: /usr/local/bin/pihole
     state: link
-    force: yes
+    force: true
   when:
     - services_enabled.pihole | default(false)
     - pihole_ftl_path != ""

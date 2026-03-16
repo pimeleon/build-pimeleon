@@ -103,7 +103,7 @@ Now create your first Pimeleon image:
 
     ```bash
     export DOCKER_BUILDKIT=1
-    export APT_CACHE_SERVER=192.168.76.5
+    export APT_PROXY=192.168.76.5:3142
     export RASPBIAN_MIRROR=http://archive.raspbian.org/raspbian/
 
     docker compose run --rm builder
@@ -118,7 +118,7 @@ Now create your first Pimeleon image:
     export PIMELEON_RPI_MODEL=3B+
     export PIMELEON_IMAGE_SIZE=8G
     export PIMELEON_INITIAL_PASSWORD=mysecurepassword
-    export APT_CACHE_SERVER=192.168.76.5
+    export APT_PROXY=192.168.76.5:3142
     export RASPBIAN_MIRROR=http://archive.raspbian.org/raspbian/
 
     docker compose run --rm builder
@@ -413,7 +413,7 @@ sudo systemctl restart docker
 curl http://192.168.76.5:3142
 
 # If not working, build without cache:
-unset APT_CACHE_SERVER
+unset APT_PROXY
 docker compose run --rm builder
 ```text
 
