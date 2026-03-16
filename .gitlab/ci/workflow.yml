@@ -16,7 +16,6 @@ variables:
   DOCKER_BUILDKIT: 1
   BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:${CI_COMMIT_REF_SLUG}
   TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:${CI_COMMIT_REF_SLUG}
-  APT_PROXY: "192.168.76.5:3142"
   GIT_DEPTH: 0
 
 # Global defaults for all jobs

@@ -252,8 +252,8 @@ if docker image inspect pimeleon-adblock2privoxy:latest &>/dev/null; then
 fi
 
 echo -e "${BLUE}🚀 Next Steps:${NC}"
-echo "1. Rebuild containers: APT_CACHE_SERVER=192.168.76.5 docker compose build --no-cache builder"
+echo "1. Rebuild containers: APT_PROXY=192.168.76.5:3142 docker compose build --no-cache builder"
 echo "2. Run build: TARGET_PLATFORM=rpi3-bookworm make build"
 echo ""
 echo "Or use the full command with cache server detection:"
-echo 'if timeout 1 bash -c "cat < /dev/null > /dev/tcp/192.168.76.5/3142" &>/dev/null; then export APT_CACHE_SERVER=192.168.76.5; fi && docker compose build --no-cache builder'
+echo 'if timeout 1 bash -c "cat < /dev/null > /dev/tcp/192.168.76.5/3142" &>/dev/null; then export APT_PROXY=192.168.76.5:3142; fi && docker compose build --no-cache builder'

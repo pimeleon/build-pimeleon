@@ -26,8 +26,7 @@ export PIMELEON_IMAGE_SIZE="${PIMELEON_IMAGE_SIZE:-4G}"
 export PIMELEON_PROFILE="${PIMELEON_PROFILE:-development}"
 export RASPBIAN_VERSION="${RASPBIAN_VERSION:-bullseye}"
 export RASPBIAN_MIRROR="${RASPBIAN_MIRROR:-http://mirrordirector.raspbian.org/raspbian/}"
-export APT_CACHE_SERVER="${APT_CACHE_SERVER:-}"
-export APT_CACHE_PORT="${APT_CACHE_PORT:-3142}"
+export APT_PROXY="${APT_PROXY:-}"
 export DEBIAN_FRONTEND=noninteractive
 
 # Directories
@@ -180,7 +179,7 @@ Environment Variables:
     PIMELEON_RPI_MODEL      Pi model (default: 3B+)
     PIMELEON_IMAGE_SIZE     Image size (default: 4G)
     RASPBIAN_VERSION        Debian version (default: bullseye)
-    APT_CACHE_SERVER        APT cache server IP
+    APT_PROXY               APT proxy (host:port)
     ENABLE_STAGE3           Enable optimization stage (default: false)
     ENABLE_STAGE4           Enable packaging stage (default: false)
 
@@ -219,7 +218,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --with-cache)
-            export APT_CACHE_SERVER="$2"
+            export APT_PROXY="$2:3142"
             shift 2
             ;;
         *)

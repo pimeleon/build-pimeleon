@@ -8,8 +8,7 @@ services:
       dockerfile: ./shared/containers/builder/Dockerfile
       target: base
       args:
-        APT_CACHE_SERVER: ${APT_CACHE_SERVER:-192.168.76.5}
-        APT_CACHE_PORT: ${APT_CACHE_PORT:-3142}
+        APT_PROXY: ${APT_PROXY:-}
     container_name: pimeleon-builder
     init: true
     stop_signal: SIGTERM
@@ -20,6 +19,7 @@ services:
       - ./shared/configs:/configs
       # Monorepo structure - mount entire workspace
       - .:/workspace:ro
+      - ../pi-router-apps:/workspace/pi-router-apps:ro
       - ./shared/scripts:/scripts:ro
       - ./shared/ansible:/ansible:ro
       # Docker volumes for caching
@@ -36,6 +36,7 @@ services:
       - OUTPUT_DIR=/output
       - CONFIG_DIR=/configs
       - WORKSPACE_DIR=/workspace
+      - PIMELEON_APPS_LOCAL_PATH=${PIMELEON_APPS_LOCAL_PATH:-/workspace/pi-router-apps}
       - ANSIBLE_DIR=/ansible
       - ANSIBLE_CONFIG=/ansible/ansible.cfg
       - DEBIAN_FRONTEND=noninteractive
@@ -54,11 +55,10 @@ services:
       - BUILD_PARALLEL_JOBS=${BUILD_PARALLEL_JOBS:-4}
       - PIMELEON_PROFILE=${PIMELEON_PROFILE:-development}
       - PIMELEON_INITIAL_PASSWORD=${PIMELEON_INITIAL_PASSWORD:-netblox}
-      # APT cache (TrueNAS apt-cacher-ng)
-      - APT_CACHE_SERVER=${APT_CACHE_SERVER:-192.168.76.5}
-      - APT_CACHE_PORT=${APT_CACHE_PORT:-3142}
+      # APT cache proxy (set APT_PROXY=host:port to enable)
+      - APT_PROXY=${APT_PROXY:-}
       # pi-router-apps package registry
-      - PIMELEON_APPS_PROJECT_ID=${PIMELEON_APPS_PROJECT_ID:-20}
+      - PIMELEON_APPS_PROJECT_ID=${PIMELEON_APPS_PROJECT_ID:-}
       - PIMELEON_APPS_READ_TOKEN=${PIMELEON_APPS_READ_TOKEN:-}
       # Network configuration - LAN
       - LAN_NETWORK=${LAN_NETWORK:-192.168.43.0/24}
@@ -112,8 +112,7 @@ services:
       context: ./shared/containers/tester
       dockerfile: Dockerfile
       args:
-        APT_CACHE_SERVER: ${APT_CACHE_SERVER:-192.168.76.5}
-        APT_CACHE_PORT: ${APT_CACHE_PORT:-3142}
+        APT_PROXY: ${APT_PROXY:-}
     container_name: pimeleon-tester
     privileged: true
     volumes:
@@ -153,8 +152,7 @@ services:
       dockerfile: ./shared/containers/builder/Dockerfile
       target: development
       args:
-        APT_CACHE_SERVER: ${APT_CACHE_SERVER:-192.168.76.5}
-        APT_CACHE_PORT: ${APT_CACHE_PORT:-3142}
+        APT_PROXY: ${APT_PROXY:-}
     container_name: pimeleon-dev
     volumes:
       - .:/workspace
