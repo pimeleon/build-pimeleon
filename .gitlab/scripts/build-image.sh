@@ -18,23 +18,19 @@ echo "Building Pimeleon image for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFIL
 mkdir -p output cache
 
 # Detect directories — shared baseline, branch-local overrides
-# In the monorepo refactor, core logic lives in shared/
 ANSIBLE_DIR="./shared/ansible"
 CONFIGS_DIR="./shared/configs"
 SCRIPTS_DIR="./shared/scripts"
-
-# Support branch-specific overrides in root if files exist
 [ ! -f "./ansible/playbooks/main.yml" ] || ANSIBLE_DIR="./ansible"
 [ ! -d "./configs/network" ]            || CONFIGS_DIR="./configs"
 [ ! -f "./scripts/build.sh" ]           || SCRIPTS_DIR="./scripts"
-
 echo "Using ansible=${ANSIBLE_DIR} configs=${CONFIGS_DIR} scripts=${SCRIPTS_DIR}"
 
 # Compute version
 chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
 BASE_VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
-PIMELEON_VERSION="${BASE_VERSION}"
-echo "[INFO] Building version: ${PIMELEON_VERSION}"
+PIMELEON_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
+echo "Building version: ${PIMELEON_VERSION}"
 
 # Create and start build container
 # $BUILD_IMAGE is expected to be provided by the CI environment

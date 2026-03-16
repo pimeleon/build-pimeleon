@@ -89,3 +89,4 @@ site/assets/javascripts/lunr/min/lunr.*.min.js
 !site/assets/javascripts/lunr/min/lunr.stemmer.support.min.js
 # Git backup files
 .git.backup*.tar.gz
+*.bak.*
