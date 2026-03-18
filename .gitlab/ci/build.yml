@@ -147,6 +147,7 @@ build:containers:
       - output/*.log
       - output/pim-initial-password.txt
     expire_in: 1 week
+    when: always
 
 # Platform build — triggered by push to release/* branches, version tags, MRs, and develop (dev profile)
 build:pimeleon:
@@ -194,4 +195,5 @@ build:custom:
       - output/*.log
       - output/pim-initial-password.txt
     expire_in: 1 week
+    when: always
   allow_failure: true
