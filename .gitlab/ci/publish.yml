@@ -23,20 +23,8 @@ publish:image:
   environment:
     name: cicd/production
   script:
-    - |
-      SCRIPTS_DIR="./shared/scripts"
-      [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
-      chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
-      VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
-      echo "Publishing version ${VERSION} for ${TARGET_PLATFORM}"
-      cd output
-      for file in pimeleon-*.img.xz pimeleon-*.tar.gz; do
-        if [ -f "$file" ]; then
-          curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-            --upload-file "$file" \
-            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pimeleon/${TARGET_PLATFORM}-v${VERSION}/$(basename $file)"
-        fi
-      done
+    - chmod +x .gitlab/scripts/publish-image.sh
+    - .gitlab/scripts/publish-image.sh
 
 # Deploy compressed image to Cloudflare R2 (production releases only, not MR pipelines)
 deploy:r2:
@@ -64,21 +52,8 @@ deploy:r2:
     AWS_SECRET_ACCESS_KEY: $R2_SECRET_ACCESS_KEY
     AWS_DEFAULT_REGION: auto
   script:
-    - |
-      SCRIPTS_DIR="./shared/scripts"
-      [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
-      chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
-      VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
-      UPLOAD_PREFIX="${TARGET_PLATFORM}/v${VERSION}"
-      echo "Deploying to R2: s3://${R2_BUCKET}/${UPLOAD_PREFIX}/"
-      cd output
-      for file in pimeleon-*.img.xz pimeleon-*.img.metadata.json; do
-        [ -f "$file" ] || continue
-        echo "Uploading $file..."
-        aws s3 cp "$file" "s3://${R2_BUCKET}/${UPLOAD_PREFIX}/$(basename $file)" \
-          --endpoint-url "${R2_ENDPOINT}" \
-          --no-progress
-      done
+    - chmod +x .gitlab/scripts/deploy-r2.sh
+    - .gitlab/scripts/deploy-r2.sh
 
 # Build MkDocs site and publish to GitLab Pages (release branches and version tags)
 publish:pages:
@@ -96,12 +71,8 @@ publish:pages:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_COMMIT_TAG'
   before_script:
-    - |
-      echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
-      echo 'Acquire::http::Pipeline-Depth "0";' >> /etc/apt/apt.conf.d/80-retries
-      echo 'Acquire::http::Timeout "60";' >> /etc/apt/apt.conf.d/80-retries
-      echo "Acquire::http::Proxy \"http://${APT_PROXY}\";" > /etc/apt/apt.conf.d/01proxy
-      echo 'Acquire::https::Proxy "DIRECT";' >> /etc/apt/apt.conf.d/01proxy
+    - chmod +x .gitlab/scripts/setup-apt-proxy.sh
+    - .gitlab/scripts/setup-apt-proxy.sh
   script:
     - apt-get -qy update && apt-get -q install -y --no-install-recommends git
     - pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin

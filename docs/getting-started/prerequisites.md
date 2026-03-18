@@ -197,7 +197,7 @@ An APT caching proxy like `apt-cacher-ng` dramatically speeds up builds by cachi
     sudo systemctl restart apt-cacher-ng
     ```
 
-    Then use `APT_CACHE_SERVER=<server-ip>` when building.
+    Then use `APT_PROXY=<server-ip>:3142` when building.
 
 === "Docker Container"
 
@@ -212,7 +212,7 @@ An APT caching proxy like `apt-cacher-ng` dramatically speeds up builds by cachi
       sameersbn/apt-cacher-ng:latest
     ```
 
-    Use `APT_CACHE_SERVER=host.docker.internal` or your host IP.
+    Use `APT_PROXY=host.docker.internal:3142` or your host IP with port.
 
 === "Skip It"
 

@@ -71,24 +71,6 @@ versions_firmware:
   linux_firmware: "latest"
 
 # =============================================================================
-# BUILD DEPENDENCIES - For source builds
-# =============================================================================
-
-versions_build_deps:
-  # Tor dependencies
-  libevent: "2.1.*"
-  openssl: "3.*"
-
-  # hostapd/wpa_supplicant dependencies
-  libnl: "3.*"
-
-  # dnscrypt-proxy (Go binary, no build deps)
-
-  # Pi-hole FTL dependencies
-  libnettle: "8.*"
-  libgmp: "6.*"
-
-# =============================================================================
 # CHECKSUMS - SHA256 for source tarballs (updated with versions)
 # =============================================================================
 
