@@ -1,23 +1,35 @@
 #!/bin/bash
 # Library for service installation functions
 
+# Fetch and extract a packaged service artifact into the image root.
+install_service_artifact_if_available() {
+    local package="$1"
+    local mount_point="$2"
+    local display_name="${3:-$1}"
+    local arch="${RPI_ARCH:-armhf}"
+
+    sudo mkdir -p "${DOWNLOAD_DIR}"
+    if get_pimeleon_apps_artifact "${package}" "${arch}" "${DOWNLOAD_DIR}"; then
+        log_info "Installing ${display_name} from artifact"
+        sudo tar -xzf "${DOWNLOAD_DIR}/${package}.tar.gz" -C "${mount_point}/"
+        return 0
+    fi
+
+    if [[ -n "${CI:-}" ]] || [[ -n "${GITLAB_CI:-}" ]]; then
+        die "FATAL: No published version found for ${package}/${arch} in registry."
+    fi
+
+    return 1
+}
+
 # Install hostapd (artifact or APT)
 install_hostapd() {
     local mount_point=$1
     if is_service_enabled "hostapd" 2>/dev/null; then
         # 1. Try to fetch pre-built artifact (local cache or registry)
-        sudo mkdir -p "${DOWNLOAD_DIR}"
-        if get_pimeleon_apps_artifact "hostapd" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
-            log_info "Installing hostapd from artifact"
-            sudo tar -xzf "${DOWNLOAD_DIR}/hostapd.tar.gz" -C "${mount_point}/"
+        if install_service_artifact_if_available "hostapd" "${mount_point}"; then
             return
         fi
-
-        # 2. Fallback to APT
-        log_info "Installing hostapd from APT"
-        chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends hostapd"
-        # Create compatibility symlink for systemd service (pointing to standard location)
-        chroot_run "${mount_point}" ln -sf /usr/sbin/hostapd /usr/local/bin/hostapd
     else
         log_info "hostapd not enabled in profile, skipping installation"
     fi
@@ -28,6 +40,10 @@ install_pihole() {
     local mount_point=$1
     if is_service_enabled "pihole" 2>/dev/null; then
         log_info "Installing Pi-hole using official installer"
+
+        if install_service_artifact_if_available "pihole" "${mount_point}" "Pi-hole"; then
+            return
+        fi
 
         # Pre-seed configuration for unattended install
         sudo mkdir -p "${mount_point}/etc/pihole"
@@ -117,16 +133,9 @@ install_tor() {
     local mount_point=$1
     if is_service_enabled "tor" 2>/dev/null; then
         # 1. Try to fetch pre-built artifact (local cache or registry)
-        sudo mkdir -p "${DOWNLOAD_DIR}"
-        if get_pimeleon_apps_artifact "tor" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
-            log_info "Installing Tor from artifact"
-            sudo tar -xzf "${DOWNLOAD_DIR}/tor.tar.gz" -C "${mount_point}/"
+        if install_service_artifact_if_available "tor" "${mount_point}" "Tor"; then
             return
         fi
-
-        # 2. Fallback to APT
-        log_info "Installing Tor from APT"
-        chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends tor tor-geoipdb"
     else
         log_info "Tor not enabled in profile, skipping installation"
     fi
@@ -137,17 +146,23 @@ install_dnscrypt_proxy() {
     local mount_point=$1
     if is_service_enabled "dnscrypt_proxy" 2>/dev/null; then
         # 1. Try to fetch pre-built artifact (local cache or registry)
-        sudo mkdir -p "${DOWNLOAD_DIR}"
-        if get_pimeleon_apps_artifact "dnscrypt-proxy" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
-            log_info "Installing dnscrypt-proxy from artifact"
-            sudo tar -xzf "${DOWNLOAD_DIR}/dnscrypt-proxy.tar.gz" -C "${mount_point}/"
+        if install_service_artifact_if_available "dnscrypt-proxy" "${mount_point}"; then
             return
         fi
-
-        # 2. Fallback to APT
-        log_info "Installing dnscrypt-proxy from APT"
-        chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends dnscrypt-proxy"
     else
         log_info "dnscrypt-proxy not enabled in profile, skipping installation"
+    fi
+}
+
+# Install wpasupplicant (artifact or APT)
+install_wpasupplicant() {
+    local mount_point=$1
+    if is_service_enabled "wpasupplicant" 2>/dev/null; then
+        # 1. Try to fetch pre-built artifact (local cache or registry)
+        if install_service_artifact_if_available "wpasupplicant" "${mount_point}"; then
+            return
+        fi
+    else
+        log_info "wpasupplicant not enabled in profile, skipping installation"
     fi
 }

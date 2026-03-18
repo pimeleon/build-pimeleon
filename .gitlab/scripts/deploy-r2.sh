@@ -8,6 +8,13 @@ set -eu
 
 SCRIPTS_DIR="./shared/scripts"
 [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
+
+# Verify required R2 variables
+if [ -z "${R2_BUCKET:-}" ] || [ -z "${R2_ENDPOINT:-}" ]; then
+  echo "Warning: R2_BUCKET or R2_ENDPOINT not set. Skipping R2 deployment."
+  exit 0
+fi
+
 chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
 VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
 UPLOAD_PREFIX="${TARGET_PLATFORM}/v${VERSION}"

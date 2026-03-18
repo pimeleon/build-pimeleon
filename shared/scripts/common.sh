@@ -720,8 +720,7 @@ fetch_pimeleon_apps() {
         2>/dev/null || true)
 
     if [[ -z "${version}" ]]; then
-        log_warn "No published version found for ${package}/${arch} in pi-router-apps registry"
-        return 1
+        die "FATAL: No published version found for ${package}/${arch} in pi-router-apps registry"
     fi
 
     local fname="${package}-${version}-${arch}-pimeleon.tar.gz"
