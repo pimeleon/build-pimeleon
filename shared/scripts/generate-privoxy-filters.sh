@@ -90,7 +90,7 @@ else
         # Add blocking action header
         echo '{+block{Ad domains from pgl.yoyo.org} +handle-as-empty-document}' | \
             sudo tee "${YOYO_FILE}" > /dev/null
-        sudo cat "${TEMP_DIR}/ads.yoyo.raw" | sudo tee -a "${YOYO_FILE}" > /dev/null
+        cat "${TEMP_DIR}/ads.yoyo.raw" | sudo tee -a "${YOYO_FILE}" > /dev/null
         # Cache it
         sudo cp "${YOYO_FILE}" "${CACHE_DIR}/ads.yoyo.action" 2>/dev/null || true
         log_info "Downloaded and cached ads.yoyo.org blocklist"

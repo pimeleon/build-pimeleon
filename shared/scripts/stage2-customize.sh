@@ -633,7 +633,7 @@ EOF
             --extra-vars "pimeleon_app=${TARGET_PLATFORM:-}" \
             --extra-vars "pimeleon_initial_password=${PIMELEON_INITIAL_PASSWORD:-netblox}" \
             --extra-vars "pimeleon_ap_name=${PIMELEON_AP_NAME:-Pimeleon}" \
-            "$playbook" 2>&1 | sudo tee -a "${ANSIBLE_LOG_FILE}" || die "Playbook failed: $playbook. See ${ANSIBLE_LOG_FILE} for details."
+            "$playbook" 2>&1 | tee -a "${ANSIBLE_LOG_FILE}" || die "Playbook failed: $playbook. See ${ANSIBLE_LOG_FILE} for details."
     done
 else
     die "FATAL: No Ansible playbooks found at: ${PLAYBOOKS_DIR}"
