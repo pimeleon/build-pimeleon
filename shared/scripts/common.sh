@@ -716,11 +716,16 @@ fetch_pimeleon_apps() {
     version=$(curl -fsSLk \
         -H "PRIVATE-TOKEN: ${token}" \
         "${reg}/${package}?per_page=1&order_by=created_at&sort=desc" 2>/dev/null \
-        | python3 -c "import json,sys; d=json.load(sys.stdin); v=next((p.get('version','') for p in d if p.get('version','').startswith('${arch}-')),''); print(v.replace('${arch}-','',1)) if v else None" \
-        2>/dev/null || true)
+        | python3 -c "import json,sys;
+try:
+    d=json.load(sys.stdin);
+    v=next((p.get('version','') for p in d if p.get('version','').startswith('${arch}-')),'');
+    if v: print(v.replace('${arch}-','',1))
+except: pass" 2>/dev/null || true)
 
     if [[ -z "${version}" ]]; then
-        die "FATAL: No published version found for ${package}/${arch} in pi-router-apps registry"
+        log_warn "No published version found for ${package}/${arch} in pi-router-apps registry"
+        return 1
     fi
 
     local fname="${package}-${version}-${arch}-pimeleon.tar.gz"

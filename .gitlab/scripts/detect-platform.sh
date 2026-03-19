@@ -42,5 +42,14 @@ fi
 
 echo "TARGET_PLATFORM=$PLATFORM" > platform.env
 echo "PIMELEON_PROFILE=$PROFILE" >> platform.env
+
+# Detect architecture from platform name
+case "$PLATFORM" in
+  rpi4-*|rpi5-*) ARCH="arm64" ;;
+  *)             ARCH="armhf" ;;
+esac
+echo "RPI_ARCH=$ARCH" >> platform.env
+
 echo "Platform detected: $PLATFORM"
 echo "Profile selected: $PROFILE"
+echo "Architecture detected: $ARCH"

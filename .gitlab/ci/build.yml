@@ -136,16 +136,7 @@ build:containers:
     - .gitlab/scripts/cleanup-build-container.sh
   artifacts:
     paths:
-      - output/*.img.xz
-      - output/*.img.metadata.json
-      - output/*.img.sha256
-      - output/*.img.md5
-      - output/*.img.xz.sha256
-      - output/*.img.xz.md5
-      - output/*.packages.txt
-      - output/*.version.txt
-      - output/*.log
-      - output/pim-initial-password.txt
+      - output/
     expire_in: 1 week
     when: always
 
@@ -184,16 +175,7 @@ build:custom:
     - .gitlab/scripts/cleanup-build-container.sh
   artifacts:
     paths:
-      - output/*.img.xz
-      - output/*.img.metadata.json
-      - output/*.img.sha256
-      - output/*.img.md5
-      - output/*.img.xz.sha256
-      - output/*.img.xz.md5
-      - output/*.packages.txt
-      - output/*.version.txt
-      - output/*.log
-      - output/pim-initial-password.txt
+      - output/
     expire_in: 1 week
     when: always
   allow_failure: true
