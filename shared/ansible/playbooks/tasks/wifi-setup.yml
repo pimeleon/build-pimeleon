@@ -3,6 +3,13 @@
 # Configures hostapd for wireless access point
 # Note: hostapd package installed in stage2-customize.sh
 
+- name: Ensure hostapd config directory exists
+  ansible.builtin.file:
+    path: /etc/hostapd
+    state: directory
+    mode: '0755'
+  when: services_enabled.hostapd | default(true)
+
 - name: Configure hostapd
   ansible.builtin.template:
     src: hostapd/hostapd.conf.j2

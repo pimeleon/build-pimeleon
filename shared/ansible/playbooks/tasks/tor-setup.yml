@@ -19,6 +19,30 @@
     - services_enabled.tor | default(false)
     - not (tor_source_bin.stat.exists | default(false))
 
+- name: Ensure debian-tor group exists
+  ansible.builtin.group:
+    name: debian-tor
+    system: true
+    state: present
+  when: services_enabled.tor | default(false)
+
+- name: Ensure debian-tor user exists
+  ansible.builtin.user:
+    name: debian-tor
+    group: debian-tor
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/lib/tor
+    create_home: false
+  when: services_enabled.tor | default(false)
+
+- name: Ensure tor config directory exists
+  ansible.builtin.file:
+    path: /etc/tor
+    state: directory
+    mode: '0755'
+  when: services_enabled.tor | default(false)
+
 - name: Create tor directories
   ansible.builtin.file:
     path: "{{ item.path }}"

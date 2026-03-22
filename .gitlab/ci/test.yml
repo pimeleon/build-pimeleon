@@ -15,7 +15,7 @@ test:smoke:
   needs:
     - job: setup:platform
       artifacts: true
-    - job: build:pimeleon
+    - job: upload:artifacts
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       variables:
@@ -54,7 +54,7 @@ test:integration:
   needs:
     - job: setup:platform
       artifacts: true
-    - job: build:pimeleon
+    - job: upload:artifacts
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       variables:

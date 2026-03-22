@@ -695,7 +695,25 @@ cache_put() {
     sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "$cache_path"
 }
 
-# Fetch a pre-built binary package from the pi-router-apps Generic Package Registry.
+# Package name mapping: internal name -> GitHub release asset prefix.
+# GitHub assets follow the pattern: {github_name}-{version}-{arch}-pimeleon.tar.gz
+declare -A PIMELEON_APPS_NAME_MAP=(
+    [hostapd]="hostapd"
+    [pihole]="pihole-FTL"
+    [tor]="tor"
+    [dnscrypt-proxy]="dnscrypt-proxy"
+    [wpasupplicant]="wpa_supplicant"
+    [privoxy]="privoxy"
+)
+
+# Resolve internal package name to the GitHub release asset prefix.
+# Usage: resolve_github_asset_name <package>
+resolve_github_asset_name() {
+    local package="$1"
+    echo "${PIMELEON_APPS_NAME_MAP[$package]:-$package}"
+}
+
+# Fetch a pre-built binary package from the pimeleon-apps GitHub releases.
 # Usage: fetch_pimeleon_apps <package> <arch> <download_dir>
 # Saves as <download_dir>/<package>.tar.gz (matching existing Ansible task expectations).
 # Non-fatal: logs a warning and returns 1 on failure so the caller can decide.
@@ -703,67 +721,70 @@ fetch_pimeleon_apps() {
     local package="$1"
     local arch="$2"
     local download_dir="$3"
-    local project_id="${PIMELEON_APPS_PROJECT_ID:-0}"
-    local token="${PIMELEON_APPS_READ_TOKEN:-}"
-    local reg="https://gitlab.pirouter.dev/api/v4/projects/${project_id}/packages/generic"
+    local token="${PIMELEON_APPS_GITHUB_TOKEN:-}"
+    local repo="pimeleon/pimeleon-apps"
+    local api="https://api.github.com/repos/${repo}/releases"
+    local github_name
+    github_name=$(resolve_github_asset_name "${package}")
 
-    if [[ "${project_id}" == "0" ]] || [[ -z "${project_id}" ]]; then
-        log_warn "PIMELEON_APPS_PROJECT_ID not set, skipping registry fetch for ${package}"
+    # Build auth header if token is available (public repos work without, but rate-limited)
+    local -a auth_header=()
+    if [[ -n "${token}" ]]; then
+        auth_header=(-H "Authorization: Bearer ${token}")
+    fi
+
+    # Get the latest release tag
+    local release_tag
+    release_tag=$(curl -fsSL "${auth_header[@]}" \
+        -H "Accept: application/vnd.github+json" \
+        "${api}/latest" 2>/dev/null \
+        | python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))" 2>/dev/null || true)
+
+    if [[ -z "${release_tag}" ]]; then
+        log_warn "Could not determine latest release from GitHub for ${repo}"
         return 1
     fi
 
-    local version
-    version=$(curl -fsSLk \
-        -H "PRIVATE-TOKEN: ${token}" \
-        "${reg}/${package}?per_page=1&order_by=created_at&sort=desc" 2>/dev/null \
-        | python3 -c "import json,sys;
-try:
-    d=json.load(sys.stdin);
-    v=next((p.get('version','') for p in d if p.get('version','').startswith('${arch}-')),'');
-    if v: print(v.replace('${arch}-','',1))
-except: pass" 2>/dev/null || true)
+    # Find matching asset for this package/arch in the release
+    local asset_url
+    asset_url=$(curl -fsSL "${auth_header[@]}" \
+        -H "Accept: application/vnd.github+json" \
+        "${api}/tags/${release_tag}" 2>/dev/null \
+        | python3 -c "import json,sys;d=json.load(sys.stdin);p='${github_name}-';s='-${arch}-pimeleon.tar.gz';print(next((a['browser_download_url'] for a in d.get('assets',[]) if a.get('name','').startswith(p) and a['name'].endswith(s) and not a['name'].endswith('.sha256')),''))" 2>/dev/null || true)
 
-    if [[ -z "${version}" ]]; then
-        log_warn "No published version found for ${package}/${arch} in pi-router-apps registry"
+    if [[ -z "${asset_url}" ]]; then
+        log_warn "No asset found for ${github_name}/${arch} in GitHub release ${release_tag}"
         return 1
     fi
 
-    local fname="${package}-${version}-${arch}-pimeleon.tar.gz"
-    local url="${reg}/${package}/${arch}-${version}/${fname}"
-    log_info "Fetching ${package} ${version} (${arch}) from pi-router-apps registry"
+    local asset_filename
+    asset_filename=$(basename "${asset_url}")
+    log_info "Fetching ${github_name} (${arch}) from GitHub release ${release_tag}"
 
-    if curl -fsSLk -H "PRIVATE-TOKEN: ${token}" -o "${download_dir}/${package}.tar.gz" "${url}"; then
-        log_info "Fetched ${package} ${version} -> ${download_dir}/${package}.tar.gz"
+    if curl -fsSL "${auth_header[@]}" -L -o "${download_dir}/${package}.tar.gz" "${asset_url}"; then
+        log_info "Fetched ${asset_filename} -> ${download_dir}/${package}.tar.gz"
         return 0
     else
-        log_warn "Failed to fetch ${package} from pi-router-apps registry"
+        log_warn "Failed to download ${asset_filename} from GitHub"
         return 1
     fi
 }
 
-# Get a pre-built binary package from either local cache or GitLab registry.
+# Get a pre-built binary package from local cache or GitHub releases.
+# Production: GitHub registry is authoritative; fails if artifact is missing.
+# Development: tries GitHub first, allows APT fallback on failure.
 # Local builds: Prioritize ${PIMELEON_APPS_LOCAL_PATH} (mounted volume).
-# CI builds: Prioritize GitLab Generic Package Registry.
 # Usage: get_pimeleon_apps_artifact <package> <arch> <download_dir>
 get_pimeleon_apps_artifact() {
     local package="$1"
     local arch="$2"
     local download_dir="$3"
     local local_path="${PIMELEON_APPS_LOCAL_PATH:-/workspace/pi-router-apps}"
+    local profile="${PIMELEON_PROFILE:-development}"
 
-    # 1. CI environment: Always use registry first to ensure freshness
-    if [[ -n "${CI:-}" ]] || [[ -n "${GITLAB_CI:-}" ]]; then
-        log_info "CI environment detected, prioritizing GitLab registry for ${package}"
-        if fetch_pimeleon_apps "$package" "$arch" "$download_dir"; then
-            return 0
-        fi
-    fi
-
-    # 2. Local environment: Prioritize local cache if directory exists
+    # 1. Local environment: Prioritize local cache if directory exists
     if [[ -d "${local_path}" ]]; then
         log_info "Checking local apps cache for ${package} in ${local_path}"
-        # Expected local format: ${package}/${arch}/${package}.tar.gz
-        # or simplified: ${package}.tar.gz in package dir
         local local_file
         if [[ -f "${local_path}/${package}/${arch}/${package}.tar.gz" ]]; then
             local_file="${local_path}/${package}/${arch}/${package}.tar.gz"
@@ -779,13 +800,18 @@ get_pimeleon_apps_artifact() {
         log_warn "Artifact for ${package} (${arch}) not found in local path ${local_path}"
     fi
 
-    # 3. Fallback: If not CI, or local failed, try registry
-    if [[ -z "${CI:-}" ]] && [[ -z "${GITLAB_CI:-}" ]]; then
-        log_info "Falling back to GitLab registry for ${package}"
-        if fetch_pimeleon_apps "$package" "$arch" "$download_dir"; then
-            return 0
-        fi
+    # 2. Try GitHub releases registry
+    log_info "Fetching ${package} from GitHub releases (profile: ${profile})"
+    if fetch_pimeleon_apps "$package" "$arch" "$download_dir"; then
+        return 0
     fi
 
+    # 3. Production: artifact MUST come from registry — no fallback
+    if [[ "${profile}" == "production" ]]; then
+        die "FATAL: ${package}/${arch} not found in GitHub registry. Production builds require all artifacts from remote registry."
+    fi
+
+    # 4. Development: allow APT fallback
+    log_warn "${package}/${arch} not in registry, development profile allows APT fallback"
     return 1
 }

@@ -2,6 +2,8 @@
 # Library for service installation functions
 
 # Fetch and extract a packaged service artifact into the image root.
+# Production profile: get_pimeleon_apps_artifact will die() if not found in registry.
+# Development profile: returns 1 to allow APT fallback.
 install_service_artifact_if_available() {
     local package="$1"
     local mount_point="$2"
@@ -13,10 +15,6 @@ install_service_artifact_if_available() {
         log_info "Installing ${display_name} from artifact"
         sudo tar -xzf "${DOWNLOAD_DIR}/${package}.tar.gz" -C "${mount_point}/"
         return 0
-    fi
-
-    if [[ -n "${CI:-}" ]] || [[ -n "${GITLAB_CI:-}" ]]; then
-        die "FATAL: No published version found for ${package}/${arch} in registry."
     fi
 
     return 1

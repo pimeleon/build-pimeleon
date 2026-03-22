@@ -10,7 +10,7 @@ publish-project-docs:
     - lightweight
   needs:
     - job: "lint:yaml"
-    - job: "build:pimeleon"
+    - job: "upload:artifacts"
       optional: true
     - job: "test:smoke"
       optional: true
@@ -53,7 +53,7 @@ trigger-docs-preview:
   stage: docs
   needs:
     - job: "lint:yaml"
-    - job: "build:pimeleon"
+    - job: "upload:artifacts"
       optional: true
     - job: "test:smoke"
       optional: true
@@ -85,7 +85,7 @@ trigger-docs-production:
   stage: docs
   needs:
     - job: "lint:yaml"
-    - job: "build:pimeleon"
+    - job: "upload:artifacts"
       optional: true
     - job: "test:smoke"
       optional: true

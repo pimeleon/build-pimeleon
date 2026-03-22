@@ -3,6 +3,30 @@
 # Transparent HTTP proxy for ad blocking and privacy
 # Note: privoxy installed in stage2-customize.sh
 
+- name: Ensure privoxy group exists
+  ansible.builtin.group:
+    name: privoxy
+    system: true
+    state: present
+  when: services_enabled.proxy_services | default(true)
+
+- name: Ensure privoxy user exists
+  ansible.builtin.user:
+    name: privoxy
+    group: privoxy
+    system: true
+    shell: /usr/sbin/nologin
+    home: /etc/privoxy
+    create_home: false
+  when: services_enabled.proxy_services | default(true)
+
+- name: Ensure privoxy config directory exists
+  ansible.builtin.file:
+    path: /etc/privoxy
+    state: directory
+    mode: '0755'
+  when: services_enabled.proxy_services | default(true)
+
 - name: Create privoxy log directory
   ansible.builtin.file:
     path: /var/log/privoxy

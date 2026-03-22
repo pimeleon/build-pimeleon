@@ -363,11 +363,13 @@ PIMELEON_PROXY_DEST="${MOUNT_POINT}/opt/pimeleon/proxy"
 PIMELEON_UI_DEST="${MOUNT_POINT}/opt/pimeleon/ui"
 
 # Try to fetch from artifact (local cache or registry)
+# pirouter-ui is NOT in GitHub releases — it's built from source as fallback.
+# Use fetch_pimeleon_apps directly to avoid the production die() in get_pimeleon_apps_artifact.
 UI_FETCHED=false
 if [[ "${PIMELEON_PROFILE:-}" == "production" ]]; then
     log_info "Attempting to fetch pirouter-ui artifact..."
     sudo mkdir -p "${DOWNLOAD_DIR}"
-    if get_pimeleon_apps_artifact "pirouter-ui" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+    if fetch_pimeleon_apps "pirouter-ui" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
         log_info "Fetched pirouter-ui artifact. Extracting..."
         EXTRACT_DIR="/tmp/pirouter-ui-extract"
         sudo rm -rf "${EXTRACT_DIR}"

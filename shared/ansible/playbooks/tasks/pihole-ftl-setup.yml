@@ -30,6 +30,27 @@
     - services_enabled.pihole | default(false)
     - pihole_ftl_path == ""
 
+- name: Ensure pihole group exists
+  ansible.builtin.group:
+    name: pihole
+    system: true
+    state: present
+  when:
+    - services_enabled.pihole | default(false)
+    - pihole_ftl_path != ""
+
+- name: Ensure pihole user exists
+  ansible.builtin.user:
+    name: pihole
+    group: pihole
+    system: true
+    shell: /usr/sbin/nologin
+    home: /etc/pihole
+    create_home: false
+  when:
+    - services_enabled.pihole | default(false)
+    - pihole_ftl_path != ""
+
 # Ensure directories exist (redundant but safe)
 - name: Create Pi-hole directories
   ansible.builtin.file:
