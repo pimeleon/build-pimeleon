@@ -15,8 +15,12 @@ test:smoke:
   needs:
     - job: setup:platform
       artifacts: true
+    - job: check:image
+      artifacts: true
     - job: upload:artifacts
   rules:
+    - if: '$IMAGE_EXISTS == "true"'
+      when: never
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       variables:
         TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
@@ -54,8 +58,12 @@ test:integration:
   needs:
     - job: setup:platform
       artifacts: true
+    - job: check:image
+      artifacts: true
     - job: upload:artifacts
   rules:
+    - if: '$IMAGE_EXISTS == "true"'
+      when: never
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       variables:
         TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
