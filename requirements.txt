@@ -1,8 +1,8 @@
 # MkDocs Material and dependencies for Pimeleon documentation
 # Install with: pip install -r requirements.txt
 
-# Core MkDocs
-mkdocs>=1.5.3
+# Core MkDocs (pinned <2.0 — MkDocs 2.0 removes plugins and breaks Material theme)
+mkdocs>=1.5.3,<2.0
 
 # Material theme
 mkdocs-material>=9.5.0
