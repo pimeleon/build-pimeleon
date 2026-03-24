@@ -69,6 +69,7 @@ check:image:
     - if: '$CI_PIPELINE_SOURCE == "web"'
   before_script:
     - apk add --no-cache curl git
+    - git fetch origin --tags 2>/dev/null || true
   script:
     - |
       SCRIPTS_DIR="./shared/scripts"
@@ -76,25 +77,26 @@ check:image:
       chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
       VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
       PACKAGE_VERSION="${TARGET_PLATFORM}-v${VERSION}"
+      REGISTRY_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?package_name=pimeleon&package_version=${PACKAGE_VERSION}"
       echo "Checking registry for pimeleon/${PACKAGE_VERSION}..."
-      STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+      echo "  URL: ${REGISTRY_URL}"
+      HTTP_RESPONSE=$(curl -sk -w "\n%{http_code}" \
         --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?package_name=pimeleon&package_version=${PACKAGE_VERSION}")
-      if [ "$STATUS" = "200" ]; then
-        # Check if the response actually contains packages (API returns 200 with empty array)
-        RESULT=$(curl -s \
-          --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-          "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?package_name=pimeleon&package_version=${PACKAGE_VERSION}")
-        if echo "$RESULT" | grep -q '"id"'; then
-          echo "IMAGE_EXISTS=true" >> image.env
-          echo "Image pimeleon/${PACKAGE_VERSION} already exists in registry — build will be skipped"
-        else
-          echo "IMAGE_EXISTS=false" >> image.env
-          echo "Image pimeleon/${PACKAGE_VERSION} not found — build required"
-        fi
+        "${REGISTRY_URL}")
+      STATUS=$(echo "$HTTP_RESPONSE" | tail -1)
+      RESULT=$(echo "$HTTP_RESPONSE" | sed '$d')
+      echo "  HTTP status: ${STATUS}"
+      if [ "$STATUS" != "200" ]; then
+        echo "ERROR: Registry query failed with HTTP ${STATUS}"
+        echo "  Response: ${RESULT}"
+        exit 1
+      fi
+      if echo "$RESULT" | grep -q '"id"'; then
+        echo "IMAGE_EXISTS=true" >> image.env
+        echo "Image pimeleon/${PACKAGE_VERSION} already exists in registry — build will be skipped"
       else
         echo "IMAGE_EXISTS=false" >> image.env
-        echo "Registry query returned ${STATUS} — build required"
+        echo "Image pimeleon/${PACKAGE_VERSION} not found — build required"
       fi
   artifacts:
     reports:
@@ -207,11 +209,11 @@ build:containers:
     policy: pull
   script:
     - echo "Uploading build artifacts from cache..."
-    - ls -lh output/
+    - ls -lh output/ 2>/dev/null || true
     - |
       if [ -z "$(ls -A output/*.img 2>/dev/null)" ]; then
-        echo "Error: No image artifacts found in output/"
-        exit 1
+        echo "No image artifacts found — image already exists in registry, skipping upload."
+        exit 0
       fi
   artifacts:
     paths:

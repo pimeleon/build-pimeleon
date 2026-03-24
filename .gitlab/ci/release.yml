@@ -1,7 +1,6 @@
 ---
 # GitLab CI/CD - Release
-# Creates GitLab Releases on version tags.
-# Tag format: {platform}-v{version}, e.g., rpi4-bookworm-v1.2.3
+# Creates GitLab Releases on version tags and pushes to GitHub.
 
 # Create a GitLab Release tied to the version tag
 release:create:
@@ -16,7 +15,7 @@ release:create:
   rules:
     - if: '$CI_COMMIT_TAG'
   environment:
-    name: cicd/production
+    name: production
   script:
     - echo "Creating GitLab Release for ${CI_COMMIT_TAG} (${TARGET_PLATFORM})"
   release:
@@ -28,3 +27,55 @@ release:create:
       Built from commit ${CI_COMMIT_SHORT_SHA} on branch ${CI_COMMIT_REF_NAME}.
 
       Download the image from the [Generic Packages registry](${CI_PROJECT_URL}/-/packages).
+
+# Create a GitHub Release with built image artifacts and changelog
+# Waits for ALL publish jobs to complete before creating the release
+release:github:
+  stage: release
+  image: alpine:latest
+  tags:
+    - lightweight
+  needs:
+    - job: setup:platform
+      artifacts: true
+    - job: check:image
+      artifacts: true
+    - job: upload:artifacts
+      artifacts: true
+    - job: publish:image
+    - job: deploy:r2-dryrun
+    - job: publish:pages
+      optional: true
+  rules:
+    - if: '$IMAGE_EXISTS == "true"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_COMMIT_TAG'
+  environment:
+    name: production
+  before_script:
+    - apk add --no-cache git curl gh
+  script:
+    - chmod +x .gitlab/scripts/release-github.sh
+    - .gitlab/scripts/release-github.sh
+
+# Trigger GitHub Actions to deploy the release to Cloudflare R2
+trigger:github:
+  stage: release
+  image: alpine:latest
+  tags:
+    - lightweight
+  needs:
+    - job: setup:platform
+      artifacts: true
+    - job: release:github
+  rules:
+    - if: '$IMAGE_EXISTS == "true"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_COMMIT_TAG'
+  before_script:
+    - apk add --no-cache curl
+  script:
+    - chmod +x .gitlab/scripts/trigger-github.sh
+    - .gitlab/scripts/trigger-github.sh

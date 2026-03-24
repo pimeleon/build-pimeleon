@@ -17,9 +17,24 @@ get_next_version() {
     base_version=""
     git_range=""
 
-    # 1. Try git tags first (legacy behavior)
+    # Ensure tags are available (CI runners may not fetch them automatically)
+    git fetch origin --tags 2>/dev/null || true
+
+    # Detect if running on a release branch (no -dev suffix on release branches)
+    current_branch="${CI_COMMIT_BRANCH:-$(git branch --show-current 2>/dev/null)}"
+    is_release=false
+    case "$current_branch" in
+        release/*) is_release=true ;;
+    esac
+
+    # 1. Try git tags first
+    # Tag format: {platform}-v{version} (e.g., rpi3-bookworm-v0.2.0)
     current_tag=""
     if [ -n "$platform" ]; then
+        current_tag=$(git tag -l "${platform}-v*" --sort=-v:refname 2>/dev/null | head -1) || current_tag=""
+    fi
+    # Legacy fallback: v{version}-{platform} or plain v{version}
+    if [ -z "$current_tag" ] && [ -n "$platform" ]; then
         current_tag=$(git tag -l "*-${platform}" --sort=-v:refname 2>/dev/null | head -1) || current_tag=""
     fi
     if [ -z "$current_tag" ]; then
@@ -27,10 +42,14 @@ get_next_version() {
     fi
 
     if [ -n "$current_tag" ]; then
-        # Extract version from tag
-        base_version=$(echo "$current_tag" | sed 's/^v//')
-        if [ -n "$platform" ]; then
-            base_version=$(echo "$base_version" | sed "s/-${platform}\$//")
+        # Extract version from tag — handle both {platform}-v{ver} and v{ver}-{platform}
+        if [ -n "$platform" ] && echo "$current_tag" | grep -q "^${platform}-v"; then
+            base_version=$(echo "$current_tag" | sed "s/^${platform}-v//")
+        else
+            base_version=$(echo "$current_tag" | sed 's/^v//')
+            if [ -n "$platform" ]; then
+                base_version=$(echo "$base_version" | sed "s/-${platform}\$//")
+            fi
         fi
         git_range="${current_tag}..HEAD"
     else
@@ -104,7 +123,11 @@ get_next_version() {
             patch=$((patch + 1))
         else
             # No releasable commits since last version change
-            echo "${major}.${minor}.${patch}-dev"
+            if [ "$is_release" = true ]; then
+                echo "${major}.${minor}.${patch}"
+            else
+                echo "${major}.${minor}.${patch}-dev"
+            fi
             return
         fi
 

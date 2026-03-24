@@ -30,6 +30,31 @@ BASE_VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
 PIMELEON_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
 echo "Building version: ${PIMELEON_VERSION}"
 
+# Skip build if this version already exists in the GitLab registry
+if [ -n "${CI_JOB_TOKEN:-}" ] && [ -n "${CI_API_V4_URL:-}" ]; then
+  apk add --no-cache curl >/dev/null 2>&1 || true
+  PACKAGE_VERSION="${TARGET_PLATFORM}-v${BASE_VERSION}"
+  REGISTRY_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?package_name=pimeleon&package_version=${PACKAGE_VERSION}"
+  echo "Checking registry for pimeleon/${PACKAGE_VERSION}..."
+  echo "  URL: ${REGISTRY_URL}"
+  HTTP_RESPONSE=$(curl -sk -w "\n%{http_code}" \
+    --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+    "${REGISTRY_URL}")
+  STATUS=$(echo "$HTTP_RESPONSE" | tail -1)
+  RESULT=$(echo "$HTTP_RESPONSE" | sed '$d')
+  echo "  HTTP status: ${STATUS}"
+  if [ "$STATUS" != "200" ]; then
+    echo "ERROR: Registry check failed with HTTP ${STATUS}"
+    echo "  Response: ${RESULT}"
+    exit 1
+  fi
+  echo "  Registry response: ${RESULT}"
+  if echo "$RESULT" | grep -q '"id"'; then
+    echo "Image pimeleon/${PACKAGE_VERSION} already exists in registry. Skipping build."
+    exit 0
+  fi
+fi
+
 # Create and start build container
 CONTAINER_ID=$(docker create \
   --privileged \
