@@ -6,6 +6,13 @@ set -eu
 #   TARGET_PLATFORM, R2_BUCKET, R2_ENDPOINT
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION (set by job)
 
+# Install git (needed by get-next-version.sh for tag/commit analysis)
+yum install -y -q git
+
+# Disable checksum algorithms unsupported by Cloudflare R2
+aws configure set default.s3.request_checksum_calculation when_required
+aws configure set default.s3.response_checksum_validation when_required
+
 SCRIPTS_DIR="./shared/scripts"
 [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
 
