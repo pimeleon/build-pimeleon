@@ -220,7 +220,6 @@ build:pimeleon:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
-
 provide:artifacts:
   extends: .provide-artifacts
   needs:
@@ -228,11 +227,35 @@ provide:artifacts:
       artifacts: true
     - job: build:pimeleon
       optional: true
+  tags:
+    - linux
   rules:
+    # 1. ALWAYS provide if version is NEW (not in registry)
+    - if: '$IMAGE_EXISTS == "false"'
+      when: on_success
+
+    # 2. Provide if version is OLD but SOURCES changed (fix on same version)
+    - if: '$IMAGE_EXISTS == "true"'
+      changes:
+        - apps/**/*
+        - shared/ansible/**/*
+        - shared/configs/**/*
+        - shared/scripts/**/*
+        - scripts/**/*
+        - Makefile
+        - docker-compose.yml
+        - requirements.txt
+        - .env.defaults
+      when: on_success
+
+    # 3. SKIP provide if version exists and NO sources changed (CI/Docs only)
+    - if: '$IMAGE_EXISTS == "true"'
+      when: never
+
+    # Standard triggers for fallback
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
-
 # Custom build — manually triggered via Web/API with configurable variables
 build:custom:
   extends: .docker-job
