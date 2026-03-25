@@ -2,11 +2,9 @@
 name: Build & Deploy Pimeleon
 
 on:
-  # Triggered by GitLab CI after release:github creates a GitHub Release
   repository_dispatch:
     types: [deploy-r2]
 
-  # Manual trigger for testing
   workflow_dispatch:
     inputs:
       tag:
@@ -22,8 +20,8 @@ env:
   R2_ENDPOINT: https://c0b0b6cd77526e2a2cb8771348e551a4.r2.cloudflarestorage.com
 
 jobs:
-  deploy-r2:
-    name: Deploy to Cloudflare R2
+  build-and-deploy:
+    name: Build & Deploy Pimeleon
     runs-on: ubuntu-latest
 
     steps:
@@ -34,33 +32,130 @@ jobs:
             echo "tag=${{ github.event.client_payload.tag }}" >> "$GITHUB_OUTPUT"
             echo "platform=${{ github.event.client_payload.platform }}" >> "$GITHUB_OUTPUT"
             echo "version=${{ github.event.client_payload.version }}" >> "$GITHUB_OUTPUT"
+            echo "commit_sha=${{ github.event.client_payload.commit_sha }}" >> "$GITHUB_OUTPUT"
+            echo "source_branch=${{ github.event.client_payload.source_branch }}" >> "$GITHUB_OUTPUT"
           else
             echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
             echo "platform=${{ inputs.platform }}" >> "$GITHUB_OUTPUT"
-            # Strip leading 'v' from tag for version
             echo "version=$(echo '${{ inputs.tag }}' | sed 's/^v//')" >> "$GITHUB_OUTPUT"
+            echo "commit_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "source_branch=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Download release assets
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Check out the specific commit passed from GitLab or the tag
+          ref: ${{ steps.params.outputs.commit_sha || github.ref }}
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm,aarch64
+
+      - name: Build Pimeleon image
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_PLATFORM: ${{ steps.params.outputs.platform }}
+          PIMELEON_PROFILE: production
+          CI_COMMIT_SHORT_SHA: ${{ steps.params.outputs.commit_sha }}
+          BUILD_IMAGE: pimeleon-builder:latest
         run: |
-          TAG="${{ steps.params.outputs.tag }}"
-          echo "Downloading assets from release ${TAG}..."
-          mkdir -p output
-          gh release download "$TAG" \
-            --repo "${{ github.repository }}" \
-            --pattern "pimeleon-*.img.xz" \
-            --pattern "pimeleon-*.img.metadata.json" \
-            --dir output || true
+          echo "Building Pimeleon image for $TARGET_PLATFORM..."
+          mkdir -p output cache
 
-          echo "Downloaded files:"
-          ls -lh output/
+          # Run builder container to produce the image
+          docker compose build builder
+          docker compose run --rm builder
 
+          # Verify output
+          ls -la output/
           if [ -z "$(ls -A output/pimeleon-*.img.xz 2>/dev/null)" ]; then
-            echo "::error::No image artifacts found in release ${TAG}"
+            echo "::error::No image artifacts produced"
             exit 1
           fi
+
+      - name: Generate Release Notes
+        id: changelog
+        run: |
+          TAG="${{ steps.params.outputs.tag }}"
+          PLATFORM="${{ steps.params.outputs.platform }}"
+          COMMIT="${{ steps.params.outputs.commit_sha }}"
+          BRANCH="${{ steps.params.outputs.source_branch }}"
+
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            GIT_RANGE="${PREV_TAG}..HEAD"
+          else
+            GIT_RANGE="HEAD~50..HEAD"
+          fi
+
+          TMPDIR=$(mktemp -d)
+          : > "$TMPDIR/breaking"
+          : > "$TMPDIR/features"
+          : > "$TMPDIR/fixes"
+          : > "$TMPDIR/perf"
+          : > "$TMPDIR/refactor"
+          : > "$TMPDIR/ci"
+          : > "$TMPDIR/docs"
+          : > "$TMPDIR/other"
+
+          git log $GIT_RANGE --format="%s" 2>/dev/null | while IFS= read -r msg; do
+            [ -z "$msg" ] && continue
+            if echo "$msg" | grep -qE '^[a-z]+(\(.+\))?!:'; then
+              echo "- ${msg}" >> "$TMPDIR/breaking"
+            elif echo "$msg" | grep -qE '^feat(\(.+\))?:'; then
+              echo "- ${msg}" >> "$TMPDIR/features"
+            elif echo "$msg" | grep -qE '^fix(\(.+\))?:'; then
+              echo "- ${msg}" >> "$TMPDIR/fixes"
+            elif echo "$msg" | grep -qE '^perf(\(.+\))?:'; then
+              echo "- ${msg}" >> "$TMPDIR/perf"
+            elif echo "$msg" | grep -qE '^refactor(\(.+\))?:'; then
+              echo "- ${msg}" >> "$TMPDIR/refactor"
+            elif echo "$msg" | grep -qE '^ci(\(.+\))?:'; then
+              echo "- ${msg}" >> "$TMPDIR/ci"
+            elif echo "$msg" | grep -qE '^docs(\(.+\))?:'; then
+              echo "- ${msg}" >> "$TMPDIR/docs"
+            elif echo "$msg" | grep -qE '^(chore|build|style|test)(\(.+\))?:'; then
+              echo "- ${msg}" >> "$TMPDIR/other"
+            fi
+          done
+
+          NOTES_FILE="release_notes.md"
+          cat > "$NOTES_FILE" <<HEADER
+          ## Pimeleon ${PLATFORM} ${TAG}
+          **Platform:** \`${PLATFORM}\`  |  **Commit:** \`${COMMIT}\`  |  **Branch:** \`${BRANCH}\`
+
+          HEADER
+
+          [ ! -s "$TMPDIR/breaking" ]  || { echo "### ⚠️ Breaking Changes"; cat "$TMPDIR/breaking";  echo; } >> "$NOTES_FILE"
+          [ ! -s "$TMPDIR/features" ]  || { echo "### Features";            cat "$TMPDIR/features";  echo; } >> "$NOTES_FILE"
+          [ ! -s "$TMPDIR/fixes" ]     || { echo "### Bug Fixes";           cat "$TMPDIR/fixes";     echo; } >> "$NOTES_FILE"
+          [ ! -s "$TMPDIR/perf" ]      || { echo "### Performance";         cat "$TMPDIR/perf";      echo; } >> "$NOTES_FILE"
+          [ ! -s "$TMPDIR/refactor" ]  || { echo "### Refactoring";         cat "$TMPDIR/refactor";  echo; } >> "$NOTES_FILE"
+          [ ! -s "$TMPDIR/ci" ]        || { echo "### CI/CD";               cat "$TMPDIR/ci";        echo; } >> "$NOTES_FILE"
+          [ ! -s "$TMPDIR/docs" ]      || { echo "### Documentation";       cat "$TMPDIR/docs";      echo; } >> "$NOTES_FILE"
+          [ ! -s "$TMPDIR/other" ]     || { echo "### Other";               cat "$TMPDIR/other";     echo; } >> "$NOTES_FILE"
+
+          cat >> "$NOTES_FILE" <<'FOOTER'
+          ---
+          ### Installation
+          1. Download the `.img.xz` file
+          2. Decompress: `xz -d pimeleon-*.img.xz`
+          3. Write to SD card: `sudo dd if=pimeleon-*.img of=/dev/sdX bs=4M status=progress`
+          FOOTER
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.params.outputs.tag }}
+          name: Pimeleon ${{ steps.params.outputs.platform }} ${{ steps.params.outputs.tag }}
+          body_path: release_notes.md
+          files: |
+            output/pimeleon-*.img.xz
+            output/pimeleon-*.img.metadata.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure AWS CLI for R2
         run: |
@@ -90,17 +185,3 @@ jobs:
           done
 
           echo "R2 deployment complete."
-
-      - name: Verify upload
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-        run: |
-          PLATFORM="${{ steps.params.outputs.platform }}"
-          VERSION="${{ steps.params.outputs.version }}"
-          UPLOAD_PREFIX="${PLATFORM}/v${VERSION}"
-
-          echo "Verifying files in s3://${R2_BUCKET}/${UPLOAD_PREFIX}/..."
-          aws s3 ls "s3://${R2_BUCKET}/${UPLOAD_PREFIX}/" \
-            --endpoint-url "${R2_ENDPOINT}"

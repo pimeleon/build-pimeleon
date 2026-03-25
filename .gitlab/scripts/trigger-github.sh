@@ -3,15 +3,15 @@ set -eu
 # Trigger GitHub Actions workflow on pimeleon/build-pimeleon via repository_dispatch.
 #
 # Inputs (CI environment):
-#   TARGET_PLATFORM, GITHUB_RELEASE_TOKEN (PAT with repo scope)
+#   TARGET_PLATFORM, PIMELEON_APPS_GITHUB_TOKEN (PAT with repo scope)
 
 SCRIPTS_DIR="./shared/scripts"
 [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
 
 GITHUB_REPO="pimeleon/build-pimeleon"
 
-if [ -z "${GITHUB_RELEASE_TOKEN:-}" ]; then
-  echo "Error: GITHUB_RELEASE_TOKEN not set. Cannot trigger GitHub Actions."
+if [ -z "${PIMELEON_APPS_GITHUB_TOKEN:-}" ]; then
+  echo "Error: PIMELEON_APPS_GITHUB_TOKEN not set. Cannot trigger GitHub Actions."
   exit 1
 fi
 
@@ -25,7 +25,7 @@ echo "  Version:  v${VERSION}"
 HTTP_CODE=$(curl -s -o /tmp/gh-dispatch-response.txt -w "%{http_code}" \
   -X POST \
   -H "Accept: application/vnd.github+json" \
-  -H "Authorization: Bearer ${GITHUB_RELEASE_TOKEN}" \
+  -H "Authorization: Bearer ${PIMELEON_APPS_GITHUB_TOKEN}" \
   "https://api.github.com/repos/${GITHUB_REPO}/dispatches" \
   -d "{
     \"event_type\": \"deploy-r2\",
