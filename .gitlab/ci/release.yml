@@ -8,6 +8,7 @@ release:create:
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   tags:
     - lightweight
+    - linux
   needs:
     - job: setup:platform
       artifacts: true
@@ -35,9 +36,20 @@ trigger:github:
   image: alpine:latest
   tags:
     - lightweight
+    - linux
   needs:
     - job: setup:platform
       artifacts: true
+    - job: check:image
+      artifacts: true
+    - job: provide:artifacts
+      artifacts: true
+    - job: publish:image
+      optional: true
+    - job: deploy:r2-dryrun
+      optional: true
+    - job: publish:pages
+      optional: true
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_COMMIT_TAG'

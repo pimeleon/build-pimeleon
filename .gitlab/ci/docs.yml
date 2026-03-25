@@ -8,6 +8,7 @@ publish-project-docs:
   image: python:3.11-slim
   tags:
     - lightweight
+    - linux
   needs:
     - job: "lint:yaml"
     - job: "provide:artifacts"
