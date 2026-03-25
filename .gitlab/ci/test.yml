@@ -17,8 +17,27 @@ test:smoke:
       artifacts: true
     - job: check:image
       artifacts: true
-    - job: upload:artifacts
+    - job: provide:artifacts
   rules:
+    # 1. ALWAYS run if version is NEW (not in registry)
+    - if: '$IMAGE_EXISTS == "false"'
+      when: on_success
+
+    # 2. Run if version is OLD but SOURCES changed (fix on same version)
+    - if: '$IMAGE_EXISTS == "true"'
+      changes:
+        - apps/**/*
+        - shared/ansible/**/*
+        - shared/configs/**/*
+        - shared/scripts/**/*
+        - scripts/**/*
+        - Makefile
+        - docker-compose.yml
+        - requirements.txt
+        - .env.defaults
+      when: on_success
+
+    # 3. SKIP tests if version exists and NO sources changed (CI/Docs only)
     - if: '$IMAGE_EXISTS == "true"'
       when: never
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
@@ -60,8 +79,27 @@ test:integration:
       artifacts: true
     - job: check:image
       artifacts: true
-    - job: upload:artifacts
+    - job: provide:artifacts
   rules:
+    # 1. ALWAYS run if version is NEW (not in registry)
+    - if: '$IMAGE_EXISTS == "false"'
+      when: on_success
+
+    # 2. Run if version is OLD but SOURCES changed (fix on same version)
+    - if: '$IMAGE_EXISTS == "true"'
+      changes:
+        - apps/**/*
+        - shared/ansible/**/*
+        - shared/configs/**/*
+        - shared/scripts/**/*
+        - scripts/**/*
+        - Makefile
+        - docker-compose.yml
+        - requirements.txt
+        - .env.defaults
+      when: on_success
+
+    # 3. SKIP tests if version exists and NO sources changed (CI/Docs only)
     - if: '$IMAGE_EXISTS == "true"'
       when: never
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'

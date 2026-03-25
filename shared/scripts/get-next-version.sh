@@ -100,7 +100,7 @@ get_next_version() {
             echo "BREAKING"
         elif echo "$msg" | grep -qE "^feat(\(.+\))?:"; then
             echo "FEAT"
-        elif echo "$msg" | grep -qE "^(fix|ci|build|perf|refactor|docs)(\(.+\))?:"; then
+        elif echo "$msg" | grep -qE "^(fix|perf|refactor)(\(.+\))?:"; then
             echo "FIX"
         fi
     done | {

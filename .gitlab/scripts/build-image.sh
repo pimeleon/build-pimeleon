@@ -27,7 +27,7 @@ echo "Using ansible=${ANSIBLE_DIR} configs=${CONFIGS_DIR} scripts=${SCRIPTS_DIR}
 # Compute version
 chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
 BASE_VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
-PIMELEON_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
+PIMELEON_VERSION="${BASE_VERSION}"
 echo "Building version: ${PIMELEON_VERSION}"
 
 # Skip build if this version already exists in the GitLab registry
