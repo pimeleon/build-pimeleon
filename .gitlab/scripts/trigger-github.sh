@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
-# Trigger GitHub Actions workflow on pimeleon/build-pimeleon via repository_dispatch.
+
+# Trigger GitHub Actions workflow via repository_dispatch.
 #
 # Inputs (CI environment):
 #   TARGET_PLATFORM, GITHUB_SYNC_TOKEN (PAT with repo scope)
@@ -25,7 +26,7 @@ echo "  Version:  v${VERSION}"
 HTTP_CODE=$(curl -s -o /tmp/gh-dispatch-response.txt -w "%{http_code}" \
   -X POST \
   -H "Accept: application/vnd.github+json" \
-  -H "Authorization: Bearer ${GITHUB_REGISTRY_PUSH_TOKEN}" \
+  -H "Authorization: Bearer ${GITHUB_SYNC_TOKEN}" \
   "https://api.github.com/repos/${GITHUB_REPO}/dispatches" \
   -d "{
     \"event_type\": \"deploy-r2\",
