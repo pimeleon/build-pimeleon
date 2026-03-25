@@ -12,7 +12,6 @@ setup:platform:
   rules:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_COMMIT_TAG'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "web"'
   script:
@@ -34,7 +33,6 @@ warm-cache:
   rules:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_COMMIT_TAG'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "web"'
   cache:
@@ -72,11 +70,15 @@ check:image:
     - git fetch origin --tags 2>/dev/null || true
   script:
     - |
-      SCRIPTS_DIR="./shared/scripts"
-      [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
-      chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
-      VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
-      PACKAGE_VERSION="${TARGET_PLATFORM}-v${VERSION}"
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        PACKAGE_VERSION="${CI_COMMIT_TAG}"
+      else
+        SCRIPTS_DIR="./shared/scripts"
+        [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
+        chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
+        VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
+        PACKAGE_VERSION="${TARGET_PLATFORM}-v${VERSION}"
+      fi
       REGISTRY_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?package_name=pimeleon&package_version=${PACKAGE_VERSION}"
       echo "Checking registry for pimeleon/${PACKAGE_VERSION}..."
       echo "  URL: ${REGISTRY_URL}"
@@ -119,8 +121,8 @@ check:containers:
     - when: never
   script:
     - |
-      if docker manifest inspect "${CI_REGISTRY_IMAGE}/builder:latest" >/dev/null 2>&1 && \
-         docker manifest inspect "${CI_REGISTRY_IMAGE}/tester:latest" >/dev/null 2>&1; then
+      if docker manifest inspect "$BUILD_IMAGE" >/dev/null 2>&1 && \
+         docker manifest inspect "$TEST_IMAGE" >/dev/null 2>&1; then
         echo "CONTAINERS_EXIST=true" >> containers.env
         echo "Builder and tester images already in registry — build will be skipped"
       else
@@ -201,7 +203,7 @@ build:containers:
 .upload-artifacts:
   stage: build
   tags:
-    - heavy
+    - linux
   cache:
     key: "build-output-${CI_PIPELINE_ID}"
     paths:
@@ -212,8 +214,8 @@ build:containers:
     - ls -lh output/ 2>/dev/null || true
     - |
       if [ -z "$(ls -A output/*.img 2>/dev/null)" ]; then
-        echo "No image artifacts found — image already exists in registry, skipping upload."
-        exit 0
+        echo "ERROR: No image artifacts found in cache. This indicates a cache miss between the build and upload jobs."
+        exit 1
       fi
   artifacts:
     paths:
@@ -236,7 +238,6 @@ build:pimeleon:
       when: never
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_COMMIT_TAG'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
 
 upload:artifacts:
@@ -250,7 +251,6 @@ upload:artifacts:
       when: never
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_COMMIT_TAG'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
 
 # Custom build — manually triggered via Web/API with configurable variables

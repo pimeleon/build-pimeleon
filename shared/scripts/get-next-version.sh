@@ -20,12 +20,16 @@ get_next_version() {
     # Ensure tags are available (CI runners may not fetch them automatically)
     git fetch origin --tags 2>/dev/null || true
 
-    # Detect if running on a release branch (no -dev suffix on release branches)
+    # Detect if running on a release branch or tag (no -dev suffix)
     current_branch="${CI_COMMIT_BRANCH:-$(git branch --show-current 2>/dev/null)}"
     is_release=false
-    case "$current_branch" in
-        release/*) is_release=true ;;
-    esac
+    if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        is_release=true
+    else
+        case "$current_branch" in
+            release/*) is_release=true ;;
+        esac
+    fi
 
     # 1. Try git tags first
     # Tag format: {platform}-v{version} (e.g., rpi3-bookworm-v0.2.0)
@@ -92,11 +96,11 @@ get_next_version() {
     # shellcheck disable=SC2086
     git log $git_range --format=%s 2>/dev/null | while IFS= read -r msg; do
         [ -z "$msg" ] && continue
-        if echo "$msg" | grep -qE "^(feat|fix|refactor|perf)(\(.+\))?!:"; then
+        if echo "$msg" | grep -qE "^[a-z]+(\(.+\))?!:"; then
             echo "BREAKING"
         elif echo "$msg" | grep -qE "^feat(\(.+\))?:"; then
             echo "FEAT"
-        elif echo "$msg" | grep -qE "^fix(\(.+\))?:"; then
+        elif echo "$msg" | grep -qE "^(fix|ci|build|perf|refactor|docs)(\(.+\))?:"; then
             echo "FIX"
         fi
     done | {
