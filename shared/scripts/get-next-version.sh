@@ -2,117 +2,53 @@
 # Resolve the current version for a specific platform with Auto-Bump logic
 # Usage: get-next-version.sh [platform]
 #
-# Version baseline resolution order:
-#   1. Git tag matching *-{platform} or any tag (legacy)
-#   2. apps/{platform}/VERSION file (used when no git tags exist)
-#   3. 0.1.0 (fallback when nothing else is found)
-#
-# POSIX sh compatible - works in Alpine/BusyBox environments
+# POSIX sh compatible
 
 set -eu
 
 get_next_version() {
     platform="${1:-}"
+    version_file="apps/${platform}/VERSION"
     base_version=""
-    git_range=""
 
-    # 1. Try git tags first (legacy behavior)
-    current_tag=""
-    if [ -n "$platform" ]; then
-        current_tag=$(git tag -l "*-${platform}" --sort=-v:refname 2>/dev/null | head -1) || current_tag=""
-    fi
-    # Legacy fallback: v{version}-{platform} or plain v{version}
-    if [ -z "$current_tag" ] && [ -n "$platform" ]; then
-        current_tag=$(git tag -l "*-${platform}" --sort=-v:refname 2>/dev/null | head -1) || current_tag=""
-    fi
-    if [ -z "$current_tag" ]; then
-        current_tag=$(git describe --tags --abbrev=0 2>/dev/null) || current_tag=""
-    fi
-
-    if [ -n "$current_tag" ]; then
-        # Extract version from tag
-        base_version=$(echo "$current_tag" | sed 's/^v//')
-        if [ -n "$platform" ]; then
-            base_version=$(echo "$base_version" | sed "s/-${platform}\$//")
-        fi
-        git_range="${current_tag}..HEAD"
+    # 1. Resolve base version from VERSION file
+    if [ -f "$version_file" ]; then
+        base_version=$(tr -d '[:space:]' < "$version_file")
     else
-        # 2. Fall back to VERSION file
-        version_file=""
-        if [ -n "$platform" ]; then
-            version_file="apps/${platform}/VERSION"
-        fi
-
-        if [ -n "$version_file" ] && [ -f "$version_file" ]; then
-            base_version=$(tr -d '[:space:]' < "$version_file")
-
-            # Find the last commit that changed the VERSION file to use as range start
-            last_file_commit=$(git log --oneline -- "$version_file" 2>/dev/null | head -1 | awk '{print $1}')
-            if [ -n "$last_file_commit" ]; then
-                git_range="${last_file_commit}..HEAD"
-            else
-                # VERSION file exists but was never committed - no commits to analyze
-                echo "$base_version"
-                return
-            fi
+        # Fallback to latest tag if file missing
+        current_tag=$(git tag -l "${platform}-v*" "v*-${platform}" --sort=-v:refname 2>/dev/null | head -1 || echo "")
+        if [ -n "$current_tag" ]; then
+            base_version=$(echo "$current_tag" | sed "s/^${platform}-v//; s/^v//; s/-${platform}\$//")
         else
-            # 3. Final fallback
-            echo "0.1.0"
-            return
+            base_version="0.1.0"
         fi
     fi
 
-    major=$(echo "$base_version" | cut -d. -f1)
-    minor=$(echo "$base_version" | cut -d. -f2)
-    patch=$(echo "$base_version" | cut -d. -f3)
+    # 2. Skip or Bump logic
+    # We check if core dependencies have changed since the last tag or VERSION file update.
+    # Dependencies: apps/, shared/ansible/, shared/configs/, shared/scripts/, docker-compose.yml
 
-    # Handle missing version components
-    major="${major:-0}"
-    minor="${minor:-0}"
-    patch="${patch:-0}"
+    # Find the commit where the version was last set
+    last_version_commit=$(git log -1 --format=%H -- "$version_file" 2>/dev/null || git rev-list --max-parents=0 HEAD)
 
-    # Analyze commits in range to determine version bump type
-    # Use pipe instead of process substitution for POSIX compatibility
-    # shellcheck disable=SC2086
-    git log $git_range --format=%s 2>/dev/null | while IFS= read -r msg; do
-        [ -z "$msg" ] && continue
-        if echo "$msg" | grep -qE "^[a-z]+(\(.+\))?!:"; then
-            echo "BREAKING"
-        elif echo "$msg" | grep -qE "^feat(\(.+\))?:"; then
-            echo "FEAT"
-        elif echo "$msg" | grep -qE "^(fix|perf|refactor)(\(.+\))?:"; then
-            echo "FIX"
-        fi
-    done | {
-        has_breaking=false
-        has_feat=false
-        has_fix=false
-
-        while IFS= read -r commit_type; do
-            case "$commit_type" in
-                BREAKING) has_breaking=true ;;
-                FEAT)     has_feat=true ;;
-                FIX)      has_fix=true ;;
-            esac
-        done
-
-        if [ "$has_breaking" = true ]; then
-            major=$((major + 1))
-            minor=0
-            patch=0
-        elif [ "$has_feat" = true ]; then
-            minor=$((minor + 1))
-            patch=0
-        elif [ "$has_fix" = true ]; then
-            patch=$((patch + 1))
-        else
-            # No releasable commits since last version change
-            echo "${major}.${minor}.${patch}-dev"
-            return
-        fi
-
-        echo "${major}.${minor}.${patch}"
-    }
+    # Check for changes in core dependencies since that commit
+    # If changes exist, we BUMP the patch version.
+    if git diff --quiet "$last_version_commit"..HEAD -- \
+        "apps/${platform}/" \
+        "shared/ansible/" \
+        "shared/configs/" \
+        "shared/scripts/" \
+        "docker-compose.yml" \
+        "requirements.txt"; then
+        # No changes in dependencies -> Return stable version for SKIP
+        echo "${base_version}"
+    else
+        # Changes detected -> BUMP patch version for NEW BUILD
+        major=$(echo "$base_version" | cut -d. -f1)
+        minor=$(echo "$base_version" | cut -d. -f2)
+        patch=$(echo "$base_version" | cut -d. -f3)
+        echo "${major}.${minor}.$((patch + 1))"
+    fi
 }
 
 case "$0" in

@@ -12,8 +12,7 @@ setup:platform:
   rules:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_COMMIT_TAG'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
   script:
     - chmod +x .gitlab/scripts/detect-platform.sh
@@ -34,8 +33,7 @@ warm-cache:
   rules:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_COMMIT_TAG'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
   cache:
     key: "base-system-${TARGET_PLATFORM}"
@@ -53,24 +51,75 @@ warm-cache:
         echo "Cache not found, will be created by build:pimeleon"
       fi
 
+# Check whether the Pimeleon image for this version already exists in the registry
+check:image:
+  stage: .pre
+  image: alpine:latest
+  tags:
+    - lightweight
+  needs:
+    - job: setup:platform
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  before_script:
+    - apk add --no-cache curl git
+    - git fetch origin --tags 2>/dev/null || true
+  script:
+    - chmod +x .gitlab/scripts/check-image.sh
+    - .gitlab/scripts/check-image.sh
+  artifacts:
+    reports:
+      dotenv: image.env
+
 # Check whether builder and tester images already exist in the registry
 check:containers:
   extends: .docker-job
   stage: .pre
   rules:
     - if: '$CI_COMMIT_TAG'
+      variables:
+        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-      changes:
-        - shared/containers/**/*
-        - containers/**/*
-        - apps/**/*
+      variables:
+        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+      variables:
+        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
     - when: never
   script:
     - |
-      if docker manifest inspect "${CI_REGISTRY_IMAGE}/builder:latest" >/dev/null 2>&1 && \
-         docker manifest inspect "${CI_REGISTRY_IMAGE}/tester:latest" >/dev/null 2>&1; then
+      # Re-evaluate BUILD_IMAGE to bypass GitLab CI rules variables bug
+      export BUILD_IMAGE="${CI_REGISTRY_IMAGE}/${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}"
+      export TEST_IMAGE="${CI_REGISTRY_IMAGE}/${TEST_IMAGE_NAME}:${TEST_IMAGE_TAG}"
+      echo "Checking registry for BUILD_IMAGE: ${BUILD_IMAGE}"
+      echo "Checking registry for TEST_IMAGE: ${TEST_IMAGE}"
+
+      if docker manifest inspect "${BUILD_IMAGE}" >/dev/null 2>&1; then
+        echo "[INFO] Builder image FOUND in registry."
+        BUILDER_FOUND=true
+      else
+        echo "[WARN] Builder image MISSING from registry."
+        BUILDER_FOUND=false
+      fi
+
+      if docker manifest inspect "${TEST_IMAGE}" >/dev/null 2>&1; then
+        echo "[INFO] Tester image FOUND in registry."
+        TESTER_FOUND=true
+      else
+        echo "[WARN] Tester image MISSING from registry."
+        TESTER_FOUND=false
+      fi
+
+      if [ "$BUILDER_FOUND" = true ] && [ "$TESTER_FOUND" = true ]; then
         echo "CONTAINERS_EXIST=true" >> containers.env
         echo "Builder and tester images already in registry — build will be skipped"
       else
@@ -88,32 +137,76 @@ build:containers:
   needs:
     - job: setup:platform
       artifacts: true
+    - job: check:containers
+      artifacts: true
   rules:
-    # Skip if containers already exist in registry
-    - if: '$CONTAINERS_EXIST == "true"'
-      when: never
-    # Always allow manual trigger from web if they don't exist
+    # 1. Manual trigger always builds
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: on_success
-    # Trigger on tags or release branch changes (includes merged MRs)
+
+    # 2. Rebuild if image not found in registry (Bootstrap Case)
+    - if: '$CONTAINERS_EXIST == "false" && $CI_COMMIT_TAG'
+      variables:
+        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+      when: on_success
+    - if: '$CONTAINERS_EXIST == "false" && $CI_COMMIT_BRANCH =~ /^release\//'
+      variables:
+        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+      when: on_success
+    - if: '$CONTAINERS_EXIST == "false" && $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+      variables:
+        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+      when: on_success
+
+    # 3. Rebuild if dependencies changed (Update Case)
     - if: '$CI_COMMIT_TAG'
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      variables:
+        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
       changes:
         - shared/containers/**/*
         - containers/**/*
         - apps/**/*
         - docker-compose.yml
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      variables:
+        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+      changes:
+        - shared/containers/**/*
+        - containers/**/*
+        - apps/**/*
+        - docker-compose.yml
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+      variables:
+        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+      changes:
+        - shared/containers/**/*
+        - containers/**/*
+        - apps/**/*
+        - docker-compose.yml
+
+    # 4. Reuse from registry if exists and metadata valid
     - when: never
   script:
+    - |
+      # Re-evaluate BUILD_IMAGE to bypass GitLab CI rules variables bug
+      export BUILD_IMAGE="${CI_REGISTRY_IMAGE}/${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}"
+      export TEST_IMAGE="${CI_REGISTRY_IMAGE}/${TEST_IMAGE_NAME}:${TEST_IMAGE_TAG}"
     - chmod +x .gitlab/scripts/build-containers.sh
     - .gitlab/scripts/build-containers.sh
-
 # Hidden template — shared build logic for all platform jobs
 .build-pimeleon:
   extends: .docker-job
   stage: build
   needs:
     - job: setup:platform
+      artifacts: true
+    - job: check:image
       artifacts: true
     - job: warm-cache
     - job: build:containers
@@ -146,50 +239,72 @@ build:containers:
       - output/pim-initial-password.txt
     expire_in: 1 week
 
-# Platform build — triggered by push to release/* branches, version tags, MRs, and develop (dev profile)
-build:pimeleon:
-  extends: .build-pimeleon
-  rules:
-    - if: '$CI_COMMIT_TAG'
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_COMMIT_TAG'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
-
-# Custom build — manually triggered via Web/API with configurable variables
-build:custom:
-  extends: .docker-job
-  stage: build
+# Finalize build by uploading artifacts to registry if build passed
+publish:image:
+  stage: publish
+  image: alpine:latest
+  tags:
+    - lightweight
+  environment:
+    name: production
   needs:
     - job: setup:platform
       artifacts: true
-    - job: warm-cache
-    - job: build:containers
+    - job: check:image
+      artifacts: true
+    - job: build:pimeleon
+      artifacts: true
+    - job: test:smoke
+      optional: true
+    - job: test:integration
       optional: true
   rules:
+    # Production: tags
+    - if: '$CI_COMMIT_TAG'
+    # Production: MR to release/*
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+    # Production: push/merge to release/*
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    # Production: manual trigger
     - if: '$CI_PIPELINE_SOURCE == "web"'
-      when: manual
-  cache:
-    key: "base-system-${TARGET_PLATFORM}"
-    paths:
-      - cache/
-    policy: pull-push
+  before_script:
+    - apk add --no-cache curl
   script:
-    - chmod +x .gitlab/scripts/build-image.sh
-    - .gitlab/scripts/build-image.sh
-  after_script:
-    - chmod +x .gitlab/scripts/cleanup-build-container.sh
-    - .gitlab/scripts/cleanup-build-container.sh
+    - chmod +x .gitlab/scripts/publish-image.sh
+    - .gitlab/scripts/publish-image.sh
   artifacts:
     paths:
       - output/*.img.xz
-      - output/*.img.metadata.json
-      - output/*.img.sha256
-      - output/*.img.md5
-      - output/*.img.xz.sha256
-      - output/*.img.xz.md5
-      - output/*.packages.txt
-      - output/*.version.txt
-      - output/*.log
-      - output/pim-initial-password.txt
+      - output/*.sha256
     expire_in: 1 week
-  allow_failure: true
+
+# Platform build — triggered by push to release/* branches, version tags, MRs, and develop (dev profile)
+build:pimeleon:
+  extends: .build-pimeleon
+  environment:
+    name: production
+  rules:
+    # 1. ALWAYS build if version is NEW (not in registry)
+    - if: '$IMAGE_EXISTS == "false"'
+      when: on_success
+    # 2. SKIP if version exists in registry (Smart Reuse)
+    - if: '$IMAGE_EXISTS == "true"'
+      when: never
+    # 3. Handle specific variables if build is triggered (Tags/MR/Push to release/*)
+    - if: '$CI_COMMIT_TAG'
+      variables:
+        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      variables:
+        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+      variables:
+        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: on_success
+
+    # 4. Default: skip
+    - when: never

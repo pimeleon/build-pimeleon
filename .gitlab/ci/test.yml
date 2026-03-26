@@ -4,7 +4,6 @@
 #
 # TARGET_PLATFORM is injected from setup:platform via dotenv artifact.
 # Jobs run on release/* branch pushes and on MRs targeting release/* branches.
-# Both use tester:latest — branch-specific images are not guaranteed to exist.
 
 # Smoke test — quick sanity check of the built image
 test:smoke:
@@ -17,15 +16,20 @@ test:smoke:
       artifacts: true
     - job: build:pimeleon
   rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-      variables:
-        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
+    # Production: tags
     - if: '$CI_COMMIT_TAG'
       variables:
-        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    # Production: MR to release/*
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
-        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    # Production: push/merge to release/*
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      variables:
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    # Production: manual trigger
+    - if: '$CI_PIPELINE_SOURCE == "web"'
   script:
     - mkdir -p test-results
     - |
@@ -45,7 +49,7 @@ test:smoke:
       junit: test-results/junit.xml
     expire_in: 1 week
 
-# Integration test — full end-to-end verification
+# Integration test — full end-to-end verification (production)
 test:integration:
   extends: .docker-job
   stage: test
@@ -56,15 +60,20 @@ test:integration:
       artifacts: true
     - job: build:pimeleon
   rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-      variables:
-        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
+    # Production: tags
     - if: '$CI_COMMIT_TAG'
       variables:
-        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    # Production: MR to release/*
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
-        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    # Production: push/merge to release/*
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      variables:
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    # Production: manual trigger
+    - if: '$CI_PIPELINE_SOURCE == "web"'
   script:
     - mkdir -p test-results
     - |
