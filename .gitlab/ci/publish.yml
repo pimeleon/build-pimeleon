@@ -8,45 +8,20 @@
 publish:image:
   stage: publish
   tags:
-    - linux
+    - lightweight
   needs:
     - job: setup:platform
       artifacts: true
-    - job: check:image
-      artifacts: true
-    - job: provide:artifacts
+    - job: build:pimeleon
       artifacts: true
     - job: test:smoke
       artifacts: false
       optional: true
   rules:
-    # 1. ALWAYS publish if version is NEW (not in registry)
-    - if: '$IMAGE_EXISTS == "false"'
-      when: on_success
-
-    # 2. Publish if version is OLD but SOURCES changed (re-publish fix)
-    - if: '$IMAGE_EXISTS == "true"'
-      changes:
-        - apps/**/*
-        - shared/ansible/**/*
-        - shared/configs/**/*
-        - shared/scripts/**/*
-        - scripts/**/*
-        - Makefile
-        - docker-compose.yml
-        - requirements.txt
-        - .env.defaults
-      when: on_success
-
-    # 3. SKIP publish if version exists and NO sources changed
-    - if: '$IMAGE_EXISTS == "true"'
-      when: never
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_COMMIT_TAG'
   environment:
-    name: production
-  before_script:
-    - apk add --no-cache curl
+    name: cicd/production
   script:
     - chmod +x .gitlab/scripts/publish-image.sh
     - .gitlab/scripts/publish-image.sh
@@ -56,46 +31,23 @@ deploy:r2-dryrun:
   stage: publish
   image: alpine:latest
   tags:
-    - linux
+    - lightweight
   needs:
     - job: setup:platform
       artifacts: true
-    - job: check:image
-      artifacts: true
-    - job: provide:artifacts
+    - job: build:pimeleon
       artifacts: true
     - job: test:smoke
       artifacts: false
       optional: true
   rules:
-    # 1. ALWAYS dry-run if version is NEW (not in registry)
-    - if: '$IMAGE_EXISTS == "false"'
-      when: on_success
-
-    # 2. Dry-run if version is OLD but SOURCES changed (fix on same version)
-    - if: '$IMAGE_EXISTS == "true"'
-      changes:
-        - apps/**/*
-        - shared/ansible/**/*
-        - shared/configs/**/*
-        - shared/scripts/**/*
-        - scripts/**/*
-        - Makefile
-        - docker-compose.yml
-        - requirements.txt
-        - .env.defaults
-      when: on_success
-
-    # 3. SKIP dry-run if version exists and NO sources changed
-    - if: '$IMAGE_EXISTS == "true"'
-      when: never
     - if: '$CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_BRANCH =~ /^release\//'
       when: on_success
     - if: '$CI_COMMIT_TAG'
       when: on_success
     - when: never
   environment:
-    name: production
+    name: cicd/production
   script:
     - chmod +x .gitlab/scripts/deploy-r2.sh
     - .gitlab/scripts/deploy-r2.sh

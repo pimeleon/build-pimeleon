@@ -4,11 +4,6 @@
 if [ -f .build_container_id ]; then
   CID=$(cat .build_container_id)
   echo "Cleaning up build container: $CID"
-
-  # Rescue any produced logs before destroying the container
-  mkdir -p output
-  docker cp "$CID":/output/. output/ 2>/dev/null || true
-
   docker stop -t 10 "$CID" 2>/dev/null || true
   docker rm -f "$CID" 2>/dev/null || true
   rm -f .build_container_id

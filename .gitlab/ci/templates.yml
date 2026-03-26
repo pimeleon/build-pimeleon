@@ -7,6 +7,9 @@
 # Uses CI_REGISTRY_PASSWORD for read-write access (CI_JOB_TOKEN is read-only)
 .docker-job:
   image: docker:latest
+  variables:
+    BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}
+    TEST_IMAGE: ${CI_REGISTRY_IMAGE}/${TEST_IMAGE_NAME}:${TEST_IMAGE_TAG}
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
   tags:
