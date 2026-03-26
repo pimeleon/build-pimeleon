@@ -21,6 +21,7 @@ VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
 echo "Triggering GitHub Actions deploy-r2 on ${GITHUB_REPO}"
 echo "  Platform: ${TARGET_PLATFORM}"
 echo "  Version:  v${VERSION}"
+echo "  Ref:      ${CI_COMMIT_REF_NAME}"
 
 HTTP_CODE=$(curl -s -o /tmp/gh-dispatch-response.txt -w "%{http_code}" \
   -X POST \

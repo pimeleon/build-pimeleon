@@ -57,8 +57,9 @@ services:
       - PIMELEON_INITIAL_PASSWORD=${PIMELEON_INITIAL_PASSWORD:-netblox}
       # APT cache proxy (set APT_PROXY=host:port to enable)
       - APT_PROXY=${APT_PROXY:-}
-      # pimeleon-apps GitHub releases registry
-      - PIMELEON_APPS_GITHUB_TOKEN=${PIMELEON_APPS_GITHUB_TOKEN:-}
+      # pi-router-apps package registry
+      - PIMELEON_APPS_PROJECT_ID=${PIMELEON_APPS_PROJECT_ID:-}
+      - PIMELEON_APPS_READ_TOKEN=${PIMELEON_APPS_READ_TOKEN:-}
       # Network configuration - LAN
       - LAN_NETWORK=${LAN_NETWORK:-192.168.43.0/24}
       - LAN_GATEWAY=${LAN_GATEWAY:-192.168.43.1}

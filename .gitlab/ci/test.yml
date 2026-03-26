@@ -4,7 +4,6 @@
 #
 # TARGET_PLATFORM is injected from setup:platform via dotenv artifact.
 # Jobs run on release/* branch pushes and on MRs targeting release/* branches.
-# Both use tester:latest — branch-specific images are not guaranteed to exist.
 
 # Smoke test — quick sanity check of the built image
 test:smoke:
@@ -15,40 +14,18 @@ test:smoke:
   needs:
     - job: setup:platform
       artifacts: true
-    - job: check:image
-      artifacts: true
-    - job: provide:artifacts
+    - job: build:pimeleon
   rules:
-    # 1. ALWAYS run if version is NEW (not in registry)
-    - if: '$IMAGE_EXISTS == "false"'
-      when: on_success
-
-    # 2. Run if version is OLD but SOURCES changed (fix on same version)
-    - if: '$IMAGE_EXISTS == "true"'
-      changes:
-        - apps/**/*
-        - shared/ansible/**/*
-        - shared/configs/**/*
-        - shared/scripts/**/*
-        - scripts/**/*
-        - Makefile
-        - docker-compose.yml
-        - requirements.txt
-        - .env.defaults
-      when: on_success
-
-    # 3. SKIP tests if version exists and NO sources changed (CI/Docs only)
-    - if: '$IMAGE_EXISTS == "true"'
-      when: never
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       variables:
-        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
     - if: '$CI_COMMIT_TAG'
       variables:
-        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
-        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    - if: '$CI_PIPELINE_SOURCE == "web"'
   script:
     - mkdir -p test-results
     - |
@@ -77,40 +54,18 @@ test:integration:
   needs:
     - job: setup:platform
       artifacts: true
-    - job: check:image
-      artifacts: true
-    - job: provide:artifacts
+    - job: build:pimeleon
   rules:
-    # 1. ALWAYS run if version is NEW (not in registry)
-    - if: '$IMAGE_EXISTS == "false"'
-      when: on_success
-
-    # 2. Run if version is OLD but SOURCES changed (fix on same version)
-    - if: '$IMAGE_EXISTS == "true"'
-      changes:
-        - apps/**/*
-        - shared/ansible/**/*
-        - shared/configs/**/*
-        - shared/scripts/**/*
-        - scripts/**/*
-        - Makefile
-        - docker-compose.yml
-        - requirements.txt
-        - .env.defaults
-      when: on_success
-
-    # 3. SKIP tests if version exists and NO sources changed (CI/Docs only)
-    - if: '$IMAGE_EXISTS == "true"'
-      when: never
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       variables:
-        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
     - if: '$CI_COMMIT_TAG'
       variables:
-        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
-        TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:latest
+        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    - if: '$CI_PIPELINE_SOURCE == "web"'
   script:
     - mkdir -p test-results
     - |

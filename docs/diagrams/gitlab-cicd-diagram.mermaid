@@ -1,0 +1,41 @@
+flowchart TD
+       %% Define Styles
+       classDef trigger fill:#e1bee7,stroke:#333,stroke-width:2px;
+       classDef decision fill:#fff3cd,stroke:#ffc107,stroke-width:2px,shape:rhombus;
+       classDef jobRun fill:#d4edda,stroke:#28a745,stroke-width:2px;
+       classDef jobSkip fill:#f8d7da,stroke:#dc3545,stroke-width:2px,stroke-dasharray: 5 5;
+       classDef action fill:#cce5ff,stroke:#004085,stroke-width:1px;
+
+       %% Entry Point
+       Start([Pipeline Triggered - Push to release branch or Tag]):::trigger --> setup[Job:
+   setup:platform]:::action
+       setup --> check[Job: check:image<br/>Queries GitLab Registry]:::action
+
+       check --> Q1{Does Version<br/>Exist in Registry?}:::decision
+
+       %% Path 1: Brand New Version
+       Q1 -- "No (IMAGE_EXISTS=false)" --> build[Job: build:pimeleon<br/>Builds fresh OS Image]:::jobRun
+       build --> test[Jobs: test:smoke & test:integration]:::jobRun
+
+       %% Path 2: Version Exists
+       Q1 -- "Yes (IMAGE_EXISTS=true)" --> Q2{Did Source Code<br/>Change?}:::decision
+
+       %% Path 2A: Sources Changed (Bug fix on same version)
+       Q2 -- "Yes (apps/, ansible/, etc.)" --> build
+
+       %% Path 2B: No Sources Changed (CI/Docs only)
+       Q2 -- "No (CI/Docs only)" --> skipBuild[Skip: build:pimeleon]:::jobSkip
+       skipBuild --> skipTest[Skip: test:smoke & test:integration]:::jobSkip
+
+       %% Re-converge for Publishing
+       test --> publish[Job: publish:image<br/>Uploads to Registry]:::jobRun
+       skipTest --> skipPublish[Job: publish:image<br/>Skips Network Ops]:::jobSkip
+
+       %% Re-converge for Deployment & Triggers
+       publish --> deploy[Job: deploy:r2-dryrun]:::jobRun
+       skipPublish --> deploy
+
+       deploy --> triggerGH[Job: trigger:github<br/>Sends repository_dispatch]:::jobRun
+
+       %% GitHub Actions Hand-off
+       triggerGH --> GHAction([GitHub Actions Workflow<br/>build.yml]):::trigger

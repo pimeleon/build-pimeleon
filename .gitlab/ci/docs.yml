@@ -8,10 +8,9 @@ publish-project-docs:
   image: python:3.11-slim
   tags:
     - lightweight
-    - linux
   needs:
     - job: "lint:yaml"
-    - job: "provide:artifacts"
+    - job: "publish:image"
       optional: true
     - job: "test:smoke"
       optional: true
@@ -19,30 +18,17 @@ publish-project-docs:
       optional: true
 
   rules:
-    # Run on develop branch push or MRs targeting develop
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes:
-        - docs/**/*
-        - mkdocs.yml
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
-      changes:
-        - docs/**/*
-        - mkdocs.yml
-    # Run on release branch push or MRs targeting release/*
+    # Run on release branch push (merge to release/*) or version tags
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-      changes:
-        - docs/**/*
-        - mkdocs.yml
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
-      changes:
-        - docs/**/*
-        - mkdocs.yml
+    - if: '$CI_COMMIT_TAG'
+    # Run on MRs targeting release/* or develop to verify documentation
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
   before_script:
     - chmod +x .gitlab/scripts/setup-apt-proxy.sh
     - .gitlab/scripts/setup-apt-proxy.sh
   script:
     - apt-get -qy update && apt-get -q install -y --no-install-recommends git
-    - pip install "mkdocs>=1.5.3,<2.0" mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin
+    - pip install mkdocs mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin
     - mkdocs build -d public
   artifacts:
     paths:
@@ -54,7 +40,7 @@ trigger-docs-preview:
   stage: docs
   needs:
     - job: "lint:yaml"
-    - job: "provide:artifacts"
+    - job: "publish:image"
       optional: true
     - job: "test:smoke"
       optional: true
@@ -71,22 +57,19 @@ trigger-docs-preview:
     name: documentation/preview
     url: https://preview.pimeleon-docs.pages.dev
   rules:
-    # Trigger on direct push to develop or MRs targeting develop
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes:
-        - docs/**/*
-        - mkdocs.yml
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
-      changes:
-        - docs/**/*
-        - mkdocs.yml
+    # Trigger on tags
+    - if: '$CI_COMMIT_TAG'
+    # Trigger on MRs targeting release/* or develop for preview
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
 
 # Trigger production site build on downstream repository
 trigger-docs-production:
   stage: docs
   needs:
     - job: "lint:yaml"
-    - job: "provide:artifacts"
+    - job: "trigger:github"
+      optional: true
+    - job: "publish:image"
       optional: true
     - job: "test:smoke"
       optional: true
@@ -103,12 +86,6 @@ trigger-docs-production:
     name: documentation/production
     url: https://pimeleon.org
   rules:
-    # Trigger on direct push to release branches or MRs targeting release/*
+    # Trigger on any release branch push (merge to release/*) or version tags
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-      changes:
-        - docs/**/*
-        - mkdocs.yml
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
-      changes:
-        - docs/**/*
-        - mkdocs.yml
+    - if: '$CI_COMMIT_TAG'
