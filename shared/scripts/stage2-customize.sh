@@ -61,7 +61,8 @@ EOF
         log_info "Installing Raspbian archive keyring"
         wget -qO- http://archive.raspbian.org/raspbian.public.key | \
             gpg --dearmor | \
-            sudo tee "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" > /dev/null
+            sudo tee "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" > /dev/null \
+            || die "Failed to fetch or install Raspbian GPG keyring"
         sudo chmod 644 "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg"
     fi
 fi
@@ -166,7 +167,7 @@ log_info "Python3 installed: ${PYTHON_VER}"
 # Install WiFi firmware (may fail if non-free not available)
 log_info "Installing WiFi firmware"
 chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
-    firmware-brcm80211 || log_warn "WiFi firmware not available, wireless may not work"
+    firmware-brcm80211 || die "WiFi firmware (firmware-brcm80211) installation failed — wireless AP cannot function"
 
 # Install Pi-specific packages (kernel and firmware)
 log_info "Installing Raspberry Pi kernel and firmware"
@@ -229,14 +230,14 @@ fi
 
 # Disable NetworkManager (Bookworm default) in favor of systemd-networkd
 log_info "Configuring systemd-networkd as network manager"
-chroot_run "${MOUNT_POINT}" systemctl disable NetworkManager 2>/dev/null || true
-chroot_run "${MOUNT_POINT}" systemctl disable ModemManager 2>/dev/null || true
-chroot_run "${MOUNT_POINT}" systemctl mask NetworkManager 2>/dev/null || true
+chroot_run "${MOUNT_POINT}" systemctl disable NetworkManager 2>/dev/null || log_warn "Could not disable NetworkManager — service may not be installed"
+chroot_run "${MOUNT_POINT}" systemctl disable ModemManager 2>/dev/null || log_warn "Could not disable ModemManager — service may not be installed"
+chroot_run "${MOUNT_POINT}" systemctl mask NetworkManager 2>/dev/null || log_warn "Could not mask NetworkManager — it may still start on boot"
 
 # Mask wpa_supplicant (we use hostapd for AP mode, not client mode)
 log_info "Disabling wpasupplicant"
-chroot_run "${MOUNT_POINT}" systemctl disable wpa_supplicant 2>/dev/null || true
-chroot_run "${MOUNT_POINT}" systemctl mask wpa_supplicant 2>/dev/null || true
+chroot_run "${MOUNT_POINT}" systemctl disable wpa_supplicant 2>/dev/null || log_warn "Could not disable wpa_supplicant — service may not be installed"
+chroot_run "${MOUNT_POINT}" systemctl mask wpa_supplicant 2>/dev/null || log_warn "Could not mask wpa_supplicant — it may still start on boot"
 
 # Configure system
 log_info "Configuring system"

@@ -79,7 +79,7 @@ safe_rm() {
                 if [[ -n "$nested_mounts" ]]; then
                     log_warn "safe_rm: Found active mounts under $path, unmounting..."
                     for mnt in $nested_mounts; do
-                        sudo umount "$mnt" 2>/dev/null || sudo umount -l "$mnt" 2>/dev/null || true
+                        sudo umount "$mnt" 2>/dev/null || sudo umount -l "$mnt" 2>/dev/null || log_warn "safe_rm: Failed to unmount $mnt — loop device may remain attached"
                     done
                 fi
             fi
@@ -178,7 +178,7 @@ cleanup_stale_mounts() {
     if [[ -n "$stale_mounts" ]]; then
         for mnt in $stale_mounts; do
             log_warn "Unmounting stale mount: $mnt"
-            sudo umount -l "$mnt" 2>/dev/null || true
+            sudo umount -l "$mnt" 2>/dev/null || log_warn "Failed to unmount stale mount: $mnt — subsequent build may fail"
         done
     fi
 
@@ -189,8 +189,8 @@ cleanup_stale_mounts() {
     if [[ -n "$stale_loops" ]]; then
         for loop in $stale_loops; do
             log_warn "Detaching stale loop device: $loop"
-            sudo kpartx -d "$loop" 2>/dev/null || true
-            sudo losetup -d "$loop" 2>/dev/null || true
+            sudo kpartx -d "$loop" 2>/dev/null || log_warn "Failed to remove partition mappings for $loop"
+            sudo losetup -d "$loop" 2>/dev/null || log_warn "Failed to detach loop device $loop — device may remain attached"
         done
     fi
 }
@@ -698,7 +698,7 @@ cache_put() {
 # Fetch a pre-built binary package from the pi-router-apps Generic Package Registry.
 # Usage: fetch_pimeleon_apps <package> <arch> <download_dir>
 # Saves as <download_dir>/<package>.tar.gz (matching existing Ansible task expectations).
-# Non-fatal: logs a warning and returns 1 on failure so the caller can decide.
+# Fatal: exits 1 if PIMELEON_APPS_PROJECT_ID is not set or package cannot be fetched.
 fetch_pimeleon_apps() {
     local package="$1"
     local arch="$2"
@@ -708,14 +708,18 @@ fetch_pimeleon_apps() {
     local reg="https://gitlab.pirouter.dev/api/v4/projects/${project_id}/packages/generic"
 
     if [[ "${project_id}" == "0" ]] || [[ -z "${project_id}" ]]; then
-        log_warn "PIMELEON_APPS_PROJECT_ID not set, skipping registry fetch for ${package}"
-        return 1
+        log_error "PIMELEON_APPS_PROJECT_ID is not set — cannot fetch ${package} from registry"
+        exit 1
     fi
 
-    local version
-    version=$(curl -fsSLk \
+    local api_response
+    api_response=$(curl -fsSLk \
         -H "PRIVATE-TOKEN: ${token}" \
-        "${reg}/${package}?per_page=1&order_by=created_at&sort=desc" 2>/dev/null \
+        "${reg}/${package}?per_page=1&order_by=created_at&sort=desc") \
+        || { log_error "Registry API request failed for ${package} (check PIMELEON_APPS_READ_TOKEN and connectivity)"; return 1; }
+
+    local version
+    version=$(echo "${api_response}" \
         | python3 -c "import json,sys; d=json.load(sys.stdin); v=next((p.get('version','') for p in d if p.get('version','').startswith('${arch}-')),''); print(v.replace('${arch}-','',1)) if v else None" \
         2>/dev/null || true)
 
