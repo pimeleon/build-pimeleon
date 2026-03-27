@@ -80,6 +80,10 @@ shared/ansible/playbooks/files/
 benchmarks/*
 output/*
 
+# External repo mount point (overlaid by ../pi-router-apps at runtime via docker-compose)
+pi-router-apps/*
+!pi-router-apps/.gitkeep
+
 # MkDocs build output
 site/
 .venv/
