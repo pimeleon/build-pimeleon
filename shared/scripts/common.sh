@@ -767,16 +767,8 @@ fetch_pimeleon_apps_github() {
     # Find the most recent asset matching <package>-*-<arch>-*.tar.gz
     local asset_url
     asset_url=$(echo "${api_response}" \
-        | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-for release in data:
-    for asset in release.get('assets', []):
-        name = asset.get('name', '')
-        if name.startswith('${package}-') and '-${arch}-' in name and name.endswith('.tar.gz'):
-            print(asset['browser_download_url'])
-            sys.exit(0)
-" 2>/dev/null || true)
+        | python3 -c "import json,sys;data=json.load(sys.stdin);url=next((a['browser_download_url'] for r in data for a in r.get('assets',[]) if a.get('name','').startswith('${package}-') and '-${arch}-' in a.get('name','') and a.get('name','').endswith('.tar.gz')),None);print(url) if url else None" \
+        2>/dev/null || true)
 
     if [[ -z "${asset_url}" ]]; then
         log_warn "No GitHub release asset found for ${package}/${arch} in pimeleon/pimeleon-apps"

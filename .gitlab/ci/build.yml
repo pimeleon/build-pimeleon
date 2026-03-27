@@ -282,29 +282,38 @@ publish:image:
 build:pimeleon:
   extends: .build-pimeleon
   environment:
-    name: production
+    name: $PIMELEON_ENV_NAME
   rules:
-    # 1. ALWAYS build if version is NEW (not in registry)
-    - if: '$IMAGE_EXISTS == "false"'
-      when: on_success
-    # 2. SKIP if version exists in registry (Smart Reuse)
+    # Skip if image already exists in registry (Smart Reuse)
     - if: '$IMAGE_EXISTS == "true"'
       when: never
-    # 3. Handle specific variables if build is triggered (Tags/MR/Push to release/*)
+    # Tag — production build from GitHub releases
     - if: '$CI_COMMIT_TAG'
       variables:
+        PIMELEON_ENV_NAME: production
+        PIMELEON_APPS_SOURCE: github
         BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
         TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    # Push/merge to release/* — production build from GitHub releases
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       variables:
+        PIMELEON_ENV_NAME: production
+        PIMELEON_APPS_SOURCE: github
         BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
         TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    # MR to release/* — development build from GitLab registry
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
+        PIMELEON_ENV_NAME: development
+        PIMELEON_APPS_SOURCE: gitlab
         BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
         TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    # Manual web trigger — production by default
     - if: '$CI_PIPELINE_SOURCE == "web"'
+      variables:
+        PIMELEON_ENV_NAME: production
+        PIMELEON_APPS_SOURCE: github
       when: on_success
 
-    # 4. Default: skip
+    # Default: skip
     - when: never
