@@ -47,7 +47,7 @@ jobs:
       - name: Resolve Platform and Version
         id: meta
         run: |
-          PLATFORM="${{ github.event.client_payload.target_platform || github.event.inputs.target_platform || 'rpi3-bookworm' }}"
+          PLATFORM="${{ github.event.client_payload.target_platform || github.event.client_payload.platform || github.event.inputs.target_platform || 'rpi3-bookworm' }}"
           chmod +x ./shared/scripts/get-next-version.sh
           VERSION=$(./shared/scripts/get-next-version.sh "$PLATFORM")
           echo "target_platform=$PLATFORM" >> $GITHUB_OUTPUT
@@ -88,17 +88,25 @@ jobs:
 
       - name: Build Pimeleon Image
         if: steps.check_image.outputs.exists == 'false' || github.event.inputs.force_rebuild == 'true'
+        env:
+          PIMELEON_APPS_GITHUB_TOKEN: ${{ secrets.PIMELEON_APPS_GITHUB_TOKEN }}
         run: |
           mkdir -p output cache
-          # Run the build using the builder image from registry
           docker run --rm --privileged \
             -v /dev:/dev:rw \
-            -v ${{ github.workspace }}:/workspace \
+            -v ${{ github.workspace }}/shared/scripts:/scripts \
+            -v ${{ github.workspace }}/shared/configs:/configs \
+            -v ${{ github.workspace }}/shared/ansible:/ansible \
             -v ${{ github.workspace }}/output:/output \
             -v ${{ github.workspace }}/cache:/cache \
+            -e CI=true \
+            -e CACHE_DIR=/cache \
+            -e OUTPUT_DIR=/output \
             -e TARGET_PLATFORM=${{ steps.meta.outputs.target_platform }} \
             -e PIMELEON_VERSION=${{ steps.meta.outputs.version }} \
-            -e CI=true \
+            -e PIMELEON_PROFILE=production \
+            -e PIMELEON_APPS_SOURCE=github \
+            -e PIMELEON_APPS_GITHUB_TOKEN="${PIMELEON_APPS_GITHUB_TOKEN}" \
             ${{ steps.meta.outputs.builder_image }} \
             /scripts/build.sh
 
