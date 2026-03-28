@@ -50,10 +50,22 @@ jobs:
           PLATFORM="${{ github.event.client_payload.target_platform || github.event.client_payload.platform || github.event.inputs.target_platform || 'rpi3-bookworm' }}"
           chmod +x ./shared/scripts/get-next-version.sh
           VERSION=$(./shared/scripts/get-next-version.sh "$PLATFORM")
-          echo "target_platform=$PLATFORM" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Rebuild only on minor bump (feat/refactor commits touching build paths).
+          # Patch bumps (fix commits) and no-bump (service commits) reuse the existing image.
+          BASE_VERSION=$(cat "apps/${PLATFORM}/VERSION" 2>/dev/null || echo "0.1.0")
+          BASE_MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
+          NEW_MINOR=$(echo "$VERSION"      | cut -d. -f2)
+          if [ "$NEW_MINOR" -gt "$BASE_MINOR" ]; then
+            NEEDS_REBUILD=true
+          else
+            NEEDS_REBUILD=false
+          fi
+
+          echo "target_platform=$PLATFORM"   >> $GITHUB_OUTPUT
+          echo "version=$VERSION"            >> $GITHUB_OUTPUT
+          echo "needs_rebuild=$NEEDS_REBUILD" >> $GITHUB_OUTPUT
           echo "builder_image=${{ env.REGISTRY }}/${{ github.repository }}/builder:latest" >> $GITHUB_OUTPUT
-          echo "pimeleon_image=${{ env.REGISTRY }}/${{ github.repository }}/pimeleon:${PLATFORM}-v${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Check for Existing Builder
         id: check_builder
@@ -75,19 +87,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Check for Existing OS Image
-        id: check_image
-        run: |
-          # We check if this specific version already exists in the registry
-          # If it does, we skip the heavy build unless forced
-          if docker manifest inspect ${{ steps.meta.outputs.pimeleon_image }} >/dev/null 2>&1; then
-             echo "exists=true" >> $GITHUB_OUTPUT
-          else
-             echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: Build Pimeleon Image
-        if: steps.check_image.outputs.exists == 'false' || github.event.inputs.force_rebuild == 'true'
+        if: steps.meta.outputs.needs_rebuild == 'true' || github.event.inputs.force_rebuild == 'true'
         env:
           PIMELEON_APPS_GITHUB_TOKEN: ${{ secrets.PIMELEON_APPS_GITHUB_TOKEN }}
         run: |
@@ -111,7 +112,7 @@ jobs:
             /scripts/build.sh
 
       - name: Generate Release Notes
-        if: steps.check_image.outputs.exists == 'false' || github.event.inputs.force_rebuild == 'true'
+        if: steps.meta.outputs.needs_rebuild == 'true' || github.event.inputs.force_rebuild == 'true'
         run: |
           echo "Pimeleon release for ${{ steps.meta.outputs.target_platform }}" > release_notes.md
           echo "Version: ${{ steps.meta.outputs.version }}" >> release_notes.md
