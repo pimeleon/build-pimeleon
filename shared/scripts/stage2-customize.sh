@@ -196,11 +196,11 @@ chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     bridge-utils \
     isc-dhcp-server \
     rfkill \
-    wireless-regdb \
-    wpasupplicant
+    wireless-regdb
 
-# Install core services (hostapd, Pi-hole, Tor) using library functions
+# Install core services from pi-router-apps artifacts
 install_hostapd "${MOUNT_POINT}"
+install_wpasupplicant "${MOUNT_POINT}"
 install_pihole "${MOUNT_POINT}"
 install_tor "${MOUNT_POINT}"
 
@@ -215,10 +215,8 @@ log_info "Installing security packages"
 chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     fail2ban
 
-# Install proxy packages
-log_info "Installing proxy packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
-    privoxy
+# Install proxy packages from pi-router-apps artifacts
+install_privoxy "${MOUNT_POINT}"
 
 # Generate Privoxy filters from AdBlock lists (runs on x86, outputs to chroot)
 log_info "Generating Privoxy ad-blocking filters"

@@ -9,7 +9,7 @@ profile_description: "Full-featured production build with all services"
 services_enabled:
   # Tier 1: Core
   networkd: true
-  wpa_supplicant: false
+  wpa_supplicant: true
   hostapd: true
   dhcp_server: true
   dns_server: true

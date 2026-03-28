@@ -13,11 +13,7 @@ install_hostapd() {
             return
         fi
 
-        # 2. Fallback to APT
-        log_info "Installing hostapd from APT"
-        chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends hostapd"
-        # Create compatibility symlink for systemd service (pointing to standard location)
-        chroot_run "${mount_point}" ln -sf /usr/sbin/hostapd /usr/local/bin/hostapd
+        die "Failed to fetch hostapd artifact — cannot continue"
     else
         die "hostapd is not enabled in profile — cannot build Pimeleon image without it"
     fi
@@ -99,6 +95,15 @@ EOF
             fi
         fi
 
+        # Install pihole-FTL from pi-router-apps artifact (replaces installer's FTL)
+        sudo mkdir -p "${DOWNLOAD_DIR}"
+        if get_pimeleon_apps_artifact "pihole-FTL" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+            log_info "Installing pihole-FTL from artifact"
+            sudo tar -xzf "${DOWNLOAD_DIR}/pihole-FTL.tar.gz" -C "${mount_point}/"
+        else
+            die "Failed to fetch pihole-FTL artifact — cannot continue"
+        fi
+
         # RESTORE DNS
         sudo rm -f "${mount_point}/etc/resolv.conf"
         sudo tee "${mount_point}/etc/resolv.conf" > /dev/null <<EOF
@@ -124,9 +129,7 @@ install_tor() {
             return
         fi
 
-        # 2. Fallback to APT
-        log_info "Installing Tor from APT"
-        chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends tor tor-geoipdb"
+        die "Failed to fetch tor artifact — cannot continue"
     else
         die "tor is not enabled in profile — cannot build Pimeleon image without it"
     fi
@@ -151,18 +154,20 @@ install_dnscrypt_proxy() {
 }
 
 # Install wpa_supplicant (artifact only)
-# Always installed regardless of service enablement — binary is required even when
-# wpa_supplicant.service is disabled (AP mode: hostapd owns wlan0, service must not run)
 install_wpasupplicant() {
     local mount_point=$1
-    sudo mkdir -p "${DOWNLOAD_DIR}"
-    if get_pimeleon_apps_artifact "wpa_supplicant" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
-        log_info "Installing wpa_supplicant from artifact"
-        sudo tar -xzf "${DOWNLOAD_DIR}/wpa_supplicant.tar.gz" -C "${mount_point}/"
-        return
-    fi
+    if is_service_enabled "wpa_supplicant" 2>/dev/null; then
+        sudo mkdir -p "${DOWNLOAD_DIR}"
+        if get_pimeleon_apps_artifact "wpa_supplicant" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+            log_info "Installing wpa_supplicant from artifact"
+            sudo tar -xzf "${DOWNLOAD_DIR}/wpa_supplicant.tar.gz" -C "${mount_point}/"
+            return
+        fi
 
-    die "Failed to fetch wpa_supplicant artifact — cannot continue"
+        die "Failed to fetch wpa_supplicant artifact — cannot continue"
+    else
+        die "wpa_supplicant is not enabled in profile — cannot build Pimeleon image without it"
+    fi
 }
 
 # Install privoxy (artifact only)
