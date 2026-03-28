@@ -154,20 +154,18 @@ install_dnscrypt_proxy() {
 }
 
 # Install wpa_supplicant (artifact only)
+# Always installed regardless of service enablement — binary is required even when
+# wpa_supplicant.service is disabled (AP mode: hostapd owns wlan0, service must not run)
 install_wpasupplicant() {
     local mount_point=$1
-    if is_service_enabled "wpa_supplicant" 2>/dev/null; then
-        sudo mkdir -p "${DOWNLOAD_DIR}"
-        if get_pimeleon_apps_artifact "wpa_supplicant" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
-            log_info "Installing wpa_supplicant from artifact"
-            sudo tar -xzf "${DOWNLOAD_DIR}/wpa_supplicant.tar.gz" -C "${mount_point}/"
-            return
-        fi
-
-        die "Failed to fetch wpa_supplicant artifact — cannot continue"
-    else
-        die "wpa_supplicant is not enabled in profile — cannot build Pimeleon image without it"
+    sudo mkdir -p "${DOWNLOAD_DIR}"
+    if get_pimeleon_apps_artifact "wpa_supplicant" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+        log_info "Installing wpa_supplicant from artifact"
+        sudo tar -xzf "${DOWNLOAD_DIR}/wpa_supplicant.tar.gz" -C "${mount_point}/"
+        return
     fi
+
+    die "Failed to fetch wpa_supplicant artifact — cannot continue"
 }
 
 # Install privoxy (artifact only)
