@@ -115,9 +115,11 @@ validate_build_environment
 log_section "Checking prerequisites"
 check_prerequisites
 
-# Cleanup stale mounts from previous failed builds
-log_section "Checking for stale mounts"
-cleanup_stale_mounts
+# Cleanup stale mounts from previous failed builds (skip in CI — fresh container each run)
+if [[ "${CI:-}" != "true" ]]; then
+    log_section "Checking for stale mounts"
+    cleanup_stale_mounts
+fi
 
 # Create work directory
 log_section "Setting up build environment"

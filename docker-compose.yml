@@ -17,9 +17,9 @@ services:
       - ./output:/output
       - ./cache:/cache
       - ./shared/configs:/configs
-      # Monorepo structure - mount entire workspace
-      - .:/workspace:ro
+      # Monorepo structure - inner mount must precede parent to survive parent's :ro
       - ../pi-router-apps:/workspace/pi-router-apps:ro
+      - .:/workspace:ro
       - ./shared/scripts:/scripts:ro
       - ./shared/ansible:/ansible:ro
       # Docker volumes for caching

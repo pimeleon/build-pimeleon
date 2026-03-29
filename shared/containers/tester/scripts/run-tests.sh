@@ -43,7 +43,7 @@ if [[ -d /tests ]] && ls /tests/*.py 1>/dev/null 2>&1; then
         --junitxml="${RESULTS_DIR}/junit.xml" \
         --timeout=300 \
         -v \
-        . || true
+        .
 else
     echo "No Python tests found in /tests"
     # Create placeholder JUnit report

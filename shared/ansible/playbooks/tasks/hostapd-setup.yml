@@ -31,3 +31,10 @@
   notify:
     - Reload systemd
     - Restart hostapd
+
+- name: Disable and mask wpa_supplicant service (conflicts with hostapd in AP mode)
+  ansible.builtin.systemd:
+    name: wpa_supplicant
+    enabled: false
+    masked: true
+  when: services_enabled.hostapd | default(true)

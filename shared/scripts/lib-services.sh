@@ -13,13 +13,9 @@ install_hostapd() {
             return
         fi
 
-        # 2. Fallback to APT
-        log_info "Installing hostapd from APT"
-        chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends hostapd"
-        # Create compatibility symlink for systemd service (pointing to standard location)
-        chroot_run "${mount_point}" ln -sf /usr/sbin/hostapd /usr/local/bin/hostapd
+        die "Failed to fetch hostapd artifact — cannot continue"
     else
-        log_info "hostapd not enabled in profile, skipping installation"
+        die "hostapd is not enabled in profile — cannot build Pimeleon image without it"
     fi
 }
 
@@ -99,6 +95,15 @@ EOF
             fi
         fi
 
+        # Install pihole-FTL from pi-router-apps artifact (replaces installer's FTL)
+        sudo mkdir -p "${DOWNLOAD_DIR}"
+        if get_pimeleon_apps_artifact "pihole-FTL" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+            log_info "Installing pihole-FTL from artifact"
+            sudo tar -xzf "${DOWNLOAD_DIR}/pihole-FTL.tar.gz" -C "${mount_point}/"
+        else
+            die "Failed to fetch pihole-FTL artifact — cannot continue"
+        fi
+
         # RESTORE DNS
         sudo rm -f "${mount_point}/etc/resolv.conf"
         sudo tee "${mount_point}/etc/resolv.conf" > /dev/null <<EOF
@@ -108,7 +113,7 @@ nameserver 1.1.1.1
 EOF
         safe_rm "${mount_point}/tmp/basic-install.sh"
     else
-        log_info "Pi-hole not enabled in profile, skipping installation"
+        die "pihole is not enabled in profile — cannot build Pimeleon image without it"
     fi
 }
 
@@ -124,11 +129,9 @@ install_tor() {
             return
         fi
 
-        # 2. Fallback to APT
-        log_info "Installing Tor from APT"
-        chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends tor tor-geoipdb"
+        die "Failed to fetch tor artifact — cannot continue"
     else
-        log_info "Tor not enabled in profile, skipping installation"
+        die "tor is not enabled in profile — cannot build Pimeleon image without it"
     fi
 }
 
@@ -144,23 +147,40 @@ install_dnscrypt_proxy() {
             return
         fi
 
-        # 2. Fallback to APT
-        log_info "Installing dnscrypt-proxy from APT"
-        chroot_run "${mount_point}" bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get install -qy --no-install-recommends dnscrypt-proxy"
+        die "Failed to fetch dnscrypt-proxy artifact — cannot continue"
     else
-        log_info "dnscrypt-proxy not enabled in profile, skipping installation"
+        die "dnscrypt-proxy is not enabled in profile — cannot build Pimeleon image without it"
     fi
 }
 
-# Install wpasupplicant (artifact or APT)
+# Install wpa_supplicant (artifact only)
+# Always installed regardless of service enablement — binary is required even when
+# wpa_supplicant.service is disabled (AP mode: hostapd owns wlan0, service must not run)
 install_wpasupplicant() {
     local mount_point=$1
-    if is_service_enabled "wpasupplicant" 2>/dev/null; then
-        # 1. Try to fetch pre-built artifact (local cache or registry)
-        if install_service_artifact_if_available "wpasupplicant" "${mount_point}"; then
+    sudo mkdir -p "${DOWNLOAD_DIR}"
+    if get_pimeleon_apps_artifact "wpa_supplicant" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+        log_info "Installing wpa_supplicant from artifact"
+        sudo tar -xzf "${DOWNLOAD_DIR}/wpa_supplicant.tar.gz" -C "${mount_point}/"
+        return
+    fi
+
+    die "Failed to fetch wpa_supplicant artifact — cannot continue"
+}
+
+# Install privoxy (artifact only)
+install_privoxy() {
+    local mount_point=$1
+    if is_service_enabled "privoxy" 2>/dev/null; then
+        sudo mkdir -p "${DOWNLOAD_DIR}"
+        if get_pimeleon_apps_artifact "privoxy" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+            log_info "Installing privoxy from artifact"
+            sudo tar -xzf "${DOWNLOAD_DIR}/privoxy.tar.gz" -C "${mount_point}/"
             return
         fi
+
+        die "Failed to fetch privoxy artifact — cannot continue"
     else
-        log_info "wpasupplicant not enabled in profile, skipping installation"
+        die "privoxy is not enabled in profile — cannot build Pimeleon image without it"
     fi
 }

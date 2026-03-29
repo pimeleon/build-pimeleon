@@ -163,7 +163,8 @@ EOF
     sudo mkdir -p "${MOUNT_POINT}/etc/apt/keyrings"
     wget -qO- https://archive.raspberrypi.com/debian/raspberrypi.gpg.key | \
         gpg --dearmor | \
-        sudo tee "${MOUNT_POINT}/etc/apt/keyrings/raspberrypi-archive-keyring.gpg" > /dev/null
+        sudo tee "${MOUNT_POINT}/etc/apt/keyrings/raspberrypi-archive-keyring.gpg" > /dev/null \
+        || die "Failed to fetch or install Raspberry Pi GPG keyring"
     sudo chmod 644 "${MOUNT_POINT}/etc/apt/keyrings/raspberrypi-archive-keyring.gpg"
 
     # Add Raspberry Pi Foundation repository for kernel and firmware (with signed-by)
