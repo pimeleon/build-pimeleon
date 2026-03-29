@@ -97,7 +97,7 @@ else
         echo "Installing missing packages..."
         sudo apt update
         sudo apt install -y "${MISSING_REQUIRED[@]}"
-        sudo systemctl restart binfmt-support || true
+        sudo systemctl restart binfmt-support || { echo -e "${RED}Failed to restart binfmt-support — ARM emulation will not work${NC}"; exit 1; }
         echo -e "${GREEN}Done!${NC}"
     else
         echo ""

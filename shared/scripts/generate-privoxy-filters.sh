@@ -86,7 +86,7 @@ else
     YOYO_URL="https://pgl.yoyo.org/as/serverlist.php?hostformat=privoxy&showintro=0&mimetype=plaintext"
     YOYO_FILE="${PRIVOXY_DIR}/ads.yoyo.action"
 
-    if curl -fsSL -o "${TEMP_DIR}/ads.yoyo.raw" "${YOYO_URL}" 2>/dev/null; then
+    if curl -fsSL -o "${TEMP_DIR}/ads.yoyo.raw" "${YOYO_URL}"; then
         # Add blocking action header
         echo '{+block{Ad domains from pgl.yoyo.org} +handle-as-empty-document}' | \
             sudo tee "${YOYO_FILE}" > /dev/null

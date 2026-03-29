@@ -61,7 +61,8 @@ EOF
         log_info "Installing Raspbian archive keyring"
         wget -qO- http://archive.raspbian.org/raspbian.public.key | \
             gpg --dearmor | \
-            sudo tee "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" > /dev/null
+            sudo tee "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" > /dev/null \
+            || die "Failed to fetch or install Raspbian GPG keyring"
         sudo chmod 644 "${MOUNT_POINT}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg"
     fi
 fi
@@ -166,7 +167,7 @@ log_info "Python3 installed: ${PYTHON_VER}"
 # Install WiFi firmware (may fail if non-free not available)
 log_info "Installing WiFi firmware"
 chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
-    firmware-brcm80211 || log_warn "WiFi firmware not available, wireless may not work"
+    firmware-brcm80211 || die "WiFi firmware (firmware-brcm80211) installation failed — wireless AP cannot function"
 
 # Install Pi-specific packages (kernel and firmware)
 log_info "Installing Raspberry Pi kernel and firmware"
@@ -189,17 +190,17 @@ else
     die "Some firmware files missing - image will not boot"
 fi
 
-# Install basic networking tools (hostapd compiled from source separately)
+# Install basic networking tools
 log_info "Installing basic networking tools"
 chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     bridge-utils \
     isc-dhcp-server \
     rfkill \
-    wireless-regdb \
-    wpasupplicant
+    wireless-regdb
 
-# Install core services (hostapd, Pi-hole, Tor) using library functions
+# Install core services from pi-router-apps artifacts
 install_hostapd "${MOUNT_POINT}"
+install_wpasupplicant "${MOUNT_POINT}"
 install_pihole "${MOUNT_POINT}"
 install_tor "${MOUNT_POINT}"
 
@@ -214,10 +215,8 @@ log_info "Installing security packages"
 chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     fail2ban
 
-# Install proxy packages
-log_info "Installing proxy packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
-    privoxy
+# Install proxy packages from pi-router-apps artifacts
+install_privoxy "${MOUNT_POINT}"
 
 # Generate Privoxy filters from AdBlock lists (runs on x86, outputs to chroot)
 log_info "Generating Privoxy ad-blocking filters"
@@ -229,14 +228,14 @@ fi
 
 # Disable NetworkManager (Bookworm default) in favor of systemd-networkd
 log_info "Configuring systemd-networkd as network manager"
-chroot_run "${MOUNT_POINT}" systemctl disable NetworkManager 2>/dev/null || true
-chroot_run "${MOUNT_POINT}" systemctl disable ModemManager 2>/dev/null || true
-chroot_run "${MOUNT_POINT}" systemctl mask NetworkManager 2>/dev/null || true
+chroot_run "${MOUNT_POINT}" systemctl disable NetworkManager 2>/dev/null || log_warn "Could not disable NetworkManager — service may not be installed"
+chroot_run "${MOUNT_POINT}" systemctl disable ModemManager 2>/dev/null || log_warn "Could not disable ModemManager — service may not be installed"
+chroot_run "${MOUNT_POINT}" systemctl mask NetworkManager 2>/dev/null || log_warn "Could not mask NetworkManager — it may still start on boot"
 
 # Mask wpa_supplicant (we use hostapd for AP mode, not client mode)
 log_info "Disabling wpasupplicant"
-chroot_run "${MOUNT_POINT}" systemctl disable wpa_supplicant 2>/dev/null || true
-chroot_run "${MOUNT_POINT}" systemctl mask wpa_supplicant 2>/dev/null || true
+chroot_run "${MOUNT_POINT}" systemctl disable wpa_supplicant 2>/dev/null || log_warn "Could not disable wpa_supplicant — service may not be installed"
+chroot_run "${MOUNT_POINT}" systemctl mask wpa_supplicant 2>/dev/null || log_warn "Could not mask wpa_supplicant — it may still start on boot"
 
 # Configure system
 log_info "Configuring system"
@@ -329,19 +328,20 @@ sudo mkdir -p "${DOWNLOAD_DIR}"
 sudo chmod 755 "${DOWNLOAD_DIR}"
 sudo chown "$(id -u):$(id -g)" "${DOWNLOAD_DIR}"
 
-# Fetch pre-built binaries from pi-router-apps registry (production only)
+# Fetch pre-built binaries from pi-router-apps (production only)
+# Source is routed by get_pimeleon_apps_artifact: GitLab registry (dev CI) or GitHub releases (prod CI)
 # Non-production profiles fall back to APT sources via Ansible
 for pkg in dnscrypt-proxy; do
     if [[ "${PIMELEON_PROFILE:-development}" == "production" ]]; then
-        if ! fetch_pimeleon_apps "${pkg}" "${RPI_ARCH}" "${DOWNLOAD_DIR}"; then
+        if ! get_pimeleon_apps_artifact "${pkg}" "${RPI_ARCH}" "${DOWNLOAD_DIR}"; then
             if is_service_enabled "${pkg//-/_}" 2>/dev/null; then
-                die "Failed to fetch ${pkg} from pi-router-apps registry and it is enabled in this profile."
+                die "Failed to fetch ${pkg} from pi-router-apps and it is enabled in this profile."
             else
-                log_warn "Failed to fetch ${pkg} from registry; service is not enabled, continuing."
+                log_warn "Failed to fetch ${pkg} from pi-router-apps; service is not enabled, continuing."
             fi
         fi
     else
-        log_info "Profile '${PIMELEON_PROFILE:-development}': skipping registry fetch for ${pkg}, APT source will be used"
+        log_info "Profile '${PIMELEON_PROFILE:-development}': skipping artifact fetch for ${pkg}, APT source will be used"
     fi
 done
 

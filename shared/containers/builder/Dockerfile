@@ -1,9 +1,10 @@
 # Pimeleon Build Container
 
 # Stage 1: Use pre-built adblock2privoxy image
-# Build once with: ./scripts/build-ab2p.sh
-# This avoids slow Haskell rebuilds on every docker compose build
-FROM pimeleon-adblock2privoxy:latest AS adblock2privoxy-builder
+# Locally: build once with ./scripts/build-ab2p.sh (default: pimeleon-adblock2privoxy:latest)
+# CI: pass --build-arg AB2P_IMAGE=<registry>/adblock2privoxy:latest
+ARG AB2P_IMAGE=pimeleon-adblock2privoxy:latest
+FROM ${AB2P_IMAGE} AS adblock2privoxy-builder
 
 # Stage 2: Main builder image
 FROM debian:12-slim AS base
@@ -100,7 +101,7 @@ RUN mkdir -p /output /cache /configs /ansible /scripts && \
 # Copy app configs into image (scripts mounted/copied at runtime)
 # Build context must be project root (.) for these paths to work
 COPY apps/ /workspace/apps/
-RUN mkdir -p /workspace && chown -R builder:docker /workspace
+RUN mkdir -p /workspace/pi-router-apps && chown -R builder:docker /workspace
 
 # Cache Debian Buster base for debootstrap (matching production Pi 3B+)
 ADD --checksum=sha256:8b9ddf0a5c3371b337e68fbfd7034ccf1b0bd3494d4c998a9da14ae8cf4b8c28 \

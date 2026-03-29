@@ -1,0 +1,25 @@
+# {{ ansible_managed }}
+# Privoxy systemd service for Pimeleon router
+
+[Unit]
+Description=Privoxy Web Proxy With Advanced Filtering Capabilities
+Documentation=https://www.privoxy.org/user-manual/
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=/run/privoxy.pid
+ExecStart=/usr/local/sbin/privoxy --no-daemon --user privoxy /etc/privoxy/config
+User=privoxy
+Group=privoxy
+Restart=on-failure
+RestartSec=10
+
+# Hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

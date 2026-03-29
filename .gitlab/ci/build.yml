@@ -12,7 +12,7 @@ setup:platform:
   rules:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
   script:
     - chmod +x .gitlab/scripts/detect-platform.sh
@@ -33,7 +33,7 @@ warm-cache:
   rules:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
   cache:
     key: "base-system-${TARGET_PLATFORM}"
@@ -63,7 +63,7 @@ check:image:
   rules:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
   before_script:
     - apk add --no-cache curl git
@@ -225,6 +225,7 @@ build:containers:
     - chmod +x .gitlab/scripts/cleanup-build-container.sh
     - .gitlab/scripts/cleanup-build-container.sh
   artifacts:
+    when: always
     paths:
       - output/*.img.xz
       - output/*.img.metadata.json
@@ -238,26 +239,33 @@ build:containers:
       - output/pim-initial-password.txt
     expire_in: 1 week
 
-# Finalize build by uploading artifacts to registry if build and tests passed
+# Finalize build by uploading artifacts to registry if build passed
 publish:image:
   stage: publish
   image: alpine:latest
   tags:
     - lightweight
+  environment:
+    name: production
   needs:
     - job: setup:platform
       artifacts: true
     - job: check:image
       artifacts: true
     - job: build:pimeleon
+      artifacts: true
     - job: test:smoke
       optional: true
     - job: test:integration
       optional: true
   rules:
+    # Production: tags
     - if: '$CI_COMMIT_TAG'
+    # Production: MR to release/*
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+    # Production: push/merge to release/*
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+    # Production: manual trigger
     - if: '$CI_PIPELINE_SOURCE == "web"'
   before_script:
     - apk add --no-cache curl
@@ -273,31 +281,39 @@ publish:image:
 # Platform build — triggered by push to release/* branches, version tags, MRs, and develop (dev profile)
 build:pimeleon:
   extends: .build-pimeleon
+  environment:
+    name: $PIMELEON_ENV_NAME
   rules:
-    # 1. ALWAYS build if version is NEW (not in registry)
-    # The version is calculated by get-next-version.sh (Skip or Bump logic)
-    - if: '$IMAGE_EXISTS == "false"'
-      when: on_success
-
-    # 2. SKIP if version exists in registry (Smart Reuse)
+    # Skip if image already exists in registry (Smart Reuse)
     - if: '$IMAGE_EXISTS == "true"'
       when: never
-
-    # 3. Handle specific variables if build is triggered (Manual/Tags/MRs)
+    # Tag — production build from GitHub releases
     - if: '$CI_COMMIT_TAG'
       variables:
+        PIMELEON_ENV_NAME: production
+        PIMELEON_APPS_SOURCE: github
         BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
         TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    # Push/merge to release/* — production build from GitHub releases
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       variables:
+        PIMELEON_ENV_NAME: production
+        PIMELEON_APPS_SOURCE: github
         BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
         TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    # MR to release/* — development build from GitLab registry
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
+        PIMELEON_ENV_NAME: development
+        PIMELEON_APPS_SOURCE: gitlab
         BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
         TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    # Manual web trigger — production by default
     - if: '$CI_PIPELINE_SOURCE == "web"'
+      variables:
+        PIMELEON_ENV_NAME: production
+        PIMELEON_APPS_SOURCE: github
       when: on_success
 
-    # 4. Default: skip
+    # Default: skip
     - when: never

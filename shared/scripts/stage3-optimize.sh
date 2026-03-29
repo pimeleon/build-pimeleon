@@ -86,7 +86,8 @@ for mapping in "${SERVICES_MAPPING[@]}"; do
     log_info "Searching for service: ${service}"
 
     # Robust discovery: Use find INSIDE the chroot to locate the service unit.
-    REL_SERVICE_PATH=$(chroot_run "${MOUNT_POINT}" find /lib/systemd/system /usr/lib/systemd/system /etc/systemd/system -name "${SEARCH_NAME}.service" -print -quit 2>/dev/null || true)
+    REL_SERVICE_PATH=$(chroot_run "${MOUNT_POINT}" find /lib/systemd/system /usr/lib/systemd/system /etc/systemd/system -name "${SEARCH_NAME}.service" -print -quit 2>/dev/null) \
+        || log_warn "find failed while searching for service ${service} — chroot or path issue"
 
     if [[ -n "${REL_SERVICE_PATH}" ]]; then
         log_info "Enabling service: ${service} (found at ${REL_SERVICE_PATH})"
@@ -106,7 +107,8 @@ for mapping in "${SERVICES_MAPPING[@]}"; do
         # Fallback/Diagnostic for legacy Pi-hole or specific cases
         if [[ "${service}" == "pihole-FTL" ]] || [[ "${service}" == "isc-dhcp-server" ]]; then
             log_info "Attempting legacy service enablement for ${service}..."
-            chroot_run "${MOUNT_POINT}" systemctl enable "${service}" 2>/dev/null || true
+            chroot_run "${MOUNT_POINT}" systemctl enable "${service}" 2>/dev/null \
+                || log_warn "Failed to enable legacy service ${service} — it may not start on boot"
         else
             # CRITICAL: Missing service that is supposed to be enabled is a fatal error
             log_error "FATAL: Service not found: ${service}. (Checked standard systemd paths in chroot)"
@@ -262,7 +264,7 @@ chroot_run "${MOUNT_POINT}" systemctl enable firstboot.service
 
 # Zero free space for better compression
 log_info "Zeroing free space"
-sudo dd if=/dev/zero of="${MOUNT_POINT}/zero.file" bs=1M 2>/dev/null || true
+sudo dd if=/dev/zero of="${MOUNT_POINT}/zero.file" bs=1M || true  # exits 1 on disk-full, which is expected
 safe_rm "${MOUNT_POINT}/zero.file"
 
 # Remove APT cache proxy from final image
