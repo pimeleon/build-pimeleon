@@ -290,12 +290,18 @@ chroot_run "${MOUNT_POINT}" useradd -r -s /usr/sbin/nologin -g pim -d /opt/pimel
 chroot_run "${MOUNT_POINT}" useradd -r -s /usr/sbin/nologin -g pim -d /opt/pimeleon/proxy pim-proxy || true
 chroot_run "${MOUNT_POINT}" useradd -r -s /usr/sbin/nologin -g pim -d /var/lib/ngrok pim-ngrok || true
 
+# Create pihole system user (required by Ansible pihole-ftl-setup tasks)
+log_info "Creating pihole system user"
+chroot_run "${MOUNT_POINT}" groupadd -f -r pihole || true
+chroot_run "${MOUNT_POINT}" useradd -r -s /usr/sbin/nologin -g pihole -d /etc/pihole pihole || true
+
 # Verify users
 log_info "Verifying Pimeleon users"
 chroot_run "${MOUNT_POINT}" id pim || true
 chroot_run "${MOUNT_POINT}" id pim-api || true
 chroot_run "${MOUNT_POINT}" id pim-proxy || true
 chroot_run "${MOUNT_POINT}" id pim-ngrok || true
+chroot_run "${MOUNT_POINT}" id pihole || true
 
 # Ensure home directory exists (fallback if useradd -m fails)
 sudo mkdir -p "${MOUNT_POINT}/home/pim"
