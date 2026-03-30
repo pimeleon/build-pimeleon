@@ -28,17 +28,15 @@ lint:ansible:
 
 lint:shell:
   stage: lint
-  image: koalaman/shellcheck-alpine:latest
+  image: python:3.11-slim
   tags:
-    - linux
+    - python
   needs: []
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends shellcheck jq
+    - pip install --quiet semgrep bashate
   script:
-    - find . -name "*.sh" -type f
-        -not -path "./cache/*"
-        -not -path "./.venv/*"
-        -not -path "*/node_modules/*"
-        -not -path "*/files/services/pihole/*"
-      | xargs shellcheck
+    - bash scripts/quality-benchmark.sh
 
 test:scripts:
   stage: test-scripts

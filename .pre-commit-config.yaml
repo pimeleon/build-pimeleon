@@ -25,13 +25,13 @@ repos:
         types: [shell]
         exclude: '\.bats$'
 
-  # Shell script linting (warnings only, don't block commits)
+  # Shell script linting (warnings and errors)
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: v0.9.0
     hooks:
       - id: shellcheck
-        args: ['-e', 'SC1091,SC2155,SC2086', '-S', 'error']  # Only fail on errors
-        exclude: '\.bats$'
+        args: ['-e', 'SC1091,SC2155,SC2086', '-S', 'warning']
+        exclude: '(\.bats$|.*/files/services/pihole/.*)'
 
   # Ansible linting (local installation to avoid version conflicts)
   - repo: local
@@ -66,14 +66,14 @@ repos:
         stages: [pre-push]
         args: ['dir', '.', '--verbose', '--redact']
 
-  # Code Quality Benchmark (pre-push only)
+  # Code Quality Benchmark (pre-commit and pre-push)
   - repo: local
     hooks:
       - id: quality-benchmark
         name: Code Quality Benchmark
         entry: ./scripts/quality-benchmark.sh
         language: script
-        stages: [pre-push]
+        stages: [pre-commit, pre-push]
         pass_filenames: false
         always_run: true
         verbose: true
