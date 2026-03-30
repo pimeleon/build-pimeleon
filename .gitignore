@@ -90,3 +90,4 @@ site/assets/javascripts/lunr/min/lunr.*.min.js
 # Git backup files
 .git.backup*.tar.gz
 *.bak.*
+.mypy_cache/

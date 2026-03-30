@@ -211,6 +211,16 @@ build:containers:
     - job: warm-cache
     - job: build:containers
       optional: true
+    - job: lint:yaml
+      optional: true
+    - job: lint:ansible
+      optional: true
+    - job: lint:shell
+      optional: true
+    - job: security:trivy
+      optional: true
+    - job: security:gitleaks
+      optional: true
   tags:
     - heavy
   cache:

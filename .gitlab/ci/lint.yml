@@ -30,4 +30,9 @@ lint:shell:
   tags:
     - linux
   script:
-    - find . -name "*.sh" -type f -exec shellcheck {} \;
+    - find . -name "*.sh" -type f
+        -not -path "./cache/*"
+        -not -path "./.venv/*"
+        -not -path "*/node_modules/*"
+        -not -path "*/files/services/pihole/*"
+      | xargs shellcheck
