@@ -6,8 +6,9 @@ stages:
   - .pre
   - scan
   - lint
+  - test-scripts
   - build
-  - test
+  - test-images
   - publish
   - release
   - docs

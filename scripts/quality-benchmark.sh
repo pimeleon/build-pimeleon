@@ -26,27 +26,30 @@ echo -e "${BLUE}       PIMELEON CODE QUALITY BENCHMARK          ${NC}"
 echo -e "${BLUE}==================================================${NC}"
 
 # 1. ShellCheck
-echo -e "\n${BLUE}[1/3] Running ShellCheck...${NC}"
+echo -n -e "${BLUE}[1/3] Running ShellCheck... ${NC}"
 # Set severity to warning to ignore style issues in exit code
 SC_OUTPUT=$(shellcheck -f json -S warning "${SCRIPTS[@]}")
 SC_CODE=$?
 SC_ERRORS=$(echo "$SC_OUTPUT" | jq '[.[] | select(.level == "error")] | length')
 SC_WARNINGS=$(echo "$SC_OUTPUT" | jq '[.[] | select(.level == "warning")] | length')
 
-if [ "$SC_ERRORS" -gt 0 ]; then
-    echo -e "${RED}✘ Failed: $SC_ERRORS ShellCheck errors found.${NC}"
-    shellcheck -S warning "${SCRIPTS[@]}" | grep -A 1 "line"
-elif [ "$SC_WARNINGS" -gt "$MAX_SHELLCHECK_WARNINGS" ]; then
-    echo -e "${RED}✘ Failed: $SC_WARNINGS ShellCheck warnings (Threshold: $MAX_SHELLCHECK_WARNINGS).${NC}"
-    shellcheck -S warning "${SCRIPTS[@]}" | grep -A 1 "line"
-elif [ "$SC_CODE" -gt 1 ]; then
-    echo -e "${RED}✘ Failed: ShellCheck execution error (Code: $SC_CODE).${NC}"
+if [ "$SC_ERRORS" -gt 0 ] || [ "$SC_WARNINGS" -gt "$MAX_SHELLCHECK_WARNINGS" ] || [ "$SC_CODE" -gt 1 ]; then
+    echo -e "${RED}✘${NC}"
+    if [ "$SC_ERRORS" -gt 0 ]; then
+        echo -e "${RED}✘ Failed: $SC_ERRORS ShellCheck errors found.${NC}"
+        shellcheck -S warning "${SCRIPTS[@]}" | grep -A 1 "line"
+    elif [ "$SC_WARNINGS" -gt "$MAX_SHELLCHECK_WARNINGS" ]; then
+        echo -e "${RED}✘ Failed: $SC_WARNINGS ShellCheck warnings (Threshold: $MAX_SHELLCHECK_WARNINGS).${NC}"
+        shellcheck -S warning "${SCRIPTS[@]}" | grep -A 1 "line"
+    elif [ "$SC_CODE" -gt 1 ]; then
+        echo -e "${RED}✘ Failed: ShellCheck execution error (Code: $SC_CODE).${NC}"
+    fi
 else
-    echo -e "${GREEN}✔ Passed: $SC_ERRORS errors, $SC_WARNINGS warnings.${NC}"
+    echo -e "${GREEN}✔${NC}"
 fi
 
 # 2. Bashate
-echo -e "\n${BLUE}[2/3] Running Bashate...${NC}"
+echo -n -e "${BLUE}[2/3] Running Bashate... ${NC}"
 # Ignore E006 (Line too long) as it's common in shell scripts with complex commands
 BASHATE_OUTPUT=$(bashate --ignore E006 "${SCRIPTS[@]}" 2>&1)
 BASHATE_CODE=$?
@@ -61,17 +64,18 @@ if [ "$BASHATE_CODE" -ne 0 ] || [ "$BASHATE_ERRORS" -gt "$MAX_BASHATE_ERRORS" ];
         echo "$BASHATE_OUTPUT" | grep "E[0-9]" | head -n 10
     fi
 else
-    echo -e "${GREEN}✔ Passed: No style errors.${NC}"
+    echo -e "${GREEN}✔${NC}"
 fi
 
 # 3. Semgrep
-echo -e "\n${BLUE}[3/3] Running Semgrep...${NC}"
+echo -n -e "${BLUE}[3/3] Running Semgrep... ${NC}"
 # Use 'auto' config for reliable rule detection
 SEMGREP_OUTPUT=$(semgrep --config auto --json "${SCRIPTS[@]}" 2>/dev/null)
 SEMGREP_CODE=$?
 SEMGREP_ISSUES=$(echo "$SEMGREP_OUTPUT" | jq '.results | length' 2>/dev/null || echo 0)
 
-if [ "$SEMGREP_ISSUES" -gt "$MAX_SEMGREP_ISSUES" ] || ([ "$SEMGREP_CODE" -ne 0 ] && [ "$SEMGREP_ISSUES" -eq 0 ]); then
+if [ "$SEMGREP_ISSUES" -gt "$MAX_SEMGREP_ISSUES" ] || { [ "$SEMGREP_CODE" -ne 0 ] && [ "$SEMGREP_ISSUES" -eq 0 ]; }; then
+    echo -e "${RED}✘${NC}"
     if [ "$SEMGREP_ISSUES" -gt "$MAX_SEMGREP_ISSUES" ]; then
         echo -e "${RED}✘ Failed: $SEMGREP_ISSUES security/pattern issues found.${NC}"
         semgrep --config auto "${SCRIPTS[@]}"
@@ -79,7 +83,7 @@ if [ "$SEMGREP_ISSUES" -gt "$MAX_SEMGREP_ISSUES" ] || ([ "$SEMGREP_CODE" -ne 0 ]
         echo -e "${RED}✘ Failed: Semgrep execution error (Code: $SEMGREP_CODE).${NC}"
     fi
 else
-    echo -e "${GREEN}✔ Passed: No critical patterns found.${NC}"
+    echo -e "${GREEN}✔${NC}"
 fi
 
 # Summary Report
@@ -101,7 +105,7 @@ if [ "$SC_ERRORS" -gt 0 ] || \
    [ "$BASHATE_CODE" -ne 0 ] || \
    [ "$BASHATE_ERRORS" -gt "$MAX_BASHATE_ERRORS" ] || \
    [ "$SEMGREP_ISSUES" -gt "$MAX_SEMGREP_ISSUES" ] || \
-   [ "$SEMGREP_CODE" -gt 1 ]; then
+   { [ "$SEMGREP_CODE" -gt 1 ]; }; then
     echo -e "${RED}RESULT: QUALITY BENCHMARK FAILED${NC}"
     exit 1
 else
