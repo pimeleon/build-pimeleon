@@ -795,7 +795,7 @@ fetch_pimeleon_apps_github() {
         return 1
     fi
 
-    log_info "Fetching ${package} (${arch}) from GitHub releases"
+    log_info "Fetching ${package} (${arch}) from GitHub package registry"
     http_code=$(curl -sL \
             "${auth_args[@]}" \
             -o "${download_dir}/${package}.tar.gz" \
