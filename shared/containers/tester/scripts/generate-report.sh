@@ -9,10 +9,11 @@ JUNIT_FILE="${RESULTS_DIR}/junit.xml"
 
 # Generate JUnit XML report for CI/CD integration
 generate_junit_xml() {
-    local passed=$(grep -c "PASS" "${RESULTS_DIR}"/*.txt 2>/dev/null || echo "0")
-    local failed=$(grep -c "FAIL" "${RESULTS_DIR}"/*.txt 2>/dev/null || echo "0")
-    local total=$((passed + failed))
-    local timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    local passed failed total timestamp
+    passed=$(grep -c "PASS" "${RESULTS_DIR}"/*.txt 2>/dev/null || echo "0")
+    failed=$(grep -c "FAIL" "${RESULTS_DIR}"/*.txt 2>/dev/null || echo "0")
+    total=$((passed + failed))
+    timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
     cat > "$JUNIT_FILE" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -23,16 +24,21 @@ EOF
     # Parse test results and add test cases
     for result_file in "${RESULTS_DIR}"/*.txt; do
         if [[ -f "$result_file" ]]; then
-            local suite_name=$(basename "$result_file" .txt)
+            local suite_name test_name
+            suite_name=$(basename "$result_file" .txt)
             while IFS= read -r line; do
                 if [[ "$line" == *"[PASS]"* ]]; then
-                    local test_name=$(echo "$line" | sed 's/.*\[PASS\] *//' | sed 's/ passed$//')
+                    # shellcheck disable=SC2001
+                    test_name=$(echo "$line" | sed 's/.*\[PASS\] *//' | sed 's/ passed$//')
                     echo "    <testcase name=\"${test_name}\" classname=\"${suite_name}\" time=\"0\"/>" >> "$JUNIT_FILE"
                 elif [[ "$line" == *"[FAIL]"* ]]; then
-                    local test_name=$(echo "$line" | sed 's/.*\[FAIL\] *//')
-                    echo "    <testcase name=\"${test_name}\" classname=\"${suite_name}\" time=\"0\">" >> "$JUNIT_FILE"
-                    echo "      <failure message=\"Test failed\">${line}</failure>" >> "$JUNIT_FILE"
-                    echo "    </testcase>" >> "$JUNIT_FILE"
+                    # shellcheck disable=SC2001
+                    test_name=$(echo "$line" | sed 's/.*\[FAIL\] *//')
+                    {
+                        echo "    <testcase name=\"${test_name}\" classname=\"${suite_name}\" time=\"0\">"
+                        echo "      <failure message=\"Test failed\">${line}</failure>"
+                        echo "    </testcase>"
+                    } >> "$JUNIT_FILE"
                 fi
             done < "$result_file"
         fi
@@ -46,7 +52,8 @@ EOF
     echo "JUnit report generated: $JUNIT_FILE"
 
     # Also copy to parent results directory for CI accessibility
-    local parent_results=$(dirname "$RESULTS_DIR")
+    local parent_results
+    parent_results=$(dirname "$RESULTS_DIR")
     if [[ -d "$parent_results" && "$parent_results" != "$RESULTS_DIR" ]]; then
         cp "$JUNIT_FILE" "${parent_results}/junit.xml"
         echo "JUnit report also copied to: ${parent_results}/junit.xml"
@@ -164,10 +171,12 @@ EOF
 # Add test results
 for result_file in "${RESULTS_DIR}"/*.txt; do
     if [[ -f "$result_file" ]]; then
-        echo "<h3>$(basename "$result_file" .txt)</h3>" >> "$REPORT_FILE"
-        echo "<pre>" >> "$REPORT_FILE"
-        cat "$result_file" >> "$REPORT_FILE"
-        echo "</pre>" >> "$REPORT_FILE"
+        {
+            echo "<h3>$(basename "$result_file" .txt)</h3>"
+            echo "<pre>"
+            cat "$result_file"
+            echo "</pre>"
+        } >> "$REPORT_FILE"
     fi
 done
 

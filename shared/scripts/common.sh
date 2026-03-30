@@ -11,6 +11,7 @@ PIMELEON_GROUP="${PIMELEON_GROUP:-docker}"
 
 # Directory configuration
 CACHE_DIR="${CACHE_DIR:-/cache}"
+# shellcheck disable=SC2034  # used in sourced scripts (lib-services.sh)
 DOWNLOAD_DIR="${CACHE_DIR}/pimeleon-downloads"
 
 # Color codes for output

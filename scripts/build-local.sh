@@ -65,7 +65,7 @@ source_common() {
     # Export paths for common.sh
     export OUTPUT_DIR CACHE_DIR CONFIG_DIR ANSIBLE_DIR
 
-    # Source common.sh
+    # shellcheck source=/dev/null
     source "${BUILDER_SCRIPTS}/common.sh"
 }
 
@@ -119,7 +119,7 @@ main() {
         log_section "Stage 3: Optimizing image"
         "${BUILDER_SCRIPTS}/stage3-optimize.sh" "${WORK_DIR}" "${IMAGE_PATH}"
     else
-        log_info "Stage 3 skipped (set ENABLE_STAGE3=true to enable)"
+        log_warn "Stage 3 skipped (set ENABLE_STAGE3=true to enable)"
     fi
 
     # Stage 4: Packaging and Metadata (CI/Release only)
@@ -130,7 +130,7 @@ main() {
         log_section "Generating metadata"
         generate_metadata "${IMAGE_PATH}"
     else
-        log_info "Skipping Stage 4 (Packaging) and Metadata generation for local build"
+        log_warn "Skipping Stage 4 (Packaging) and Metadata generation for local build"
     fi
 
     # Cleanup
@@ -156,7 +156,7 @@ main() {
 
     # Show password location if exists
     if [[ -f "${OUTPUT_DIR}/pi-initial-password.txt" ]]; then
-        echo "  Password: ${OUTPUT_DIR}/pi-initial-password.txt"
+        log_warn "Initial password saved to: ${OUTPUT_DIR}/pi-initial-password.txt"
     fi
 }
 

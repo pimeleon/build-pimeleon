@@ -187,7 +187,7 @@ finalize_benchmark() {
   "build_results": {
     "exit_code": $exit_code,
     "duration_seconds": $build_duration,
-    "success": $([ $exit_code -eq 0 ] && echo "true" || echo "false"),
+    "success": $([ "${exit_code}" -eq 0 ] && echo "true" || echo "false"),
     "image_generated": $image_exists,
     "image_size_mb": $image_size_mb
   },
@@ -202,7 +202,7 @@ finalize_benchmark() {
   "optimization_notes": [
     "Stages 3 and 4 disabled for testing",
     "APT cache server: $apt_cache_server",
-    "Cache effectiveness: $([ $cache_files -gt 0 ] && echo "enabled" || echo "disabled")",
+    "Cache effectiveness: $([ "${cache_files}" -gt 0 ] && echo "enabled" || echo "disabled")",
     "Benchmark mode: $([ "$NO_CACHE" == "true" ] && echo "no-cache comparison" || echo "optimized with cache")"
   ]
 }

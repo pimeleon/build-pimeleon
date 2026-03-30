@@ -8,7 +8,7 @@ libvirtd -d
 
 # Wait for libvirtd to be ready
 echo "Waiting for libvirtd to start..."
-for i in {1..30}; do
+for _ in {1..30}; do
     if virsh list &>/dev/null; then
         echo "libvirtd is ready"
         break

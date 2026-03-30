@@ -7,6 +7,7 @@ set -uo pipefail
 # Colors for report
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+# shellcheck disable=SC2034
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
@@ -26,7 +27,7 @@ echo -e "${BLUE}==================================================${NC}"
 # 1. ShellCheck
 echo -e "\n${BLUE}[1/3] Running ShellCheck...${NC}"
 # Exclude info SC2086 and others from blocking, but report them
-SC_OUTPUT=$(shellcheck -f json $SCRIPTS)
+SC_OUTPUT=$(shellcheck -f json "$SCRIPTS")
 SC_ERRORS=$(echo "$SC_OUTPUT" | jq '[.[] | select(.level == "error")] | length')
 SC_WARNINGS=$(echo "$SC_OUTPUT" | jq '[.[] | select(.level == "warning")] | length')
 
@@ -43,7 +44,7 @@ fi
 # 2. Bashate
 echo -e "\n${BLUE}[2/3] Running Bashate...${NC}"
 # Ignore E006 (Line too long) as it's common in shell scripts with complex commands
-BASHATE_OUTPUT=$(bashate --ignore E006 $SCRIPTS 2>&1)
+BASHATE_OUTPUT=$(bashate --ignore E006 "$SCRIPTS" 2>&1)
 BASHATE_CODE=$?
 BASHATE_ERRORS=$(echo "$BASHATE_OUTPUT" | grep -c "E[0-9]" || true)
 
@@ -56,12 +57,12 @@ fi
 
 # 3. Semgrep
 echo -e "\n${BLUE}[3/3] Running Semgrep...${NC}"
-SEMGREP_OUTPUT=$(semgrep --config p/shell --json $SCRIPTS 2>/dev/null)
+SEMGREP_OUTPUT=$(semgrep --config p/shell --json "$SCRIPTS" 2>/dev/null)
 SEMGREP_ISSUES=$(echo "$SEMGREP_OUTPUT" | jq '.results | length' 2>/dev/null || echo 0)
 
 if [ "$SEMGREP_ISSUES" -gt "$MAX_SEMGREP_ISSUES" ]; then
     echo -e "${RED}✘ Failed: $SEMGREP_ISSUES security/pattern issues found.${NC}"
-    semgrep --config p/shell $SCRIPTS
+    semgrep --config p/shell "$SCRIPTS"
 else
     echo -e "${GREEN}✔ Passed: No critical patterns found.${NC}"
 fi

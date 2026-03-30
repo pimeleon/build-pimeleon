@@ -28,6 +28,7 @@ fi
 
 # Detect distribution
 if [ -f /etc/os-release ]; then
+    # shellcheck source=/dev/null
     . /etc/os-release
     DISTRO=$ID
     VERSION=$VERSION_ID
@@ -176,7 +177,7 @@ show_menu() {
     echo "5) Setup auto-discovery (Pimeleon only)"
     echo "6) Exit"
     echo
-    read -p "Select option: " choice
+    read -r -p "Select option: " choice
 
     case $choice in
         1)

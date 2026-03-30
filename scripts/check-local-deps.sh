@@ -54,7 +54,7 @@ done
 echo ""
 echo "Checking optional dependencies..."
 for pkg in "${OPTIONAL_PACKAGES[@]}"; do
-    if check_package "$pkg"; then
+    if check_package "$pkg" || check_command "$pkg"; then
         echo -e "  ${GREEN}✓${NC} $pkg"
     else
         echo -e "  ${YELLOW}○${NC} $pkg (optional)"

@@ -331,6 +331,7 @@ sudo chown "$(id -u):$(id -g)" "${DOWNLOAD_DIR}"
 # Fetch pre-built binaries from pi-router-apps (production only)
 # Source is routed by get_pimeleon_apps_artifact: GitLab registry (dev CI) or GitHub releases (prod CI)
 # Non-production profiles fall back to APT sources via Ansible
+# shellcheck disable=SC2043
 for pkg in dnscrypt-proxy; do
     if [[ "${PIMELEON_PROFILE:-development}" == "production" ]]; then
         if ! get_pimeleon_apps_artifact "${pkg}" "${RPI_ARCH}" "${DOWNLOAD_DIR}"; then
