@@ -4,9 +4,20 @@ set -eu
 # Upload Pimeleon image artifacts to the GitLab Generic Packages registry.
 # If the image already exists (IMAGE_EXISTS=true), it skips the network operations.
 #
-# Inputs: IMAGE_EXISTS, PACKAGE_VERSION, TARGET_PLATFORM, CI_JOB_TOKEN, CI_API_V4_URL, CI_PROJECT_ID
+# Inputs: IMAGE_EXISTS, PACKAGE_VERSION (from check:image dotenv), TARGET_PLATFORM,
+#         CI_JOB_TOKEN, CI_API_V4_URL, CI_PROJECT_ID
 
 IMAGE_EXISTS="${IMAGE_EXISTS:-false}"
+
+# PACKAGE_VERSION comes from check:image dotenv artifact; compute it as fallback
+if [ -z "${PACKAGE_VERSION:-}" ]; then
+  SCRIPTS_DIR="./shared/scripts"
+  [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
+  chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
+  VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
+  PACKAGE_VERSION="${TARGET_PLATFORM}-v${VERSION}"
+  echo "[INFO] PACKAGE_VERSION not injected via dotenv, computed: ${PACKAGE_VERSION}"
+fi
 
 if [ "$IMAGE_EXISTS" = "true" ]; then
   echo "[INFO] Image version '${PACKAGE_VERSION}' confirmed in registry."
