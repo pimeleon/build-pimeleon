@@ -48,8 +48,6 @@ deploy:r2-dryrun:
     - when: never
   environment:
     name: cicd/production
-  before_script:
-    - apk add --no-cache git
   script:
     - chmod +x .gitlab/scripts/deploy-r2.sh
     - .gitlab/scripts/deploy-r2.sh

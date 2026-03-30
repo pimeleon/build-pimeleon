@@ -130,7 +130,7 @@ main() {
         log_section "Generating metadata"
         generate_metadata "${IMAGE_PATH}"
     else
-        log_warn "Skipping Stage 4 (Packaging) and Metadata generation for local build"
+        log_info "Skipping Stage 4 (Packaging) and Metadata generation for local build"
     fi
 
     # Cleanup

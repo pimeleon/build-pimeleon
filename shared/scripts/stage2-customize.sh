@@ -323,28 +323,25 @@ sudo chmod 440 "${MOUNT_POINT}/etc/sudoers.d/010_pim-admin"
 log_info "Downloading files for chroot installation"
 
 # Create download directory in cache (outside image to save space)
-DOWNLOAD_DIR="${CACHE_DIR}/pimeleon-downloads"
-sudo mkdir -p "${DOWNLOAD_DIR}"
-sudo chmod 755 "${DOWNLOAD_DIR}"
-sudo chown "$(id -u):$(id -g)" "${DOWNLOAD_DIR}"
+sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+sudo chmod 755 "${CACHE_DIR}/pimeleon-downloads"
+sudo chown "$(id -u):$(id -g)" "${CACHE_DIR}/pimeleon-downloads"
 
 # Fetch pre-built binaries from pi-router-apps (production only)
 # Source is routed by get_pimeleon_apps_artifact: GitLab registry (dev CI) or GitHub releases (prod CI)
 # Non-production profiles fall back to APT sources via Ansible
-# shellcheck disable=SC2043
-for pkg in dnscrypt-proxy; do
-    if [[ "${PIMELEON_PROFILE:-development}" == "production" ]]; then
-        if ! get_pimeleon_apps_artifact "${pkg}" "${RPI_ARCH}" "${DOWNLOAD_DIR}"; then
-            if is_service_enabled "${pkg//-/_}" 2>/dev/null; then
-                die "Failed to fetch ${pkg} from pi-router-apps and it is enabled in this profile."
-            else
-                log_warn "Failed to fetch ${pkg} from pi-router-apps; service is not enabled, continuing."
-            fi
+pkg="dnscrypt-proxy"
+if [[ "${PIMELEON_PROFILE:-development}" == "production" ]]; then
+    if ! get_pimeleon_apps_artifact "${pkg}" "${RPI_ARCH}" "${CACHE_DIR}/pimeleon-downloads"; then
+        if is_service_enabled "${pkg//-/_}" 2>/dev/null; then
+            die "Failed to fetch ${pkg} from pi-router-apps and it is enabled in this profile."
+        else
+            log_warn "Failed to fetch ${pkg} from pi-router-apps; service is not enabled, continuing."
         fi
-    else
-        log_info "Profile '${PIMELEON_PROFILE:-development}': skipping artifact fetch for ${pkg}, APT source will be used"
     fi
-done
+else
+    log_info "Profile '${PIMELEON_PROFILE:-development}': skipping artifact fetch for ${pkg}, APT source will be used"
+fi
 
 # Pi-hole FTL is built from source (see build-pihole-ftl.sh)
 # Tor is installed from official Tor Project repository (see tor-setup.yml)
@@ -352,10 +349,10 @@ done
 # Copy downloads into chroot for Ansible to find
 log_info "Copying downloads into chroot"
 sudo mkdir -p "${MOUNT_POINT}/tmp/pimeleon-downloads"
-if [[ -n "$(ls -A "${DOWNLOAD_DIR}" 2>/dev/null)" ]]; then
-    sudo cp -r "${DOWNLOAD_DIR}"/* "${MOUNT_POINT}/tmp/pimeleon-downloads/"
+if [[ -n "$(ls -A "${CACHE_DIR}/pimeleon-downloads" 2>/dev/null)" ]]; then
+    sudo cp -r "${CACHE_DIR}/pimeleon-downloads"/* "${MOUNT_POINT}/tmp/pimeleon-downloads/"
 else
-    log_info "No files found in ${DOWNLOAD_DIR} to copy"
+    log_info "No files found in ${CACHE_DIR}/pimeleon-downloads to copy"
 fi
 sudo chmod -R 755 "${MOUNT_POINT}/tmp/pimeleon-downloads"
 
@@ -382,13 +379,13 @@ PIMELEON_UI_DEST="${MOUNT_POINT}/opt/pimeleon/ui"
 UI_FETCHED=false
 if [[ "${PIMELEON_PROFILE:-}" == "production" ]]; then
     log_info "Attempting to fetch pirouter-ui artifact..."
-    sudo mkdir -p "${DOWNLOAD_DIR}"
-    if get_pimeleon_apps_artifact "pirouter-ui" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+    sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+    if get_pimeleon_apps_artifact "pirouter-ui" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
         log_info "Fetched pirouter-ui artifact. Extracting..."
         EXTRACT_DIR="/tmp/pirouter-ui-extract"
         sudo rm -rf "${EXTRACT_DIR}"
         mkdir -p "${EXTRACT_DIR}"
-        sudo tar -xzf "${DOWNLOAD_DIR}/pirouter-ui.tar.gz" -C "${EXTRACT_DIR}"
+        sudo tar -xzf "${CACHE_DIR}/pimeleon-downloads/pirouter-ui.tar.gz" -C "${EXTRACT_DIR}"
 
         # Copy extracted files to destinations
         # Expected layout in tarball:

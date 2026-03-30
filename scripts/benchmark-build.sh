@@ -112,7 +112,7 @@ collect_system_info() {
 
     # System load before build
     local load_avg
-    load_avg=$(cat /proc/loadavg | awk '{print $1}')
+    load_avg=$(awk '{print $1}' < /proc/loadavg)
 
     cat > "$BENCHMARK_FILE" <<EOF
 {
@@ -156,7 +156,7 @@ finalize_benchmark() {
 
     # System load after build
     local load_avg_post
-    load_avg_post=$(cat /proc/loadavg | awk '{print $1}')
+    load_avg_post=$(awk '{print $1}' < /proc/loadavg)
     local available_ram_post
     available_ram_post=$(free -m | awk '/^Mem:/{print $7}')
     local available_space_post

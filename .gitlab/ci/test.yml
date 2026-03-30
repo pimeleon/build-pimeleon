@@ -8,7 +8,7 @@
 # Smoke test — quick sanity check of the built image
 test:smoke:
   extends: .docker-job
-  stage: test
+  stage: test-images
   variables:
     DOCKER_HOST: unix:///var/run/docker.sock
   needs:
@@ -52,7 +52,7 @@ test:smoke:
 # Integration test — full end-to-end verification (production)
 test:integration:
   extends: .docker-job
-  stage: test
+  stage: test-images
   variables:
     DOCKER_HOST: unix:///var/run/docker.sock
   needs:

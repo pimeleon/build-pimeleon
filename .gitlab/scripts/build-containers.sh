@@ -25,43 +25,43 @@ AB2P_DF="./shared/containers/builder/Dockerfile.ab2p"
 [ -f "./containers/builder/Dockerfile.ab2p" ] && AB2P_DF="./containers/builder/Dockerfile.ab2p"
 
 if docker manifest inspect "${AB2P_IMAGE}" >/dev/null 2>&1; then
-  echo "adblock2privoxy image found in registry, skipping build"
+    echo "adblock2privoxy image found in registry, skipping build"
 else
-  echo "adblock2privoxy image not found — building and pushing to registry..."
-  docker buildx build \
-    --cache-from type=registry,ref="${CACHE_IMAGE}:ab2p-main" \
-    --cache-to type=registry,ref="${CACHE_IMAGE}:ab2p-main",mode=max \
-    -t "${AB2P_IMAGE}" \
-    --push \
-    -f "$AB2P_DF" "$(dirname "$AB2P_DF")"
-  echo "adblock2privoxy image pushed: ${AB2P_IMAGE}"
+    echo "adblock2privoxy image not found — building and pushing to registry..."
+    docker buildx build \
+        --cache-from type=registry,ref="${CACHE_IMAGE}:ab2p-main" \
+        --cache-to type=registry,ref="${CACHE_IMAGE}:ab2p-main",mode=max \
+        -t "${AB2P_IMAGE}" \
+        --push \
+        -f "$AB2P_DF" "$(dirname "$AB2P_DF")"
+    echo "adblock2privoxy image pushed: ${AB2P_IMAGE}"
 fi
 
 # Build builder image with BuildKit registry cache
 echo "Building builder image..."
 docker buildx build \
-  --cache-from type=registry,ref="${CACHE_IMAGE}:builder-${CI_COMMIT_REF_SLUG}" \
-  --cache-from type=registry,ref="${CACHE_IMAGE}:builder-main" \
-  --cache-to type=registry,ref="${CACHE_IMAGE}:builder-${CI_COMMIT_REF_SLUG}",mode=max \
-  --build-arg AB2P_IMAGE="${AB2P_IMAGE}" \
-  --build-arg APT_PROXY="${APT_PROXY:-}" \
-  --build-arg CI="${CI:-}" \
-  --build-arg PIMELEON_PROFILE="${PIMELEON_PROFILE:-}" \
-  -t "$BUILD_IMAGE" -t "${CI_REGISTRY_IMAGE}/builder:latest" \
-  --push \
-  -f "$BUILDER_DF" .
+    --cache-from type=registry,ref="${CACHE_IMAGE}:builder-${CI_COMMIT_REF_SLUG}" \
+    --cache-from type=registry,ref="${CACHE_IMAGE}:builder-main" \
+    --cache-to type=registry,ref="${CACHE_IMAGE}:builder-${CI_COMMIT_REF_SLUG}",mode=max \
+    --build-arg AB2P_IMAGE="${AB2P_IMAGE}" \
+    --build-arg APT_PROXY="${APT_PROXY:-}" \
+    --build-arg CI="${CI:-}" \
+    --build-arg PIMELEON_PROFILE="${PIMELEON_PROFILE:-}" \
+    -t "$BUILD_IMAGE" -t "${CI_REGISTRY_IMAGE}/builder:latest" \
+    --push \
+    -f "$BUILDER_DF" .
 
 # Build tester image with BuildKit registry cache
 echo "Building tester image..."
 docker buildx build \
-  --cache-from type=registry,ref="${CACHE_IMAGE}:tester-${CI_COMMIT_REF_SLUG}" \
-  --cache-from type=registry,ref="${CACHE_IMAGE}:tester-main" \
-  --cache-to type=registry,ref="${CACHE_IMAGE}:tester-${CI_COMMIT_REF_SLUG}",mode=max \
-  --build-arg APT_PROXY="${APT_PROXY:-}" \
-  --build-arg CI="${CI:-}" \
-  --build-arg PIMELEON_PROFILE="${PIMELEON_PROFILE:-}" \
-  -t "$TEST_IMAGE" -t "${CI_REGISTRY_IMAGE}/tester:latest" \
-  --push \
-  -f "$TESTER_DF" "$(dirname "$TESTER_DF")"
+    --cache-from type=registry,ref="${CACHE_IMAGE}:tester-${CI_COMMIT_REF_SLUG}" \
+    --cache-from type=registry,ref="${CACHE_IMAGE}:tester-main" \
+    --cache-to type=registry,ref="${CACHE_IMAGE}:tester-${CI_COMMIT_REF_SLUG}",mode=max \
+    --build-arg APT_PROXY="${APT_PROXY:-}" \
+    --build-arg CI="${CI:-}" \
+    --build-arg PIMELEON_PROFILE="${PIMELEON_PROFILE:-}" \
+    -t "$TEST_IMAGE" -t "${CI_REGISTRY_IMAGE}/tester:latest" \
+    --push \
+    -f "$TESTER_DF" "$(dirname "$TESTER_DF")"
 
 echo "Builder and tester images built and pushed successfully"

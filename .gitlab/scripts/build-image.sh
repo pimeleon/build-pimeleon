@@ -40,23 +40,23 @@ echo "[INFO] Building version: ${PIMELEON_VERSION}"
 # $BUILD_IMAGE is expected to be provided by the CI environment
 echo "[INFO] Using builder image: ${BUILD_IMAGE}"
 CONTAINER_ID=$(docker create \
-  --privileged \
-  -v /dev:/dev:rw \
-  -v "${CI_PROJECT_DIR}/cache":/cache \
-  -e CI=true \
-  -e WORKSPACE_DIR=/workspace \
-  -e CACHE_DIR=/cache \
-  -e OUTPUT_DIR=/output \
-  -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
-  -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
-  -e PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
-  -e APT_PROXY="${APT_PROXY:-}" \
-  -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN:-}" \
-  -e PIMELEON_APPS_SOURCE="${PIMELEON_APPS_SOURCE}" \
-  -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID:-}" \
-  -e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN:-}" \
-  -e PIMELEON_APPS_GITHUB_TOKEN="${PIMELEON_APPS_GITHUB_TOKEN:-}" \
-  "${BUILD_IMAGE}")
+        --privileged \
+        -v /dev:/dev:rw \
+        -v "${CI_PROJECT_DIR}/cache":/cache \
+        -e CI=true \
+        -e WORKSPACE_DIR=/workspace \
+        -e CACHE_DIR=/cache \
+        -e OUTPUT_DIR=/output \
+        -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
+        -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
+        -e PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
+        -e APT_PROXY="${APT_PROXY:-}" \
+        -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN:-}" \
+        -e PIMELEON_APPS_SOURCE="${PIMELEON_APPS_SOURCE}" \
+        -e PIMELEON_APPS_PROJECT_ID="${PIMELEON_APPS_PROJECT_ID:-}" \
+        -e PIMELEON_APPS_READ_TOKEN="${PIMELEON_APPS_READ_TOKEN:-}" \
+        -e PIMELEON_APPS_GITHUB_TOKEN="${PIMELEON_APPS_GITHUB_TOKEN:-}" \
+    "${BUILD_IMAGE}")
 
 # Persist container ID for after_script cleanup on cancel/timeout
 echo "$CONTAINER_ID" > .build_container_id
@@ -69,11 +69,11 @@ docker start -a "$CONTAINER_ID"
 EXIT_CODE=$(docker inspect "$CONTAINER_ID" --format='{{.State.ExitCode}}')
 echo "Container exit code: ${EXIT_CODE}"
 if [ "${EXIT_CODE}" -ne 0 ]; then
-  echo "Error: Build container failed with exit code ${EXIT_CODE}"
-  docker cp "$CONTAINER_ID":/output/. output/ || true
-  docker rm -f "$CONTAINER_ID" || true
-  rm -f .build_container_id
-  exit 1
+    echo "Error: Build container failed with exit code ${EXIT_CODE}"
+    docker cp "$CONTAINER_ID":/output/. output/ || true
+    docker rm -f "$CONTAINER_ID" || true
+    rm -f .build_container_id
+    exit 1
 fi
 
 echo "Extracting artifacts from container..."
@@ -86,8 +86,8 @@ ls -la output/
 
 # Ensure artifacts were actually produced
 if [ -z "$(ls -A output/*.img 2>/dev/null)" ]; then
-  echo "Error: No image artifacts found in output/"
-  exit 1
+    echo "Error: No image artifacts found in output/"
+    exit 1
 fi
 
 chown -R "$(id -u):$(id -g)" output/ || true

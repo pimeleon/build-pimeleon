@@ -217,6 +217,8 @@ build:containers:
       optional: true
     - job: lint:shell
       optional: true
+    - job: test:scripts
+      optional: true
     - job: security:trivy
       optional: true
     - job: security:gitleaks

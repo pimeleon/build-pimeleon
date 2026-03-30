@@ -38,28 +38,28 @@ get_next_version() {
 
     # Count minor-bump commits: feat: or refactor: touching build paths
     minor_commits=$(git log "$last_version_commit"..HEAD \
-        --format="%s" \
-        -- \
-        "apps/${platform}/" \
-        "shared/ansible/" \
-        "shared/configs/" \
-        "shared/scripts/" \
-        "docker-compose.yml" \
-        "requirements.txt" \
-        2>/dev/null \
+            --format="%s" \
+            -- \
+            "apps/${platform}/" \
+            "shared/ansible/" \
+            "shared/configs/" \
+            "shared/scripts/" \
+            "docker-compose.yml" \
+            "requirements.txt" \
+            2>/dev/null \
         | grep -cE "^(feat|refactor)(\([^)]*\))?!?:" || true)
 
     # Count patch-bump commits: anything not service and not minor touching build paths
     patch_commits=$(git log "$last_version_commit"..HEAD \
-        --format="%s" \
-        -- \
-        "apps/${platform}/" \
-        "shared/ansible/" \
-        "shared/configs/" \
-        "shared/scripts/" \
-        "docker-compose.yml" \
-        "requirements.txt" \
-        2>/dev/null \
+            --format="%s" \
+            -- \
+            "apps/${platform}/" \
+            "shared/ansible/" \
+            "shared/configs/" \
+            "shared/scripts/" \
+            "docker-compose.yml" \
+            "requirements.txt" \
+            2>/dev/null \
         | grep -cvE "^(docs|chore|ci|style|test|feat|refactor)(\([^)]*\))?!?:" || true)
 
     if [ "${minor_commits}" -gt 0 ]; then
