@@ -31,6 +31,11 @@ publish:image:
   script:
     - chmod +x .gitlab/scripts/publish-image.sh
     - .gitlab/scripts/publish-image.sh
+  artifacts:
+    paths:
+      - output/*.img.xz
+      - output/*.sha256
+    expire_in: 1 week
 
 # Dry-run R2 validation (actual upload delegated to GitHub Actions)
 deploy:r2-dryrun:
@@ -72,6 +77,8 @@ publish:pages:
   needs:
     - job: setup:platform
       artifacts: true
+    - job: publish:image
+      artifacts: false
     - job: test:smoke
       artifacts: false
     - job: publish:image
