@@ -11,8 +11,8 @@ SCRIPTS_DIR="./shared/scripts"
 GITHUB_REPO="pimeleon/build-pimeleon"
 
 if [ -z "${GITHUB_REGISTRY_PUSH_TOKEN:-}" ]; then
-  echo "Error: GITHUB_REGISTRY_PUSH_TOKEN not set. Cannot trigger GitHub Actions."
-  exit 1
+    echo "Error: GITHUB_REGISTRY_PUSH_TOKEN not set. Cannot trigger GitHub Actions."
+    exit 1
 fi
 
 chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
@@ -24,25 +24,25 @@ echo "  Version:  v${VERSION}"
 echo "  Ref:      ${CI_COMMIT_REF_NAME}"
 
 HTTP_CODE=$(curl -s -o /tmp/gh-dispatch-response.txt -w "%{http_code}" \
-  -X POST \
-  -H "Accept: application/vnd.github+json" \
-  -H "Authorization: Bearer ${GITHUB_REGISTRY_PUSH_TOKEN}" \
-  "https://api.github.com/repos/${GITHUB_REPO}/dispatches" \
-  -d "{
-    \"event_type\": \"deploy-r2\",
-    \"client_payload\": {
-      \"platform\": \"${TARGET_PLATFORM}\",
-      \"version\": \"${VERSION}\",
-      \"tag\": \"v${VERSION}\",
-      \"commit_sha\": \"${CI_COMMIT_SHORT_SHA}\",
-      \"source_branch\": \"${CI_COMMIT_REF_NAME}\"
-    }
-  }")
+    -X POST \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer ${GITHUB_REGISTRY_PUSH_TOKEN}" \
+    "https://api.github.com/repos/${GITHUB_REPO}/dispatches" \
+    -d "{
+        \"event_type\": \"deploy-r2\",
+        \"client_payload\": {
+            \"platform\": \"${TARGET_PLATFORM}\",
+            \"version\": \"${VERSION}\",
+            \"tag\": \"v${VERSION}\",
+            \"commit_sha\": \"${CI_COMMIT_SHORT_SHA}\",
+            \"source_branch\": \"${CI_COMMIT_REF_NAME}\"
+        }
+    }")
 
 if [ "$HTTP_CODE" = "204" ]; then
-  echo "GitHub Actions workflow triggered successfully."
+    echo "GitHub Actions workflow triggered successfully."
 else
-  echo "Error: GitHub API returned HTTP ${HTTP_CODE}"
-  cat /tmp/gh-dispatch-response.txt
-  exit 1
+    echo "Error: GitHub API returned HTTP ${HTTP_CODE}"
+    cat /tmp/gh-dispatch-response.txt
+    exit 1
 fi

@@ -11,7 +11,6 @@ PIMELEON_GROUP="${PIMELEON_GROUP:-docker}"
 
 # Directory configuration
 CACHE_DIR="${CACHE_DIR:-/cache}"
-DOWNLOAD_DIR="${CACHE_DIR}/pimeleon-downloads"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -67,9 +66,9 @@ safe_rm() {
 
         # Only allow deletion within sanctioned directories
         if [[ "$path" == "${work_dir_base}"* ]] || \
-           [[ -n "${WORK_DIR:-}" && "$path" == "${WORK_DIR}"* ]] || \
-           [[ "$path" == "${output_dir_base}"* ]] || \
-           [[ -n "${OUTPUT_DIR:-}" && "$path" == "${OUTPUT_DIR}"* ]]; then
+            [[ -n "${WORK_DIR:-}" && "$path" == "${WORK_DIR}"* ]] || \
+            [[ "$path" == "${output_dir_base}"* ]] || \
+            [[ -n "${OUTPUT_DIR:-}" && "$path" == "${OUTPUT_DIR}"* ]]; then
 
             # Proactively find and unmount any sub-mounts under this path
             # Only if path is a directory
@@ -438,7 +437,7 @@ validate_build_environment() {
     if [[ "$reachable" == "false" ]]; then
         # Fallback to checking DNS or HTTP port instead of ICMP ping
         if timeout 1 bash -c "cat < /dev/null > /dev/tcp/8.8.8.8/53" 2>/dev/null || \
-           timeout 1 bash -c "cat < /dev/null > /dev/tcp/google.com/80" 2>/dev/null; then
+            timeout 1 bash -c "cat < /dev/null > /dev/tcp/google.com/80" 2>/dev/null; then
             log_info "Internet connectivity detected."
             reachable=true
         else
@@ -512,8 +511,8 @@ migrate_apt_keyring() {
             --keyring "${mount_point}/etc/apt/trusted.gpg" \
             --export 2>/dev/null | \
             sudo gpg --no-default-keyring \
-                --keyring "gnupg-ring:${mount_point}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" \
-                --import 2>/dev/null || true
+            --keyring "gnupg-ring:${mount_point}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" \
+            --import 2>/dev/null || true
         sudo chmod 644 "${mount_point}/etc/apt/trusted.gpg.d/raspbian-archive-keyring.gpg" 2>/dev/null || true
         sudo rm -f "${mount_point}/etc/apt/trusted.gpg"
         log_info "Legacy keyring migrated and removed"
@@ -712,8 +711,8 @@ fetch_pimeleon_apps() {
 
     local raw http_code api_response
     raw=$(curl -sLk \
-        -H "PRIVATE-TOKEN: ${PIMELEON_APPS_READ_TOKEN}" \
-        -w "\n%{http_code}" \
+            -H "PRIVATE-TOKEN: ${PIMELEON_APPS_READ_TOKEN}" \
+            -w "\n%{http_code}" \
         "${list_url}")
     http_code=$(echo "${raw}" | tail -1)
     api_response=$(echo "${raw}" | head -n -1)
@@ -727,7 +726,7 @@ fetch_pimeleon_apps() {
 
     local version
     version=$(echo "${api_response}" \
-        | python3 -c "import json,sys; d=json.load(sys.stdin); v=next((p.get('version','') for p in d if p.get('version','').startswith('${arch}-')),''); print(v.replace('${arch}-','',1)) if v else None" \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); v=next((p.get('version','') for p in d if p.get('version','').startswith('${arch}-')),''); print(v.replace('${arch}-','',1)) if v else None" \
         2>/dev/null || true)
 
     if [[ -z "${version}" ]]; then
@@ -740,9 +739,9 @@ fetch_pimeleon_apps() {
     log_info "Fetching ${package} ${version} (${arch}) from pi-router-apps registry"
 
     http_code=$(curl -sLk \
-        -H "PRIVATE-TOKEN: ${PIMELEON_APPS_READ_TOKEN}" \
-        -o "${download_dir}/${package}.tar.gz" \
-        -w "%{http_code}" \
+            -H "PRIVATE-TOKEN: ${PIMELEON_APPS_READ_TOKEN}" \
+            -o "${download_dir}/${package}.tar.gz" \
+            -w "%{http_code}" \
         "${url}")
     if [[ "${http_code}" != "200" ]]; then
         log_error "Failed to fetch ${package}: HTTP ${http_code}"
@@ -771,9 +770,9 @@ fetch_pimeleon_apps_github() {
     local gh_list_url="${api_url}?per_page=10"
     local raw http_code api_response
     raw=$(curl -sL \
-        "${auth_args[@]}" \
-        -H "Accept: application/vnd.github+json" \
-        -w "\n%{http_code}" \
+            "${auth_args[@]}" \
+            -H "Accept: application/vnd.github+json" \
+            -w "\n%{http_code}" \
         "${gh_list_url}")
     http_code=$(echo "${raw}" | tail -1)
     api_response=$(echo "${raw}" | head -n -1)
@@ -788,7 +787,7 @@ fetch_pimeleon_apps_github() {
     # Find the most recent asset matching <package>-*-<arch>-*.tar.gz
     local asset_url
     asset_url=$(echo "${api_response}" \
-        | python3 -c "import json,sys;data=json.load(sys.stdin);url=next((a['browser_download_url'] for r in data for a in r.get('assets',[]) if a.get('name','').startswith('${package}-') and '-${arch}-' in a.get('name','') and a.get('name','').endswith('.tar.gz')),None);print(url) if url else None" \
+            | python3 -c "import json,sys;data=json.load(sys.stdin);url=next((a['browser_download_url'] for r in data for a in r.get('assets',[]) if a.get('name','').startswith('${package}-') and '-${arch}-' in a.get('name','') and a.get('name','').endswith('.tar.gz')),None);print(url) if url else None" \
         2>/dev/null || true)
 
     if [[ -z "${asset_url}" ]]; then
@@ -798,9 +797,9 @@ fetch_pimeleon_apps_github() {
 
     log_info "Fetching ${package} (${arch}) from GitHub releases"
     http_code=$(curl -sL \
-        "${auth_args[@]}" \
-        -o "${download_dir}/${package}.tar.gz" \
-        -w "%{http_code}" \
+            "${auth_args[@]}" \
+            -o "${download_dir}/${package}.tar.gz" \
+            -w "%{http_code}" \
         "${asset_url}")
     if [[ "${http_code}" != "200" ]]; then
         log_error "Failed to download ${package} from GitHub: HTTP ${http_code}"

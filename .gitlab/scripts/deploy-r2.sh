@@ -15,9 +15,9 @@ echo "Deploying to R2: s3://${R2_BUCKET}/${UPLOAD_PREFIX}/"
 
 cd output
 for file in pimeleon-*.img.xz pimeleon-*.img.metadata.json; do
-  [ -f "$file" ] || continue
-  echo "Uploading $file..."
-  aws s3 cp "$file" "s3://${R2_BUCKET}/${UPLOAD_PREFIX}/$(basename "$file")" \
-    --endpoint-url "${R2_ENDPOINT}" \
-    --no-progress
+    [ -f "$file" ] || continue
+    echo "Uploading $file..."
+    aws s3 cp "$file" "s3://${R2_BUCKET}/${UPLOAD_PREFIX}/$(basename "$file")" \
+        --endpoint-url "${R2_ENDPOINT}" \
+        --no-progress
 done

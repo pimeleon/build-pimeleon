@@ -1,6 +1,6 @@
 #!/bin/bash
 # Pimeleon Quality Benchmark Script
-# Performs static analysis and fails if quality thresholds are exceeded
+# Performs static analysis with ZERO TOLERANCE and fails if ANY issues are found
 
 set -uo pipefail
 
@@ -12,10 +12,8 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Quality Thresholds
-MAX_SHELLCHECK_WARNINGS=5
-MAX_BASHATE_ERRORS=0
-MAX_SEMGREP_ISSUES=0
+# Quality Thresholds - ZERO TOLERANCE
+# Any issue triggers failure
 
 # Core scripts to scan
 # shellcheck disable=SC2207
@@ -27,21 +25,19 @@ echo -e "${BLUE}==================================================${NC}"
 
 # 1. ShellCheck
 echo -n -e "${BLUE}[1/3] Running ShellCheck... ${NC}"
-# Set severity to warning to ignore style issues in exit code
-SC_OUTPUT=$(shellcheck -f json -S warning "${SCRIPTS[@]}")
+# Run ShellCheck with default severity to catch ALL issues (error, warning, info, style)
+SC_OUTPUT=$(shellcheck -f json "${SCRIPTS[@]}")
 SC_CODE=$?
+SC_ISSUES=$(echo "$SC_OUTPUT" | jq 'length')
 SC_ERRORS=$(echo "$SC_OUTPUT" | jq '[.[] | select(.level == "error")] | length')
 SC_WARNINGS=$(echo "$SC_OUTPUT" | jq '[.[] | select(.level == "warning")] | length')
 
-if [ "$SC_ERRORS" -gt 0 ] || [ "$SC_WARNINGS" -gt "$MAX_SHELLCHECK_WARNINGS" ] || [ "$SC_CODE" -gt 1 ]; then
+if [ "$SC_ISSUES" -gt 0 ] || [ "$SC_CODE" -ne 0 ]; then
     echo -e "${RED}✘${NC}"
-    if [ "$SC_ERRORS" -gt 0 ]; then
-        echo -e "${RED}✘ Failed: $SC_ERRORS ShellCheck errors found.${NC}"
-        shellcheck -S warning "${SCRIPTS[@]}" | grep -A 1 "line"
-    elif [ "$SC_WARNINGS" -gt "$MAX_SHELLCHECK_WARNINGS" ]; then
-        echo -e "${RED}✘ Failed: $SC_WARNINGS ShellCheck warnings (Threshold: $MAX_SHELLCHECK_WARNINGS).${NC}"
-        shellcheck -S warning "${SCRIPTS[@]}" | grep -A 1 "line"
-    elif [ "$SC_CODE" -gt 1 ]; then
+    if [ "$SC_ISSUES" -gt 0 ]; then
+        echo -e "${RED}✘ Failed: $SC_ERRORS errors, $SC_WARNINGS warnings found.${NC}"
+        shellcheck "${SCRIPTS[@]}" | grep -A 1 "line"
+    else
         echo -e "${RED}✘ Failed: ShellCheck execution error (Code: $SC_CODE).${NC}"
     fi
 else
@@ -51,12 +47,12 @@ fi
 # 2. Bashate
 echo -n -e "${BLUE}[2/3] Running Bashate... ${NC}"
 # Ignore E006 (Line too long) as it's common in shell scripts with complex commands
-# Ignore E003 (Indent not multiple of 4) to accommodate existing scripts
-BASHATE_OUTPUT=$(bashate --ignore E006,E003 "${SCRIPTS[@]}" 2>&1)
+BASHATE_OUTPUT=$(bashate --ignore E006 "${SCRIPTS[@]}" 2>&1)
 BASHATE_CODE=$?
 BASHATE_ERRORS=$(echo "$BASHATE_OUTPUT" | grep -c "E[0-9]" || true)
 
-if [ "$BASHATE_CODE" -ne 0 ] || [ "$BASHATE_ERRORS" -gt "$MAX_BASHATE_ERRORS" ]; then
+if [ "$BASHATE_CODE" -ne 0 ] || [ "$BASHATE_ERRORS" -gt 0 ]; then
+    echo -e "${RED}✘${NC}"
     echo -e "${RED}✘ Failed: $BASHATE_ERRORS style errors found.${NC}"
     if [ "$BASHATE_ERRORS" -eq 0 ] && [ "$BASHATE_CODE" -ne 0 ]; then
         echo -e "${RED}Bashate execution error:${NC}"
@@ -70,14 +66,13 @@ fi
 
 # 3. Semgrep
 echo -n -e "${BLUE}[3/3] Running Semgrep... ${NC}"
-# Use 'auto' config for reliable rule detection
 SEMGREP_OUTPUT=$(semgrep --config auto --json "${SCRIPTS[@]}" 2>/dev/null)
 SEMGREP_CODE=$?
 SEMGREP_ISSUES=$(echo "$SEMGREP_OUTPUT" | jq '.results | length' 2>/dev/null || echo 0)
 
-if [ "$SEMGREP_ISSUES" -gt "$MAX_SEMGREP_ISSUES" ] || { [ "$SEMGREP_CODE" -ne 0 ] && [ "$SEMGREP_ISSUES" -eq 0 ]; }; then
+if [ "$SEMGREP_ISSUES" -gt 0 ] || { [ "$SEMGREP_CODE" -ne 0 ] && [ "$SEMGREP_ISSUES" -eq 0 ]; }; then
     echo -e "${RED}✘${NC}"
-    if [ "$SEMGREP_ISSUES" -gt "$MAX_SEMGREP_ISSUES" ]; then
+    if [ "$SEMGREP_ISSUES" -gt 0 ]; then
         echo -e "${RED}✘ Failed: $SEMGREP_ISSUES security/pattern issues found.${NC}"
         semgrep --config auto "${SCRIPTS[@]}"
     else
@@ -94,19 +89,18 @@ echo -e "${BLUE}==================================================${NC}"
 printf "%-25s | %-10s | %-10s\n" "Metric" "Found" "Threshold"
 echo "--------------------------------------------------"
 printf "%-25s | %-10s | %-10s\n" "ShellCheck Errors" "$SC_ERRORS" "0"
-printf "%-25s | %-10s | %-10s\n" "ShellCheck Warnings" "$SC_WARNINGS" "$MAX_SHELLCHECK_WARNINGS"
-printf "%-25s | %-10s | %-10s\n" "Bashate Errors" "$BASHATE_ERRORS" "$MAX_BASHATE_ERRORS"
-printf "%-25s | %-10s | %-10s\n" "Semgrep Issues" "$SEMGREP_ISSUES" "$MAX_SEMGREP_ISSUES"
+printf "%-25s | %-10s | %-10s\n" "ShellCheck Warnings" "$SC_WARNINGS" "0"
+printf "%-25s | %-10s | %-10s\n" "Bashate Errors" "$BASHATE_ERRORS" "0"
+printf "%-25s | %-10s | %-10s\n" "Semgrep Issues" "$SEMGREP_ISSUES" "0"
 echo "--------------------------------------------------"
 
 # Final Verdict
-if [ "$SC_ERRORS" -gt 0 ] || \
-   [ "$SC_WARNINGS" -gt "$MAX_SHELLCHECK_WARNINGS" ] || \
-   [ "$SC_CODE" -gt 1 ] || \
-   [ "$BASHATE_CODE" -ne 0 ] || \
-   [ "$BASHATE_ERRORS" -gt "$MAX_BASHATE_ERRORS" ] || \
-   [ "$SEMGREP_ISSUES" -gt "$MAX_SEMGREP_ISSUES" ] || \
-   { [ "$SEMGREP_CODE" -gt 1 ]; }; then
+if [ "$SC_ISSUES" -gt 0 ] || \
+    [ "$SC_CODE" -ne 0 ] || \
+    [ "$BASHATE_CODE" -ne 0 ] || \
+    [ "$BASHATE_ERRORS" -gt 0 ] || \
+    [ "$SEMGREP_ISSUES" -gt 0 ] || \
+    { [ "$SEMGREP_CODE" -ne 0 ]; }; then
     echo -e "${RED}RESULT: QUALITY BENCHMARK FAILED${NC}"
     exit 1
 else

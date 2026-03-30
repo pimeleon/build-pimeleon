@@ -6,10 +6,10 @@ install_hostapd() {
     local mount_point=$1
     if is_service_enabled "hostapd" 2>/dev/null; then
         # 1. Try to fetch pre-built artifact (local cache or registry)
-        sudo mkdir -p "${DOWNLOAD_DIR}"
-        if get_pimeleon_apps_artifact "hostapd" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+        sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+        if get_pimeleon_apps_artifact "hostapd" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
             log_info "Installing hostapd from artifact"
-            sudo tar -xzf "${DOWNLOAD_DIR}/hostapd.tar.gz" -C "${mount_point}/"
+            sudo tar -xzf "${CACHE_DIR}/pimeleon-downloads/hostapd.tar.gz" -C "${mount_point}/"
             return
         fi
 
@@ -96,10 +96,10 @@ EOF
         fi
 
         # Install pihole-FTL from pi-router-apps artifact (replaces installer's FTL)
-        sudo mkdir -p "${DOWNLOAD_DIR}"
-        if get_pimeleon_apps_artifact "pihole-FTL" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+        sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+        if get_pimeleon_apps_artifact "pihole-FTL" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
             log_info "Installing pihole-FTL from artifact"
-            sudo tar -xzf "${DOWNLOAD_DIR}/pihole-FTL.tar.gz" -C "${mount_point}/"
+            sudo tar -xzf "${CACHE_DIR}/pimeleon-downloads/pihole-FTL.tar.gz" -C "${mount_point}/"
         else
             die "Failed to fetch pihole-FTL artifact — cannot continue"
         fi
@@ -122,10 +122,10 @@ install_tor() {
     local mount_point=$1
     if is_service_enabled "tor" 2>/dev/null; then
         # 1. Try to fetch pre-built artifact (local cache or registry)
-        sudo mkdir -p "${DOWNLOAD_DIR}"
-        if get_pimeleon_apps_artifact "tor" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+        sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+        if get_pimeleon_apps_artifact "tor" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
             log_info "Installing Tor from artifact"
-            sudo tar -xzf "${DOWNLOAD_DIR}/tor.tar.gz" -C "${mount_point}/"
+            sudo tar -xzf "${CACHE_DIR}/pimeleon-downloads/tor.tar.gz" -C "${mount_point}/"
             return
         fi
 
@@ -140,10 +140,10 @@ install_dnscrypt_proxy() {
     local mount_point=$1
     if is_service_enabled "dnscrypt_proxy" 2>/dev/null; then
         # 1. Try to fetch pre-built artifact (local cache or registry)
-        sudo mkdir -p "${DOWNLOAD_DIR}"
-        if get_pimeleon_apps_artifact "dnscrypt-proxy" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+        sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+        if get_pimeleon_apps_artifact "dnscrypt-proxy" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
             log_info "Installing dnscrypt-proxy from artifact"
-            sudo tar -xzf "${DOWNLOAD_DIR}/dnscrypt-proxy.tar.gz" -C "${mount_point}/"
+            sudo tar -xzf "${CACHE_DIR}/pimeleon-downloads/dnscrypt-proxy.tar.gz" -C "${mount_point}/"
             return
         fi
 
@@ -158,10 +158,10 @@ install_dnscrypt_proxy() {
 # wpa_supplicant.service is disabled (AP mode: hostapd owns wlan0, service must not run)
 install_wpasupplicant() {
     local mount_point=$1
-    sudo mkdir -p "${DOWNLOAD_DIR}"
-    if get_pimeleon_apps_artifact "wpa_supplicant" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+    sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+    if get_pimeleon_apps_artifact "wpa_supplicant" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
         log_info "Installing wpa_supplicant from artifact"
-        sudo tar -xzf "${DOWNLOAD_DIR}/wpa_supplicant.tar.gz" -C "${mount_point}/"
+        sudo tar -xzf "${CACHE_DIR}/pimeleon-downloads/wpa_supplicant.tar.gz" -C "${mount_point}/"
         return
     fi
 
@@ -172,10 +172,10 @@ install_wpasupplicant() {
 install_privoxy() {
     local mount_point=$1
     if is_service_enabled "privoxy" 2>/dev/null; then
-        sudo mkdir -p "${DOWNLOAD_DIR}"
-        if get_pimeleon_apps_artifact "privoxy" "${RPI_ARCH:-armhf}" "${DOWNLOAD_DIR}"; then
+        sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+        if get_pimeleon_apps_artifact "privoxy" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
             log_info "Installing privoxy from artifact"
-            sudo tar -xzf "${DOWNLOAD_DIR}/privoxy.tar.gz" -C "${mount_point}/"
+            sudo tar -xzf "${CACHE_DIR}/pimeleon-downloads/privoxy.tar.gz" -C "${mount_point}/"
             return
         fi
 

@@ -1,4 +1,5 @@
 ---
+fail_fast: true
 repos:
   # Standard pre-commit hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -25,12 +26,12 @@ repos:
         types: [shell]
         exclude: '\.bats$'
 
-  # Shell script linting (warnings and errors)
+  # Shell script linting (Zero tolerance: fails on error, warning, info, style)
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: v0.9.0
     hooks:
       - id: shellcheck
-        args: ['-e', 'SC1091,SC2155,SC2086', '-S', 'warning']
+        args: ['-e', 'SC1091,SC2155,SC2086', '-S', 'style']
         exclude: '(\.bats$|.*/files/services/pihole/.*)'
 
   # Ansible linting (local installation to avoid version conflicts)
