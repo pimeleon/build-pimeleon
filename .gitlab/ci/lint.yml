@@ -36,3 +36,22 @@ lint:shell:
         -not -path "*/node_modules/*"
         -not -path "*/files/services/pihole/*"
       | xargs shellcheck
+
+test:scripts:
+  stage: lint
+  image: python:3.11-slim
+  tags:
+    - python
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends bats git
+    - pip install --quiet pyyaml
+  script:
+    - mkdir -p test-results
+    - bash scripts/run-script-tests.sh
+  artifacts:
+    when: always
+    reports:
+      junit: test-results/report.xml
+    paths:
+      - test-results/
+    expire_in: 1 week

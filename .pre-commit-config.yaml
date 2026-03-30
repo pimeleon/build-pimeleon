@@ -23,6 +23,7 @@ repos:
         entry: bash -n
         language: system
         types: [shell]
+        exclude: '\.bats$'
 
   # Shell script linting (warnings only, don't block commits)
   - repo: https://github.com/koalaman/shellcheck-precommit
@@ -30,6 +31,7 @@ repos:
     hooks:
       - id: shellcheck
         args: ['-e', 'SC1091,SC2155,SC2086', '-S', 'error']  # Only fail on errors
+        exclude: '\.bats$'
 
   # Ansible linting (local installation to avoid version conflicts)
   - repo: local
@@ -75,3 +77,25 @@ repos:
         pass_filenames: false
         always_run: true
         verbose: true
+
+  # Script unit tests — run on commit when script or test files change
+  - repo: local
+    hooks:
+      - id: script-unit-tests
+        name: Script Unit Tests
+        entry: ./scripts/run-script-tests.sh
+        language: script
+        files: ^(shared/scripts/|scripts/|tests/scripts/).*\.(sh|bats)$
+        pass_filenames: false
+        stages: [pre-commit]
+
+  # Script unit tests — full suite on every push
+  - repo: local
+    hooks:
+      - id: script-unit-tests-push
+        name: Script Unit Tests (full suite)
+        entry: ./scripts/run-script-tests.sh
+        language: script
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
