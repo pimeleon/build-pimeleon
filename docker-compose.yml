@@ -53,7 +53,7 @@ services:
       - IMAGE_COMPRESSION_LEVEL=${IMAGE_COMPRESSION_LEVEL:-6}
       # Build configuration
       - BUILD_PARALLEL_JOBS=${BUILD_PARALLEL_JOBS:-4}
-      - PIMELEON_PROFILE=${PIMELEON_PROFILE:-development}
+      - PIMELEON_PROFILE=${PIMELEON_PROFILE:-production}
       - PIMELEON_INITIAL_PASSWORD=${PIMELEON_INITIAL_PASSWORD:-netblox}
       # APT cache proxy (set APT_PROXY=host:port to enable)
       - APT_PROXY=${APT_PROXY:-}

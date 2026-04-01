@@ -23,7 +23,7 @@ log_section() { echo -e "\n${GREEN}=== $* ===${NC}"; }
 # Default configuration
 export PIMELEON_RPI_MODEL="${PIMELEON_RPI_MODEL:-3B+}"
 export PIMELEON_IMAGE_SIZE="${PIMELEON_IMAGE_SIZE:-4G}"
-export PIMELEON_PROFILE="${PIMELEON_PROFILE:-development}"
+export PIMELEON_PROFILE="${PIMELEON_PROFILE:-production}"
 export RASPBIAN_VERSION="${RASPBIAN_VERSION:-bullseye}"
 export RASPBIAN_MIRROR="${RASPBIAN_MIRROR:-http://mirrordirector.raspbian.org/raspbian/}"
 export APT_PROXY="${APT_PROXY:-}"
@@ -175,7 +175,7 @@ Options:
     --with-cache SERVER     APT cache server IP
 
 Environment Variables:
-    PIMELEON_PROFILE        Build profile (default: development)
+    PIMELEON_PROFILE        Build profile (default: production)
     PIMELEON_RPI_MODEL      Pi model (default: 3B+)
     PIMELEON_IMAGE_SIZE     Image size (default: 4G)
     RASPBIAN_VERSION        Debian version (default: bullseye)

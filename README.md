@@ -190,7 +190,7 @@ pimeleon-build/
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TARGET_PLATFORM=` | `rpi3-bookworm` | App to build (determines device, arch, debian) |
-| `PIMELEON_PROFILE` | `development` | Build profile (`development`, `production`) |
+| `PIMELEON_PROFILE` | `production` | Build profile (`development`, `production`) |
 | `PIMELEON_IMAGE_SIZE` | `4G` | Output image size |
 | `APT_PROXY` | - | APT proxy server (`host:port`, e.g., `192.168.76.5:3142`) |
 

@@ -146,7 +146,7 @@ cleanup_on_exit() {
 is_service_enabled() {
     local service_name=$1
     local ansible_dir="${ANSIBLE_DIR:-/ansible}"
-    local profile_path="${ansible_dir}/vars/common/profiles/${PIMELEON_PROFILE:-development}.yml"
+    local profile_path="${ansible_dir}/vars/common/profiles/${PIMELEON_PROFILE:-production}.yml"
 
     if [[ ! -f "$profile_path" ]]; then
         die "FATAL: Profile file not found: $profile_path"

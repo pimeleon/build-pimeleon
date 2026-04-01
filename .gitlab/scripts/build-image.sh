@@ -11,8 +11,8 @@ set -eu
 #   PIMELEON_APPS_SOURCE, PIMELEON_APPS_PROJECT_ID, PIMELEON_APPS_READ_TOKEN,
 #   PIMELEON_APPS_GITHUB_TOKEN
 
-[ -n "${TARGET_PLATFORM:-}" ]   || { echo "[ERROR] TARGET_PLATFORM is not set"; exit 1; }
-[ -n "${PIMELEON_PROFILE:-}" ] || { echo "[ERROR] PIMELEON_PROFILE is not set"; exit 1; }
+[ -n "${TARGET_PLATFORM}" ]   || { echo "[ERROR] TARGET_PLATFORM is not set"; exit 1; }
+[ -n "${PIMELEON_PROFILE}" ] || { echo "[ERROR] PIMELEON_PROFILE is not set"; exit 1; }
 echo "Building Pimeleon image for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."
 
 mkdir -p output cache

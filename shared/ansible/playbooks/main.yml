@@ -26,7 +26,7 @@
       ansible.builtin.debug:
         msg: |
           Building Pimeleon image
-          Profile: {{ pimeleon_profile | default('development') }}
+          Profile: {{ pimeleon_profile | default('production') }}
           Platform: {{ platform_model | default('3B+') }}
           Debian: {{ debian_version | default('bookworm') }}
 
@@ -144,7 +144,7 @@
       ansible.builtin.debug:
         msg: |
           Pimeleon configuration completed!
-          Profile: {{ pimeleon_profile | default('development') }}
+          Profile: {{ pimeleon_profile | default('production') }}
 
   handlers:
     # Note: All service handlers skip in chroot - services start on first boot

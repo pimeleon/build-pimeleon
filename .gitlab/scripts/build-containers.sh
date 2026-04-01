@@ -56,7 +56,7 @@ docker buildx build \
     --build-arg AB2P_IMAGE="${AB2P_IMAGE}" \
     --build-arg APT_PROXY="${APT_PROXY:-}" \
     --build-arg CI="${CI:-}" \
-    --build-arg PIMELEON_PROFILE="${PIMELEON_PROFILE:-}" \
+    --build-arg PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
     -t "$BUILD_IMAGE" -t "${CI_REGISTRY_IMAGE}/builder:latest" \
     --push \
     -f "$BUILDER_DF" .
@@ -67,9 +67,9 @@ docker buildx build \
     --cache-from type=registry,ref="${CACHE_IMAGE}:tester-${CI_COMMIT_REF_SLUG}" \
     --cache-from type=registry,ref="${CACHE_IMAGE}:tester-main" \
     --cache-to type=registry,ref="${CACHE_IMAGE}:tester-${CI_COMMIT_REF_SLUG}",mode=max \
-    --build-arg APT_PROXY="${APT_PROXY:-}" \
+    --build-arg APT_PROXY="${APT_PROXY}" \
     --build-arg CI="${CI:-}" \
-    --build-arg PIMELEON_PROFILE="${PIMELEON_PROFILE:-}" \
+    --build-arg PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
     -t "$TEST_IMAGE" -t "${CI_REGISTRY_IMAGE}/tester:latest" \
     --push \
     -f "$TESTER_DF" "$(dirname "$TESTER_DF")"
