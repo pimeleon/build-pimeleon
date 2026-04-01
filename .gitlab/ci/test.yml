@@ -11,7 +11,6 @@ test:smoke:
   stage: test-images
   variables:
     DOCKER_HOST: unix:///var/run/docker.sock
-    TEST_SUITE: smoke
   needs:
     - job: setup:platform
       artifacts: true

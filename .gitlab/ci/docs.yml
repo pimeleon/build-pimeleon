@@ -11,9 +11,11 @@ publish-project-docs:
   needs:
     - job: "lint:yaml"
     - job: "publish:image"
-    - job: "deploy:r2-dryrun"
+      optional: true
     - job: "test:smoke"
+      optional: true
     - job: "test:integration"
+      optional: true
 
   rules:
     # Run on release branch push (merge to release/*) or version tags
@@ -21,6 +23,9 @@ publish-project-docs:
     - if: '$CI_COMMIT_TAG'
     # Run on MRs targeting release/* or develop to verify documentation
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+  before_script:
+    - chmod +x .gitlab/scripts/setup-apt-proxy.sh
+    - .gitlab/scripts/setup-apt-proxy.sh
   script:
     - chmod +x .gitlab/scripts/build-docs.sh
     - .gitlab/scripts/build-docs.sh
@@ -35,8 +40,11 @@ trigger-docs-preview:
   needs:
     - job: "lint:yaml"
     - job: "publish:image"
+      optional: true
     - job: "test:smoke"
+      optional: true
     - job: "test:integration"
+      optional: true
   trigger:
     project: pirouter/pimeleon-site
     branch: preview
@@ -59,10 +67,13 @@ trigger-docs-production:
   needs:
     - job: "lint:yaml"
     - job: "trigger:github"
+      optional: true
     - job: "publish:image"
-    - job: "deploy:r2-dryrun"
+      optional: true
     - job: "test:smoke"
+      optional: true
     - job: "test:integration"
+      optional: true
   trigger:
     project: pirouter/pimeleon-site
     branch: master

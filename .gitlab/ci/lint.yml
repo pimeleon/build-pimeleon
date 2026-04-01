@@ -8,9 +8,10 @@ lint:yaml:
   tags:
     - python
   needs: []
+  before_script:
+    - pip install --quiet yamllint
   script:
-    - chmod +x .gitlab/scripts/lint-yaml.sh
-    - .gitlab/scripts/lint-yaml.sh
+    - yamllint -c .yamllint .
 
 lint:ansible:
   stage: lint
@@ -18,9 +19,12 @@ lint:ansible:
   tags:
     - python
   needs: []
+  before_script:
+    - pip install --quiet ansible-lint
+    - ansible-galaxy collection install -r shared/ansible/requirements.yml
   script:
-    - chmod +x .gitlab/scripts/lint-ansible.sh
-    - .gitlab/scripts/lint-ansible.sh
+    - cd shared/ansible
+    - ansible-lint playbooks/*.yml
 
 lint:shell:
   stage: lint
@@ -28,9 +32,11 @@ lint:shell:
   tags:
     - python
   needs: []
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends shellcheck jq
+    - pip install --quiet semgrep bashate
   script:
-    - chmod +x .gitlab/scripts/lint-shell.sh
-    - .gitlab/scripts/lint-shell.sh
+    - bash scripts/quality-benchmark.sh
 
 test:scripts:
   stage: test-scripts
@@ -53,9 +59,12 @@ test:scripts:
     # Manual trigger
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends bats git
+    - pip install --quiet pyyaml
   script:
-    - chmod +x .gitlab/scripts/test-scripts.sh
-    - .gitlab/scripts/test-scripts.sh
+    - mkdir -p test-results
+    - bash scripts/run-script-tests.sh
   artifacts:
     when: always
     reports:

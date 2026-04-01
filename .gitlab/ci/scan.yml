@@ -40,5 +40,6 @@ security:gitleaks:
       when: never
     - when: on_success
   script:
-    - chmod +x .gitlab/scripts/scan-gitleaks.sh
-    - .gitlab/scripts/scan-gitleaks.sh
+    - echo "Running secret detection with gitleaks..."
+    - gitleaks git . --verbose --redact --config .gitleaks.toml
+    - echo "Secret detection completed"

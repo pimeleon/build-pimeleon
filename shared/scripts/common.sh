@@ -694,7 +694,7 @@ cache_put() {
     sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "$cache_path"
 }
 
-# Fetch a pre-built binary package from the GitLab pi-router-apps Generic Package Registry.
+# Fetch a pre-built binary package from the GitLab Generic Package Registry.
 # Usage: fetch_pimeleon_apps <package> <arch> <download_dir>
 # Saves as <download_dir>/<package>.tar.gz (matching existing Ansible task expectations).
 # Returns 1 if PIMELEON_APPS_PROJECT_ID is not set or package cannot be fetched.
@@ -730,13 +730,13 @@ fetch_pimeleon_apps() {
         2>/dev/null || true)
 
     if [[ -z "${version}" ]]; then
-        log_warn "No published version found for ${package}/${arch} in pi-router-apps registry"
+        log_warn "No published version found for ${package}/${arch} in apps registry"
         return 1
     fi
 
     local fname="${package}-${version}-${arch}-pimeleon.tar.gz"
     local url="${reg}/${package}/${arch}-${version}/${fname}"
-    log_info "Fetching ${package} ${version} (${arch}) from pi-router-apps registry"
+    log_info "Fetching ${package} ${version} (${arch}) from apps registry"
 
     http_code=$(curl -sLk \
             -H "PRIVATE-TOKEN: ${PIMELEON_APPS_READ_TOKEN}" \
@@ -814,14 +814,14 @@ fetch_pimeleon_apps_github() {
 # Get a pre-built binary package from the appropriate source based on build context.
 # CI development builds (MR to release/*): GitLab package registry.
 # CI production builds (tag or push to release/*): GitHub releases.
-# Local builds: local mounted pi-router-apps path, then GitLab registry as fallback.
+# Local builds: local mounted registry-apps path, then GitLab registry as fallback.
 # Source can be forced via PIMELEON_APPS_SOURCE=gitlab|github.
 # Usage: get_pimeleon_apps_artifact <package> <arch> <download_dir>
 get_pimeleon_apps_artifact() {
     local package="$1"
     local arch="$2"
     local download_dir="$3"
-    local local_path="${PIMELEON_APPS_LOCAL_PATH:-/workspace/pi-router-apps}"
+    local local_path="${PIMELEON_APPS_LOCAL_PATH:-/workspace/registry-apps}"
 
     # 1. CI environment: PIMELEON_APPS_SOURCE must be set (via CI rules variables)
     if [[ -n "${CI:-}" ]] || [[ -n "${GITLAB_CI:-}" ]]; then

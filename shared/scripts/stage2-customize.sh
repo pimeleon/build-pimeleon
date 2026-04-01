@@ -104,7 +104,7 @@ NET_CORE_PKGS=(
 
 NET_ROUTER_PKGS=(
     "bridge-utils" "vlan" "ppp" "pppoeconf" "wireguard-tools"
-    "wireless-tools" "wireless-regdb" "rfkill" "wpasupplicant" "iw"
+    "wireless-tools" "wireless-regdb" "rfkill" "iw"
     "isc-dhcp-server"
 )
 
@@ -198,7 +198,7 @@ chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     rfkill \
     wireless-regdb
 
-# Install core services from pi-router-apps artifacts
+# Install core services from registry apps artifacts
 install_hostapd "${MOUNT_POINT}"
 install_wpasupplicant "${MOUNT_POINT}"
 install_pihole "${MOUNT_POINT}"
@@ -215,7 +215,7 @@ log_info "Installing security packages"
 chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     fail2ban
 
-# Install proxy packages from pi-router-apps artifacts
+# Install proxy packages from registry apps artifacts
 install_privoxy "${MOUNT_POINT}"
 
 # Generate Privoxy filters from AdBlock lists (runs on x86, outputs to chroot)
@@ -233,7 +233,7 @@ chroot_run "${MOUNT_POINT}" systemctl disable ModemManager 2>/dev/null || log_wa
 chroot_run "${MOUNT_POINT}" systemctl mask NetworkManager 2>/dev/null || log_warn "Could not mask NetworkManager — it may still start on boot"
 
 # Mask wpa_supplicant (we use hostapd for AP mode, not client mode)
-log_info "Disabling wpasupplicant"
+log_info "Disabling and masking wpa_supplicant service"
 chroot_run "${MOUNT_POINT}" systemctl disable wpa_supplicant 2>/dev/null || log_warn "Could not disable wpa_supplicant — service may not be installed"
 chroot_run "${MOUNT_POINT}" systemctl mask wpa_supplicant 2>/dev/null || log_warn "Could not mask wpa_supplicant — it may still start on boot"
 
@@ -333,16 +333,16 @@ sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
 sudo chmod 755 "${CACHE_DIR}/pimeleon-downloads"
 sudo chown "$(id -u):$(id -g)" "${CACHE_DIR}/pimeleon-downloads"
 
-# Fetch pre-built binaries from pi-router-apps (production only)
+# Fetch pre-built binaries from registry (production only)
 # Source is routed by get_pimeleon_apps_artifact: GitLab registry (dev CI) or GitHub releases (prod CI)
 # Non-production profiles fall back to APT sources via Ansible
 pkg="dnscrypt-proxy"
 if [[ "${PIMELEON_PROFILE:-development}" == "production" ]]; then
     if ! get_pimeleon_apps_artifact "${pkg}" "${RPI_ARCH}" "${CACHE_DIR}/pimeleon-downloads"; then
         if is_service_enabled "${pkg//-/_}" 2>/dev/null; then
-            die "Failed to fetch ${pkg} from pi-router-apps and it is enabled in this profile."
+            die "Failed to fetch ${pkg} from apps registry and it is enabled in this profile."
         else
-            log_warn "Failed to fetch ${pkg} from pi-router-apps; service is not enabled, continuing."
+            log_warn "Failed to fetch ${pkg} from apps registry; service is not enabled, continuing."
         fi
     fi
 else
