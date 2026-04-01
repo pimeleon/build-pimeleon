@@ -2,30 +2,6 @@
 # GitLab CI/CD - Publishing
 # Image registry, GitLab Pages, and Documentation Previews
 
-# Upload platform image to the Generic Packages registry.
-# Version is computed from conventional commits using apps/{platform}/VERSION as baseline.
-# Only runs on production pipelines (release/* branches and version tags).
-publish:image:
-  stage: publish
-  tags:
-    - lightweight
-  needs:
-    - job: setup:platform
-      artifacts: true
-    - job: build:pimeleon
-      artifacts: true
-    - job: test:smoke
-      artifacts: false
-      optional: true
-  rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_COMMIT_TAG'
-  environment:
-    name: cicd/production
-  script:
-    - chmod +x .gitlab/scripts/publish-image.sh
-    - .gitlab/scripts/publish-image.sh
-
 # Dry-run R2 validation (actual upload delegated to GitHub Actions)
 deploy:r2-dryrun:
   stage: publish
