@@ -7,7 +7,6 @@
 # Only runs on production pipelines (release/* branches and version tags).
 publish:image:
   stage: publish
-  image: alpine:latest
   tags:
     - lightweight
   needs:
@@ -21,7 +20,6 @@ publish:image:
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_COMMIT_TAG'
-    - when: on_success
   environment:
     name: cicd/production
   script:
