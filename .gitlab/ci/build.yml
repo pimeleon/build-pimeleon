@@ -41,15 +41,8 @@ warm-cache:
       - cache/
     policy: pull-push
   script:
-    - mkdir -p cache
-    - |
-      CACHE_FILE="cache/pimeleon-${TARGET_PLATFORM}-base.tar.gz"
-      if [ -f "$CACHE_FILE" ]; then
-        echo "Cache found: $CACHE_FILE"
-        ls -lh "$CACHE_FILE"
-      else
-        echo "Cache not found, will be created by build:pimeleon"
-      fi
+    - chmod +x .gitlab/scripts/warm-cache.sh
+    - .gitlab/scripts/warm-cache.sh
 
 # Check whether the Pimeleon image for this version already exists in the registry
 check:image:
@@ -65,9 +58,6 @@ check:image:
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
-  before_script:
-    - apk add --no-cache curl git
-    - git fetch origin --tags 2>/dev/null || true
   script:
     - chmod +x .gitlab/scripts/check-image.sh
     - .gitlab/scripts/check-image.sh
@@ -96,36 +86,8 @@ check:containers:
       when: always
     - when: never
   script:
-    - |
-      # Re-evaluate BUILD_IMAGE to bypass GitLab CI rules variables bug
-      export BUILD_IMAGE="${CI_REGISTRY_IMAGE}/${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}"
-      export TEST_IMAGE="${CI_REGISTRY_IMAGE}/${TEST_IMAGE_NAME}:${TEST_IMAGE_TAG}"
-      echo "Checking registry for BUILD_IMAGE: ${BUILD_IMAGE}"
-      echo "Checking registry for TEST_IMAGE: ${TEST_IMAGE}"
-
-      if docker manifest inspect "${BUILD_IMAGE}" >/dev/null 2>&1; then
-        echo "[INFO] Builder image FOUND in registry."
-        BUILDER_FOUND=true
-      else
-        echo "[WARN] Builder image MISSING from registry."
-        BUILDER_FOUND=false
-      fi
-
-      if docker manifest inspect "${TEST_IMAGE}" >/dev/null 2>&1; then
-        echo "[INFO] Tester image FOUND in registry."
-        TESTER_FOUND=true
-      else
-        echo "[WARN] Tester image MISSING from registry."
-        TESTER_FOUND=false
-      fi
-
-      if [ "$BUILDER_FOUND" = true ] && [ "$TESTER_FOUND" = true ]; then
-        echo "CONTAINERS_EXIST=true" >> containers.env
-        echo "Builder and tester images already in registry — build will be skipped"
-      else
-        echo "CONTAINERS_EXIST=false" >> containers.env
-        echo "Images not found in registry — build required"
-      fi
+    - chmod +x .gitlab/scripts/check-containers.sh
+    - .gitlab/scripts/check-containers.sh
   artifacts:
     reports:
       dotenv: containers.env
@@ -193,10 +155,6 @@ build:containers:
     # 4. Reuse from registry if exists and metadata valid
     - when: never
   script:
-    - |
-      # Re-evaluate BUILD_IMAGE to bypass GitLab CI rules variables bug
-      export BUILD_IMAGE="${CI_REGISTRY_IMAGE}/${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}"
-      export TEST_IMAGE="${CI_REGISTRY_IMAGE}/${TEST_IMAGE_NAME}:${TEST_IMAGE_TAG}"
     - chmod +x .gitlab/scripts/build-containers.sh
     - .gitlab/scripts/build-containers.sh
 # Hidden template — shared build logic for all platform jobs

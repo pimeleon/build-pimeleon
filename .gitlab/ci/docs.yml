@@ -21,13 +21,9 @@ publish-project-docs:
     - if: '$CI_COMMIT_TAG'
     # Run on MRs targeting release/* or develop to verify documentation
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
-  before_script:
-    - chmod +x .gitlab/scripts/setup-apt-proxy.sh
-    - .gitlab/scripts/setup-apt-proxy.sh
   script:
-    - apt-get -qy update && apt-get -q install -y --no-install-recommends git
-    - pip install "mkdocs>=1.5.3,<2.0" mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-minify-plugin
-    - mkdocs build -d public
+    - chmod +x .gitlab/scripts/build-docs.sh
+    - .gitlab/scripts/build-docs.sh
   artifacts:
     paths:
       - public

@@ -1,6 +1,9 @@
 #!/bin/sh
 set -eu
 
+# Install dependencies needed for version calculation and API requests
+apk add --no-cache curl git >/dev/null 2>&1 || true
+
 # Upload Pimeleon image artifacts to the GitLab Generic Packages registry.
 # If the image already exists (IMAGE_EXISTS=true), it skips the network operations.
 #

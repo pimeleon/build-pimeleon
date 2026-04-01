@@ -11,6 +11,7 @@ test:smoke:
   stage: test-images
   variables:
     DOCKER_HOST: unix:///var/run/docker.sock
+    TEST_SUITE: smoke
   needs:
     - job: setup:platform
       artifacts: true
@@ -31,16 +32,8 @@ test:smoke:
     # Production: manual trigger
     - if: '$CI_PIPELINE_SOURCE == "web"'
   script:
-    - mkdir -p test-results
-    - |
-      docker run --rm \
-        --privileged \
-        -v $CI_PROJECT_DIR/output:/images:ro \
-        -v $CI_PROJECT_DIR/tests:/tests \
-        -v $CI_PROJECT_DIR/test-results:/results \
-        -e TEST_SUITE=smoke \
-        -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
-        $TEST_IMAGE
+    - chmod +x .gitlab/scripts/run-tests.sh
+    - .gitlab/scripts/run-tests.sh
   artifacts:
     when: always
     paths:
@@ -55,6 +48,7 @@ test:integration:
   stage: test-images
   variables:
     DOCKER_HOST: unix:///var/run/docker.sock
+    TEST_SUITE: integration
   needs:
     - job: setup:platform
       artifacts: true
@@ -75,14 +69,6 @@ test:integration:
     # Production: manual trigger
     - if: '$CI_PIPELINE_SOURCE == "web"'
   script:
-    - mkdir -p test-results
-    - |
-      docker run --rm \
-        --privileged \
-        -v $CI_PROJECT_DIR/output:/images:ro \
-        -v $CI_PROJECT_DIR/tests:/tests \
-        -v $CI_PROJECT_DIR/test-results:/results \
-        -e TEST_SUITE=integration \
-        -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
-        $TEST_IMAGE
+    - chmod +x .gitlab/scripts/run-tests.sh
+    - .gitlab/scripts/run-tests.sh
   timeout: 30 minutes

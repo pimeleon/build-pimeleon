@@ -7,6 +7,10 @@ set -eu
 #   CI_REGISTRY_IMAGE, BUILD_IMAGE, TEST_IMAGE, APT_PROXY, CI, PIMELEON_PROFILE,
 #   CACHE_IMAGE, BUILDKIT_INLINE_CACHE
 
+# Re-evaluate BUILD_IMAGE to bypass GitLab CI rules variables bug
+export BUILD_IMAGE="${CI_REGISTRY_IMAGE}/${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}"
+export TEST_IMAGE="${CI_REGISTRY_IMAGE}/${TEST_IMAGE_NAME}:${TEST_IMAGE_TAG}"
+
 # Prioritize local Dockerfiles if they exist in the branch root
 BUILDER_DF="./containers/builder/Dockerfile"
 TESTER_DF="./containers/tester/Dockerfile"
