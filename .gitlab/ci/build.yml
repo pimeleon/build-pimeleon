@@ -106,24 +106,7 @@ build:containers:
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: on_success
 
-    # 2. Rebuild if image not found in registry (Bootstrap Case)
-    - if: '$CONTAINERS_EXIST == "false" && $CI_COMMIT_TAG'
-      variables:
-        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-      when: on_success
-    - if: '$CONTAINERS_EXIST == "false" && $CI_COMMIT_BRANCH =~ /^release\//'
-      variables:
-        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-      when: on_success
-    - if: '$CONTAINERS_EXIST == "false" && $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
-      variables:
-        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-      when: on_success
-
-    # 3. Rebuild if dependencies changed (Update Case)
+    # 2. Rebuild if dependencies changed (Update Case)
     - if: '$CI_COMMIT_TAG'
       variables:
         BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
@@ -152,7 +135,6 @@ build:containers:
         - apps/**/*
         - docker-compose.yml
 
-    # 4. Reuse from registry if exists and metadata valid
     - when: never
   script:
     - chmod +x .gitlab/scripts/build-containers.sh

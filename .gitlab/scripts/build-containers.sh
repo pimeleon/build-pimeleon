@@ -7,6 +7,12 @@ set -eu
 #   CI_REGISTRY_IMAGE, BUILD_IMAGE, TEST_IMAGE, APT_PROXY, CI, PIMELEON_PROFILE,
 #   CACHE_IMAGE, BUILDKIT_INLINE_CACHE
 
+# Skip if containers already exist (CONTAINERS_EXIST from check:containers dotenv artifact)
+if [ "${CONTAINERS_EXIST:-}" = "true" ]; then
+    echo "[INFO] CONTAINERS_EXIST=true — containers already in registry, skipping rebuild"
+    exit 0
+fi
+
 # Re-evaluate BUILD_IMAGE to bypass GitLab CI rules variables bug
 export BUILD_IMAGE="${CI_REGISTRY_IMAGE}/${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}"
 export TEST_IMAGE="${CI_REGISTRY_IMAGE}/${TEST_IMAGE_NAME}:${TEST_IMAGE_TAG}"
