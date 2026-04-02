@@ -261,3 +261,25 @@ run_version_script() {
     [ "$status" -eq 0 ]
     [ "$output" = "0.2.0" ]
 }
+
+@test "build: commit touching shared/containers/ bumps patch" {
+    cd "$TEST_TMPDIR"
+    mkdir -p shared/containers/builder
+    echo "FROM alpine:latest" > shared/containers/builder/Dockerfile
+    git add .
+    git commit -q -m "build: refresh builder image"
+    run_version_script
+    [ "$status" -eq 0 ]
+    [ "$output" = "0.1.1" ]
+}
+
+@test "feat: commit touching containers/ bumps minor" {
+    cd "$TEST_TMPDIR"
+    mkdir -p containers/tester
+    echo "FROM alpine:latest" > containers/tester/Dockerfile
+    git add .
+    git commit -q -m "feat: add tester tooling"
+    run_version_script
+    [ "$status" -eq 0 ]
+    [ "$output" = "0.2.0" ]
+}

@@ -41,6 +41,8 @@ get_next_version() {
             --format="%s" \
             -- \
             "apps/${platform}/" \
+            "containers/" \
+            "shared/containers/" \
             "shared/ansible/" \
             "shared/configs/" \
             "shared/scripts/" \
@@ -54,6 +56,8 @@ get_next_version() {
             --format="%s" \
             -- \
             "apps/${platform}/" \
+            "containers/" \
+            "shared/containers/" \
             "shared/ansible/" \
             "shared/configs/" \
             "shared/scripts/" \
