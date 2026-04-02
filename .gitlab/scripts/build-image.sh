@@ -35,14 +35,28 @@ echo "Using ansible=${ANSIBLE_DIR} configs=${CONFIGS_DIR} scripts=${SCRIPTS_DIR}
 # Compute version
 PIMELEON_VERSION=$(sh .gitlab/scripts/resolve-version.sh base "${TARGET_PLATFORM}")
 PACKAGE_VERSION=$(sh .gitlab/scripts/resolve-version.sh package "${TARGET_PLATFORM}")
+BUILDER_IMAGE_DIGEST=$(sh .gitlab/scripts/resolve-builder-image-digest.sh "${BUILD_IMAGE}")
 echo "[INFO] Building version: ${PIMELEON_VERSION}"
 echo "[INFO] Package version: ${PACKAGE_VERSION}"
+echo "[INFO] Builder image digest: ${BUILDER_IMAGE_DIGEST}"
 
 echo "[INFO] Checking registry for existing image package..."
 if sh .gitlab/scripts/check-package-exists.sh "${PACKAGE_VERSION}"; then
-    echo "[INFO] Package ${PACKAGE_VERSION} already exists. Skipping image build."
-    mkdir -p output
-    exit 0
+    metadata_file="$(mktemp)"
+    trap 'rm -f "${metadata_file}"' EXIT
+    sh .gitlab/scripts/download-package-metadata.sh "${PACKAGE_VERSION}" "${metadata_file}"
+
+    existing_builder_digest=$(grep -o '"builder_image_digest":[[:space:]]*"[^"]*"' "${metadata_file}" | head -1 | sed 's/.*"builder_image_digest":[[:space:]]*"//; s/"$//' || true)
+
+    if [ -n "${existing_builder_digest}" ] && [ "${existing_builder_digest}" = "${BUILDER_IMAGE_DIGEST}" ]; then
+        echo "[INFO] Package ${PACKAGE_VERSION} already exists and matches builder digest ${BUILDER_IMAGE_DIGEST}. Skipping image build."
+        mkdir -p output
+        exit 0
+    fi
+
+    echo "[INFO] Package ${PACKAGE_VERSION} exists but was built with a different builder image."
+    echo "[INFO] Existing digest: ${existing_builder_digest:-unknown}"
+    echo "[INFO] Current digest:  ${BUILDER_IMAGE_DIGEST}"
 else
     status=$?
     if [ "${status}" -ne 1 ]; then
@@ -64,6 +78,8 @@ CONTAINER_ID=$(docker create \
         -e TARGET_PLATFORM="${TARGET_PLATFORM}" \
         -e PIMELEON_VERSION="${PIMELEON_VERSION}" \
         -e PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
+        -e BUILDER_IMAGE_REF="${BUILD_IMAGE}" \
+        -e BUILDER_IMAGE_DIGEST="${BUILDER_IMAGE_DIGEST}" \
         -e APT_PROXY="${APT_PROXY:-}" \
         -e PIMELEON_UI_BUILD_TOKEN="${PIMELEON_UI_BUILD_TOKEN:-}" \
         -e PIMELEON_APPS_SOURCE="${PIMELEON_APPS_SOURCE}" \

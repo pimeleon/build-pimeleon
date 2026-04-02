@@ -573,7 +573,9 @@ generate_metadata() {
     "build_info": {
         "rpi_model": "${PIMELEON_RPI_MODEL:-3B+}",
         "raspbian_version": "${RASPBIAN_VERSION:-buster}",
-        "builder_version": "1.0.0"
+        "builder_version": "1.0.0",
+        "builder_image_ref": "${BUILDER_IMAGE_REF:-unknown}",
+        "builder_image_digest": "${BUILDER_IMAGE_DIGEST:-unknown}"
     }
 }
 EOF
