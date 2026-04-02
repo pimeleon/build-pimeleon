@@ -9,6 +9,7 @@ PACKAGE_VERSION=$(sh .gitlab/scripts/resolve-version.sh package "${TARGET_PLATFO
 
 echo "[INFO] Uploading artifacts for package version: ${PACKAGE_VERSION}"
 
+# Check for new artifacts
 if [ -z "$(ls -A output/*.img.xz 2>/dev/null)" ]; then
     if sh .gitlab/scripts/check-package-exists.sh "${PACKAGE_VERSION}"; then
         echo "[INFO] Package ${PACKAGE_VERSION} already exists in the registry and no fresh artifacts were produced. Skipping upload."
@@ -23,6 +24,11 @@ if [ -z "$(ls -A output/*.img.xz 2>/dev/null)" ]; then
     echo "[ERROR] No .img.xz artifacts found in output/. Build likely failed."
     exit 1
 fi
+
+# We have fresh artifacts, so delete existing package version from registry if it exists
+# to ensure we don't end up with conflicting files or incorrect metadata.
+echo "[INFO] Fresh artifacts found. Deleting existing package ${PACKAGE_VERSION} if it exists..."
+sh .gitlab/scripts/delete-package.sh "${PACKAGE_VERSION}" || { echo "[WARN] Package deletion failed, attempting upload anyway..." ; }
 
 # Upload logic
 # We use -w to check the HTTP status code because -f doesn't give us the response body on failure
