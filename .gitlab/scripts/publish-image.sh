@@ -5,9 +5,19 @@ set -eu
 #
 # Inputs: TARGET_PLATFORM, CI_JOB_TOKEN, CI_API_V4_URL, CI_PROJECT_ID
 
-PACKAGE_VERSION=$(.gitlab/scripts/resolve-version.sh package "${TARGET_PLATFORM}")
+PACKAGE_VERSION=$(sh .gitlab/scripts/resolve-version.sh package "${TARGET_PLATFORM}")
 
 echo "[INFO] Uploading artifacts for package version: ${PACKAGE_VERSION}"
+
+if sh .gitlab/scripts/check-package-exists.sh "${PACKAGE_VERSION}"; then
+    echo "[INFO] Package ${PACKAGE_VERSION} already exists in the registry. Skipping upload."
+    exit 0
+else
+    status=$?
+    if [ "${status}" -ne 1 ]; then
+        exit "${status}"
+    fi
+fi
 
 if [ -z "$(ls -A output/*.img.xz 2>/dev/null)" ]; then
     echo "[ERROR] No .img.xz artifacts found in output/. Build likely failed."

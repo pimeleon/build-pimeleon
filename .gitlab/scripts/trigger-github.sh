@@ -16,7 +16,7 @@ if [ -z "${GITHUB_REGISTRY_PUSH_TOKEN:-}" ]; then
     exit 1
 fi
 
-VERSION=$(.gitlab/scripts/resolve-version.sh base "${TARGET_PLATFORM}")
+VERSION=$(sh .gitlab/scripts/resolve-version.sh base "${TARGET_PLATFORM}")
 
 echo "Triggering GitHub Actions deploy-r2 on ${GITHUB_REPO}"
 echo "  Platform: ${TARGET_PLATFORM}"
