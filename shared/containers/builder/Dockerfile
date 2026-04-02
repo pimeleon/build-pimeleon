@@ -121,7 +121,8 @@ USER builder
 WORKDIR /workspace
 
 # Default command
-CMD ["/scripts/build.sh"]
+# Use exec form to ensure signals are passed to the script correctly
+CMD ["/bin/bash", "/scripts/build.sh"]
 
 # Development stage with additional tools
 FROM base AS development

@@ -118,9 +118,16 @@ cleanup_on_exit() {
         fi
 
         # Unmount image
-        if [[ -n "$CLEANUP_MOUNT_POINT" ]] && [[ -n "$CLEANUP_LOOP_DEVICE" ]]; then
+        if [[ -n "$CLEANUP_MOUNT_POINT" ]] || [[ -n "$CLEANUP_LOOP_DEVICE" ]]; then
             log_info "Unmounting image and detaching loop device..."
             unmount_image "$CLEANUP_MOUNT_POINT" "$CLEANUP_LOOP_DEVICE" || true
+        fi
+
+        # Extra safety: if we have a loop device, ensure it's detached even if unmount_image failed
+        if [[ -n "$CLEANUP_LOOP_DEVICE" ]] && [[ -e "$CLEANUP_LOOP_DEVICE" ]]; then
+            log_warn "Ensuring loop device $CLEANUP_LOOP_DEVICE is detached..."
+            sudo kpartx -d "$CLEANUP_LOOP_DEVICE" 2>/dev/null || true
+            sudo losetup -d "$CLEANUP_LOOP_DEVICE" 2>/dev/null || true
         fi
     fi
 
@@ -251,6 +258,9 @@ mount_image() {
     # Create loop device
     local loop_device
     loop_device=$(sudo losetup -f --show "$image_path")
+
+    # Register for cleanup as soon as loop device is created
+    CLEANUP_LOOP_DEVICE="$loop_device"
 
     # Scan for partitions
     sudo kpartx -av "$loop_device"

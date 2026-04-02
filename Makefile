@@ -183,11 +183,20 @@ clean:
 	rm -rf tests/results/*
 	docker compose down -v 2>/dev/null || true
 
+clean-loops:
+	@echo "Cleaning up stale host loop devices..."
+	@if [ -f "./.gitlab/scripts/cleanup-stale-loop-devices.sh" ]; then \
+		sudo bash ./.gitlab/scripts/cleanup-stale-loop-devices.sh; \
+	else \
+		echo "Error: cleanup-stale-loop-devices.sh not found"; \
+		exit 1; \
+	fi
+
 clean-cache:
 	@echo "Cleaning build cache..."
 	rm -rf cache/*
 
-clean-all: clean clean-cache
+clean-all: clean clean-loops clean-cache
 	@echo "Removing all containers and images..."
 	docker compose down -v --rmi all 2>/dev/null || true
 

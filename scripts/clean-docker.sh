@@ -114,6 +114,11 @@ fi
 print_info "Removing stopped Docker containers..."
 docker container prune -f
 
+print_info "Cleaning up stale host loop devices (if any)..."
+if [ -f "./.gitlab/scripts/cleanup-stale-loop-devices.sh" ]; then
+    sudo bash ./.gitlab/scripts/cleanup-stale-loop-devices.sh 2>/dev/null || true
+fi
+
 print_info "Removing unused Docker networks..."
 docker network prune -f
 
