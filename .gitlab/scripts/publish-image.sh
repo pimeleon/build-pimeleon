@@ -1,36 +1,23 @@
 #!/bin/sh
 set -eu
 
-# Install dependencies needed for version calculation and API requests
-apk add --no-cache curl git >/dev/null 2>&1 || true
-
 # Upload Pimeleon image artifacts to the GitLab Generic Packages registry.
-# If the image already exists (IMAGE_EXISTS=true), it skips the network operations.
 #
-# Inputs: IMAGE_EXISTS, PACKAGE_VERSION (from check:image dotenv), TARGET_PLATFORM,
-#         CI_JOB_TOKEN, CI_API_V4_URL, CI_PROJECT_ID
+# Inputs: TARGET_PLATFORM, CI_JOB_TOKEN, CI_API_V4_URL, CI_PROJECT_ID
 
-IMAGE_EXISTS="${IMAGE_EXISTS:-false}"
+PACKAGE_VERSION=$(sh .gitlab/scripts/resolve-version.sh package "${TARGET_PLATFORM}")
 
-# PACKAGE_VERSION comes from check:image dotenv artifact; compute it as fallback
-if [ -z "${PACKAGE_VERSION:-}" ]; then
-    SCRIPTS_DIR="./shared/scripts"
-    [ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
-    chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
-    VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
-    PACKAGE_VERSION="${TARGET_PLATFORM}-v${VERSION}"
-    echo "[INFO] PACKAGE_VERSION not injected via dotenv, computed: ${PACKAGE_VERSION}"
-fi
+echo "[INFO] Uploading artifacts for package version: ${PACKAGE_VERSION}"
 
-if [ "$IMAGE_EXISTS" = "true" ]; then
-    echo "[INFO] Image version '${PACKAGE_VERSION}' confirmed in registry."
-    echo "[INFO] Skipping upload operations to optimize network usage."
-    mkdir -p output
-    echo "Registry: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages" > output/registry_link.txt
+if sh .gitlab/scripts/check-package-exists.sh "${PACKAGE_VERSION}"; then
+    echo "[INFO] Package ${PACKAGE_VERSION} already exists in the registry. Skipping upload."
     exit 0
+else
+    status=$?
+    if [ "${status}" -ne 1 ]; then
+        exit "${status}"
+    fi
 fi
-
-echo "[INFO] Image missing from registry. Starting upload of local artifacts..."
 
 if [ -z "$(ls -A output/*.img.xz 2>/dev/null)" ]; then
     echo "[ERROR] No .img.xz artifacts found in output/. Build likely failed."

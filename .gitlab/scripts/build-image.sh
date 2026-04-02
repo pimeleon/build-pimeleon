@@ -11,6 +11,8 @@ set -eu
 #   PIMELEON_APPS_SOURCE, PIMELEON_APPS_PROJECT_ID, PIMELEON_APPS_READ_TOKEN,
 #   PIMELEON_APPS_GITHUB_TOKEN
 
+apk add --no-cache curl git >/dev/null 2>&1 || true
+
 [ -n "${TARGET_PLATFORM}" ]   || { echo "[ERROR] TARGET_PLATFORM is not set"; exit 1; }
 [ -n "${PIMELEON_PROFILE}" ] || { echo "[ERROR] PIMELEON_PROFILE is not set"; exit 1; }
 echo "Building Pimeleon image for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."
@@ -31,10 +33,22 @@ SCRIPTS_DIR="./shared/scripts"
 echo "Using ansible=${ANSIBLE_DIR} configs=${CONFIGS_DIR} scripts=${SCRIPTS_DIR}"
 
 # Compute version
-chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
-BASE_VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
-PIMELEON_VERSION="${BASE_VERSION}"
+PIMELEON_VERSION=$(sh .gitlab/scripts/resolve-version.sh base "${TARGET_PLATFORM}")
+PACKAGE_VERSION=$(sh .gitlab/scripts/resolve-version.sh package "${TARGET_PLATFORM}")
 echo "[INFO] Building version: ${PIMELEON_VERSION}"
+echo "[INFO] Package version: ${PACKAGE_VERSION}"
+
+echo "[INFO] Checking registry for existing image package..."
+if sh .gitlab/scripts/check-package-exists.sh "${PACKAGE_VERSION}"; then
+    echo "[INFO] Package ${PACKAGE_VERSION} already exists. Skipping image build."
+    mkdir -p output
+    exit 0
+else
+    status=$?
+    if [ "${status}" -ne 1 ]; then
+        exit "${status}"
+    fi
+fi
 
 # Create and start build container
 # $BUILD_IMAGE is expected to be provided by the CI environment

@@ -9,9 +9,6 @@ apk add --no-cache curl git >/dev/null 2>&1 || true
 # Inputs (CI environment):
 #   TARGET_PLATFORM, GITHUB_REGISTRY_PUSH_TOKEN (PAT with repo scope)
 
-SCRIPTS_DIR="./shared/scripts"
-[ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
-
 GITHUB_REPO="pimeleon/build-pimeleon"
 
 if [ -z "${GITHUB_REGISTRY_PUSH_TOKEN:-}" ]; then
@@ -19,8 +16,7 @@ if [ -z "${GITHUB_REGISTRY_PUSH_TOKEN:-}" ]; then
     exit 1
 fi
 
-chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
-VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
+VERSION=$(sh .gitlab/scripts/resolve-version.sh base "${TARGET_PLATFORM}")
 
 echo "Triggering GitHub Actions deploy-r2 on ${GITHUB_REPO}"
 echo "  Platform: ${TARGET_PLATFORM}"

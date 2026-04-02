@@ -10,8 +10,6 @@
   variables:
     # BuildKit for faster builds with cache reuse
     DOCKER_BUILDKIT: "1"
-    # Cache image for BuildKit registry backend
-    CACHE_IMAGE: "${CI_REGISTRY_IMAGE}/cache"
     BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}
     TEST_IMAGE: ${CI_REGISTRY_IMAGE}/${TEST_IMAGE_NAME}:${TEST_IMAGE_TAG}
   before_script:

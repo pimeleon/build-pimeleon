@@ -10,10 +10,7 @@ apk add --no-cache git aws-cli >/dev/null 2>&1 || true
 #   TARGET_PLATFORM, R2_BUCKET, R2_ENDPOINT
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION (set by job)
 
-SCRIPTS_DIR="./shared/scripts"
-[ ! -f "./scripts/build.sh" ] || SCRIPTS_DIR="./scripts"
-chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
-VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
+VERSION=$(sh .gitlab/scripts/resolve-version.sh base "${TARGET_PLATFORM}")
 UPLOAD_PREFIX="${TARGET_PLATFORM}/v${VERSION}"
 echo "Deploying to R2: s3://${R2_BUCKET}/${UPLOAD_PREFIX}/"
 
