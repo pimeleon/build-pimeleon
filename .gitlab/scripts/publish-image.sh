@@ -26,7 +26,7 @@ fi
 
 # Upload logic
 # We use -w to check the HTTP status code because -f doesn't give us the response body on failure
-for file in output/pimeleon-*.img.xz output/*.sha256; do
+for file in output/pimeleon-*.img.xz output/*.img.metadata.json output/*.sha256; do
     if [ -f "$file" ]; then
         echo "[INFO] Uploading $(basename "$file")..."
 

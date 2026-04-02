@@ -44,19 +44,26 @@ echo "[INFO] Checking registry for existing image package..."
 if sh .gitlab/scripts/check-package-exists.sh "${PACKAGE_VERSION}"; then
     metadata_file="$(mktemp)"
     trap 'rm -f "${metadata_file}"' EXIT
-    sh .gitlab/scripts/download-package-metadata.sh "${PACKAGE_VERSION}" "${metadata_file}"
+    if sh .gitlab/scripts/download-package-metadata.sh "${PACKAGE_VERSION}" "${metadata_file}"; then
+        existing_builder_digest=$(grep -o '"builder_image_digest":[[:space:]]*"[^"]*"' "${metadata_file}" | head -1 | sed 's/.*"builder_image_digest":[[:space:]]*"//; s/"$//' || true)
 
-    existing_builder_digest=$(grep -o '"builder_image_digest":[[:space:]]*"[^"]*"' "${metadata_file}" | head -1 | sed 's/.*"builder_image_digest":[[:space:]]*"//; s/"$//' || true)
+        if [ -n "${existing_builder_digest}" ] && [ "${existing_builder_digest}" = "${BUILDER_IMAGE_DIGEST}" ]; then
+            echo "[INFO] Package ${PACKAGE_VERSION} already exists and matches builder digest ${BUILDER_IMAGE_DIGEST}. Skipping image build."
+            mkdir -p output
+            exit 0
+        fi
 
-    if [ -n "${existing_builder_digest}" ] && [ "${existing_builder_digest}" = "${BUILDER_IMAGE_DIGEST}" ]; then
-        echo "[INFO] Package ${PACKAGE_VERSION} already exists and matches builder digest ${BUILDER_IMAGE_DIGEST}. Skipping image build."
-        mkdir -p output
-        exit 0
+        echo "[INFO] Package ${PACKAGE_VERSION} exists but was built with a different builder image."
+        echo "[INFO] Existing digest: ${existing_builder_digest:-unknown}"
+        echo "[INFO] Current digest:  ${BUILDER_IMAGE_DIGEST}"
+    else
+        status=$?
+        if [ "${status}" -eq 3 ]; then
+            echo "[INFO] Package ${PACKAGE_VERSION} exists but has no metadata artifact. Rebuilding to refresh package metadata."
+        else
+            exit "${status}"
+        fi
     fi
-
-    echo "[INFO] Package ${PACKAGE_VERSION} exists but was built with a different builder image."
-    echo "[INFO] Existing digest: ${existing_builder_digest:-unknown}"
-    echo "[INFO] Current digest:  ${BUILDER_IMAGE_DIGEST}"
 else
     status=$?
     if [ "${status}" -ne 1 ]; then

@@ -3,6 +3,10 @@ set -eu
 
 # Download the metadata JSON artifact for an existing Pimeleon package version.
 # Usage: download-package-metadata.sh <package_version> <output_path>
+#
+# Exit codes:
+#   0 => metadata downloaded
+#   3 => package exists but has no metadata artifact (legacy package)
 
 package_version="${1:-}"
 output_path="${2:-}"
@@ -41,7 +45,10 @@ if [ "${files_status}" != "200" ]; then
 fi
 
 file_name=$(printf "%s" "${files_result}" | grep -o '"file_name":"[^"]*\.metadata\.json"' | head -1 | sed 's/.*"file_name":"//; s/"$//' || true)
-[ -n "${file_name}" ] || { echo "[ERROR] No .metadata.json file found for ${package_version}" >&2; exit 1; }
+if [ -z "${file_name}" ]; then
+    echo "[WARN] No .metadata.json file found for ${package_version}" >&2
+    exit 3
+fi
 
 mkdir -p "$(dirname "${output_path}")"
 download_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pimeleon/${package_version}/${file_name}"
