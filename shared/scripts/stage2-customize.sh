@@ -457,6 +457,19 @@ get_npm_registry_url() {
     printf '%s' "${npm_config_registry:-${NPM_CONFIG_REGISTRY:-${NPM_REGISTRY:-}}}"
 }
 
+npm_proxy_config_url() {
+    local endpoint="$1"
+
+    case "$endpoint" in
+        http://*|https://*)
+            printf '%s' "$endpoint"
+            ;;
+        *)
+            printf 'http://%s' "$endpoint"
+            ;;
+    esac
+}
+
 npm_endpoint_reachable() {
     local endpoint="$1"
     local target host port
@@ -511,6 +524,7 @@ run_pnpm_command() {
 
 NPM_PROXY_URL="$(get_npm_proxy_url)"
 NPM_REGISTRY_URL="$(get_npm_registry_url)"
+NPM_PROXY_CONFIG_URL="$(npm_proxy_config_url "${NPM_PROXY_URL}")"
 NPM_DISABLE_PROXY_FALLBACK=0
 
 if [[ -n "${NPM_PROXY_URL}" ]] && ! npm_endpoint_reachable "${NPM_PROXY_URL}"; then
@@ -525,9 +539,19 @@ fi
 
 # Configure pnpm caching and always use the default registry.
 run_pnpm_command config set store-dir "${CACHE_DIR}/.pnpm-store"
-run_pnpm_command config delete proxy 2>/dev/null || true
-run_pnpm_command config delete https-proxy 2>/dev/null || true
-run_pnpm_command config delete registry 2>/dev/null || true
+if [[ "${NPM_DISABLE_PROXY_FALLBACK}" == "1" ]] || [[ -z "${NPM_PROXY_URL}" ]]; then
+    run_pnpm_command config delete proxy 2>/dev/null || true
+    run_pnpm_command config delete https-proxy 2>/dev/null || true
+else
+    run_pnpm_command config set proxy "${NPM_PROXY_CONFIG_URL}"
+    run_pnpm_command config set https-proxy "${NPM_PROXY_CONFIG_URL}"
+fi
+
+if [[ "${NPM_DISABLE_PROXY_FALLBACK}" == "1" ]] || [[ -z "${NPM_REGISTRY_URL}" ]]; then
+    run_pnpm_command config delete registry 2>/dev/null || true
+else
+    run_pnpm_command config set registry "${NPM_REGISTRY_URL}"
+fi
 
 if [[ "${NPM_DISABLE_PROXY_FALLBACK}" == "1" ]]; then
     log_info "pnpm: using cache at ${CACHE_DIR}/.pnpm-store with default registry and no proxy"
@@ -546,9 +570,12 @@ fi
 rm -rf node_modules
 
 # Ensure jose is present in the API package
+log_info "pnpm: preparing workspace dependencies"
 run_pnpm_command --filter "@pi-router/api" add jose
 export CI=true
+log_info "pnpm: running frozen install"
 run_pnpm_command install --frozen-lockfile
+log_info "pnpm: running build"
 NODE_ENV="${PIMELEON_PROFILE}" run_pnpm_command build
 popd > /dev/null
 

@@ -33,7 +33,7 @@ if [ -n "${CLEANUP_IMAGE}" ]; then
         -v "$PWD":/workspace \
         -w /workspace \
         "${CLEANUP_IMAGE}" \
-        bash -lc '.gitlab/scripts/cleanup-stale-loop-devices.sh' || true
+        sh /workspace/.gitlab/scripts/cleanup-stale-loop-devices.sh || true
 else
     echo "[WARN] No builder image found for host loop cleanup. Stale loop devices may remain."
 fi
