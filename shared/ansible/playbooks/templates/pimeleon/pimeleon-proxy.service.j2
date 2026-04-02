@@ -8,7 +8,7 @@ Type=simple
 User=pim-proxy
 Group=pim
 WorkingDirectory=/opt/pimeleon/proxy
-Environment=NODE_ENV={{ build_mode | default('development', true) }}
+Environment=NODE_ENV={{ build_mode | default('production', true) }}
 Environment=HOST=127.0.0.1
 Environment=PORT={{ ui_proxy_port | default('3000', true) }}
 EnvironmentFile=/opt/pimeleon/proxy/.env

@@ -1,5 +1,9 @@
 #!/bin/sh
 set -eu
+
+# Install dependencies needed for version calculation and API requests
+apk add --no-cache curl git >/dev/null 2>&1 || true
+
 # Trigger GitHub Actions workflow on pimeleon/build-pimeleon via repository_dispatch.
 #
 # Inputs (CI environment):

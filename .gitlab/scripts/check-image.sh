@@ -1,6 +1,10 @@
 #!/bin/sh
 set -eu
 
+# Install dependencies needed for version calculation and API requests
+apk add --no-cache curl git >/dev/null 2>&1 || true
+git fetch origin --tags 2>/dev/null || true
+
 # Check if the Pimeleon image for this version already exists in the registry
 # Uses GitLab Generic Packages API: https://docs.gitlab.com/ee/api/packages.html
 

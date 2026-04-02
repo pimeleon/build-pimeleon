@@ -7,6 +7,16 @@ set -eu
 #   CI_REGISTRY_IMAGE, BUILD_IMAGE, TEST_IMAGE, APT_PROXY, CI, PIMELEON_PROFILE,
 #   CACHE_IMAGE, BUILDKIT_INLINE_CACHE
 
+# Skip if containers already exist (CONTAINERS_EXIST from check:containers dotenv artifact)
+if [ "${CONTAINERS_EXIST:-}" = "true" ]; then
+    echo "[INFO] CONTAINERS_EXIST=true — containers already in registry, skipping rebuild"
+    exit 0
+fi
+
+# Re-evaluate BUILD_IMAGE to bypass GitLab CI rules variables bug
+export BUILD_IMAGE="${CI_REGISTRY_IMAGE}/${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}"
+export TEST_IMAGE="${CI_REGISTRY_IMAGE}/${TEST_IMAGE_NAME}:${TEST_IMAGE_TAG}"
+
 # Prioritize local Dockerfiles if they exist in the branch root
 BUILDER_DF="./containers/builder/Dockerfile"
 TESTER_DF="./containers/tester/Dockerfile"
@@ -46,7 +56,7 @@ docker buildx build \
     --build-arg AB2P_IMAGE="${AB2P_IMAGE}" \
     --build-arg APT_PROXY="${APT_PROXY:-}" \
     --build-arg CI="${CI:-}" \
-    --build-arg PIMELEON_PROFILE="${PIMELEON_PROFILE:-}" \
+    --build-arg PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
     -t "$BUILD_IMAGE" -t "${CI_REGISTRY_IMAGE}/builder:latest" \
     --push \
     -f "$BUILDER_DF" .
@@ -57,9 +67,9 @@ docker buildx build \
     --cache-from type=registry,ref="${CACHE_IMAGE}:tester-${CI_COMMIT_REF_SLUG}" \
     --cache-from type=registry,ref="${CACHE_IMAGE}:tester-main" \
     --cache-to type=registry,ref="${CACHE_IMAGE}:tester-${CI_COMMIT_REF_SLUG}",mode=max \
-    --build-arg APT_PROXY="${APT_PROXY:-}" \
+    --build-arg APT_PROXY="${APT_PROXY}" \
     --build-arg CI="${CI:-}" \
-    --build-arg PIMELEON_PROFILE="${PIMELEON_PROFILE:-}" \
+    --build-arg PIMELEON_PROFILE="${PIMELEON_PROFILE}" \
     -t "$TEST_IMAGE" -t "${CI_REGISTRY_IMAGE}/tester:latest" \
     --push \
     -f "$TESTER_DF" "$(dirname "$TESTER_DF")"

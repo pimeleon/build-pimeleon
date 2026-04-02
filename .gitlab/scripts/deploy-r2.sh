@@ -1,5 +1,9 @@
 #!/bin/sh
 set -eu
+
+# Install dependencies needed for version calculation and R2 uploads
+apk add --no-cache git aws-cli >/dev/null 2>&1 || true
+
 # Deploy Pimeleon image artifacts to Cloudflare R2 via S3-compatible API.
 #
 # Inputs (CI environment):

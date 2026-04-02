@@ -2,7 +2,7 @@
 
 # Default platform (can be overridden: make build TARGET_PLATFORM=rpi4-bookworm)
 TARGET_PLATFORM ?= rpi3-bookworm
-PIMELEON_PROFILE ?= development
+PIMELEON_PROFILE ?= production
 
 # Default target
 help:

@@ -87,7 +87,7 @@ find "${OUTPUT_DIR}" -name "build-${TARGET_PLATFORM}-*.log" -not -name "$(basena
 export CLEANUP_IMAGE_PATH="${IMAGE_PATH}"
 
 # Build profile and APT cache (can be overridden by environment)
-export PIMELEON_PROFILE="${PIMELEON_PROFILE:-development}"
+export PIMELEON_PROFILE="${PIMELEON_PROFILE:-production}"
 export RASPBIAN_MIRROR="${RASPBIAN_MIRROR:-http://archive.raspbian.org/raspbian/}"
 export APT_PROXY="${APT_PROXY:-}"
 
