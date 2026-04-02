@@ -91,3 +91,4 @@ site/assets/javascripts/lunr/min/lunr.*.min.js
 .git.backup*.tar.gz
 *.bak.*
 .mypy_cache/
+*trace.*

@@ -171,10 +171,8 @@ setup() {
     [ "$status" -eq 1 ]
 }
 
-@test "is_service_enabled returns 0 for hostapd with development profile" {
-    ANSIBLE_DIR="${PROJECT_ROOT}/shared/ansible"
-    PIMELEON_PROFILE="development"
-    run is_service_enabled "hostapd"
+@test "is_service_enabled falls back to the production profile when unset" {
+    run bash -c "source '${COMMON_SH}'; ANSIBLE_DIR='${PROJECT_ROOT}/shared/ansible'; unset PIMELEON_PROFILE; is_service_enabled hostapd"
     [ "$status" -eq 0 ]
 }
 

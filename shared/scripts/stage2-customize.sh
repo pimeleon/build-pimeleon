@@ -104,7 +104,7 @@ NET_CORE_PKGS=(
 
 NET_ROUTER_PKGS=(
     "bridge-utils" "vlan" "ppp" "pppoeconf" "wireguard-tools"
-    "wireless-tools" "wireless-regdb" "rfkill" "wpasupplicant" "iw"
+    "wireless-tools" "wireless-regdb" "rfkill" "iw"
     "isc-dhcp-server"
 )
 
@@ -198,7 +198,7 @@ chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     rfkill \
     wireless-regdb
 
-# Install core services from pi-router-apps artifacts
+# Install core services from registry apps artifacts
 install_hostapd "${MOUNT_POINT}"
 install_wpasupplicant "${MOUNT_POINT}"
 install_pihole "${MOUNT_POINT}"
@@ -215,7 +215,7 @@ log_info "Installing security packages"
 chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends \
     fail2ban
 
-# Install proxy packages from pi-router-apps artifacts
+# Install proxy packages from registry apps artifacts
 install_privoxy "${MOUNT_POINT}"
 
 # Generate Privoxy filters from AdBlock lists (runs on x86, outputs to chroot)
@@ -233,7 +233,7 @@ chroot_run "${MOUNT_POINT}" systemctl disable ModemManager 2>/dev/null || log_wa
 chroot_run "${MOUNT_POINT}" systemctl mask NetworkManager 2>/dev/null || log_warn "Could not mask NetworkManager — it may still start on boot"
 
 # Mask wpa_supplicant (we use hostapd for AP mode, not client mode)
-log_info "Disabling wpasupplicant"
+log_info "Disabling and masking wpa_supplicant service"
 chroot_run "${MOUNT_POINT}" systemctl disable wpa_supplicant 2>/dev/null || log_warn "Could not disable wpa_supplicant — service may not be installed"
 chroot_run "${MOUNT_POINT}" systemctl mask wpa_supplicant 2>/dev/null || log_warn "Could not mask wpa_supplicant — it may still start on boot"
 
@@ -333,20 +333,20 @@ sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
 sudo chmod 755 "${CACHE_DIR}/pimeleon-downloads"
 sudo chown "$(id -u):$(id -g)" "${CACHE_DIR}/pimeleon-downloads"
 
-# Fetch pre-built binaries from pi-router-apps (production only)
+# Fetch pre-built binaries from registry (production only)
 # Source is routed by get_pimeleon_apps_artifact: GitLab registry (dev CI) or GitHub releases (prod CI)
 # Non-production profiles fall back to APT sources via Ansible
 pkg="dnscrypt-proxy"
-if [[ "${PIMELEON_PROFILE:-development}" == "production" ]]; then
+if [[ "${PIMELEON_PROFILE}" == "production" ]]; then
     if ! get_pimeleon_apps_artifact "${pkg}" "${RPI_ARCH}" "${CACHE_DIR}/pimeleon-downloads"; then
         if is_service_enabled "${pkg//-/_}" 2>/dev/null; then
-            die "Failed to fetch ${pkg} from pi-router-apps and it is enabled in this profile."
+            die "Failed to fetch ${pkg} from apps registry and it is enabled in this profile."
         else
-            log_warn "Failed to fetch ${pkg} from pi-router-apps; service is not enabled, continuing."
+            log_warn "Failed to fetch ${pkg} from apps registry; service is not enabled, continuing."
         fi
     fi
 else
-    log_info "Profile '${PIMELEON_PROFILE:-development}': skipping artifact fetch for ${pkg}, APT source will be used"
+    log_info "Profile '${PIMELEON_PROFILE}': skipping artifact fetch for ${pkg}, APT source will be used"
 fi
 
 # Pi-hole FTL is built from source (see build-pihole-ftl.sh)
@@ -383,7 +383,7 @@ PIMELEON_UI_DEST="${MOUNT_POINT}/opt/pimeleon/ui"
 
 # Try to fetch from artifact (local cache or registry)
 UI_FETCHED=false
-if [[ "${PIMELEON_PROFILE:-}" == "production" ]]; then
+if [[ "${PIMELEON_PROFILE}" == "production" ]]; then
     log_info "Attempting to fetch pirouter-ui artifact..."
     sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
     if get_pimeleon_apps_artifact "pirouter-ui" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
@@ -437,7 +437,7 @@ if [[ "$UI_FETCHED" == "false" ]]; then
     if [[ -n "${PIMELEON_UI_BRANCH:-}" ]]; then
         # Use explicitly configured branch
         :
-    elif [[ "${PIMELEON_PROFILE:-development}" == "development" ]]; then
+    elif [[ "${PIMELEON_PROFILE}" == "development" ]]; then
         PIMELEON_UI_BRANCH="staging"
     else
         PIMELEON_UI_BRANCH="master"
@@ -471,7 +471,7 @@ if [[ "$UI_FETCHED" == "false" ]]; then
     fi
 
     # Build UI and API using pnpm (Node.js 22 installed in builder image)
-    log_info "Building Pimeleon UI and API (${PIMELEON_PROFILE:-development} mode, branch: ${PIMELEON_UI_BRANCH})..."
+    log_info "Building Pimeleon UI and API (${PIMELEON_PROFILE} mode, branch: ${PIMELEON_UI_BRANCH})..."
     export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
     pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
 
@@ -496,7 +496,7 @@ if [[ "$UI_FETCHED" == "false" ]]; then
     pnpm --filter "@pi-router/api" add jose
     export CI=true
     pnpm install --frozen-lockfile
-    NODE_ENV="${PIMELEON_PROFILE:-production}" pnpm build
+    NODE_ENV="${PIMELEON_PROFILE}" pnpm build
     popd > /dev/null
 
     # =============================================================================
@@ -635,9 +635,9 @@ EOF
     fi
 
     # Copy profile vars to all group
-    if [[ -f "${SHARED_VARS_DIR}/common/profiles/${PIMELEON_PROFILE:-development}.yml" ]]; then
-        cp "${SHARED_VARS_DIR}/common/profiles/${PIMELEON_PROFILE:-development}.yml" "${WORK_DIR}/group_vars/all/profile.yml"
-        log_info "Using profile: ${PIMELEON_PROFILE:-development}"
+    if [[ -f "${SHARED_VARS_DIR}/common/profiles/${PIMELEON_PROFILE}.yml" ]]; then
+        cp "${SHARED_VARS_DIR}/common/profiles/${PIMELEON_PROFILE}.yml" "${WORK_DIR}/group_vars/all/profile.yml"
+        log_info "Using profile: ${PIMELEON_PROFILE}"
     fi
 
     # Run playbooks with platform, version, app, and profile extra-vars
@@ -648,7 +648,7 @@ EOF
             --extra-vars "platform_model=${PIMELEON_RPI_MODEL:-3B+}" \
             --extra-vars "rpi_arch=${RPI_ARCH:-armhf}" \
             --extra-vars "debian_version=${RASPBIAN_VERSION:-bookworm}" \
-            --extra-vars "pimeleon_profile=${PIMELEON_PROFILE:-development}" \
+            --extra-vars "pimeleon_profile=${PIMELEON_PROFILE}" \
             --extra-vars "pimeleon_app=${TARGET_PLATFORM:-}" \
             --extra-vars "pimeleon_initial_password=${PIMELEON_INITIAL_PASSWORD:-netblox}" \
             --extra-vars "pimeleon_ap_name=${PIMELEON_AP_NAME:-Pimeleon}" \

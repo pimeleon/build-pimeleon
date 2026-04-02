@@ -18,7 +18,7 @@ services:
       - ./cache:/cache
       - ./shared/configs:/configs
       # Monorepo structure - inner mount must precede parent to survive parent's :ro
-      - ../pi-router-apps:/workspace/pi-router-apps:ro
+      - ../pi-router-apps:/workspace/registry-apps:ro
       - .:/workspace:ro
       - ./shared/scripts:/scripts:ro
       - ./shared/ansible:/ansible:ro
@@ -36,7 +36,7 @@ services:
       - OUTPUT_DIR=/output
       - CONFIG_DIR=/configs
       - WORKSPACE_DIR=/workspace
-      - PIMELEON_APPS_LOCAL_PATH=${PIMELEON_APPS_LOCAL_PATH:-/workspace/pi-router-apps}
+      - PIMELEON_APPS_LOCAL_PATH=${PIMELEON_APPS_LOCAL_PATH:-/workspace/registry-apps}
       - ANSIBLE_DIR=/ansible
       - ANSIBLE_CONFIG=/ansible/ansible.cfg
       - DEBIAN_FRONTEND=noninteractive
@@ -53,11 +53,11 @@ services:
       - IMAGE_COMPRESSION_LEVEL=${IMAGE_COMPRESSION_LEVEL:-6}
       # Build configuration
       - BUILD_PARALLEL_JOBS=${BUILD_PARALLEL_JOBS:-4}
-      - PIMELEON_PROFILE=${PIMELEON_PROFILE:-development}
+      - PIMELEON_PROFILE=${PIMELEON_PROFILE:-production}
       - PIMELEON_INITIAL_PASSWORD=${PIMELEON_INITIAL_PASSWORD:-netblox}
       # APT cache proxy (set APT_PROXY=host:port to enable)
       - APT_PROXY=${APT_PROXY:-}
-      # pi-router-apps package registry
+      # customized apps package registry
       - PIMELEON_APPS_PROJECT_ID=${PIMELEON_APPS_PROJECT_ID:-}
       - PIMELEON_APPS_READ_TOKEN=${PIMELEON_APPS_READ_TOKEN:-}
       # Network configuration - LAN

@@ -11,8 +11,8 @@ set -eu
 #   PIMELEON_APPS_SOURCE, PIMELEON_APPS_PROJECT_ID, PIMELEON_APPS_READ_TOKEN,
 #   PIMELEON_APPS_GITHUB_TOKEN
 
-[ -n "${TARGET_PLATFORM:-}" ]   || { echo "[ERROR] TARGET_PLATFORM is not set"; exit 1; }
-[ -n "${PIMELEON_PROFILE:-}" ] || { echo "[ERROR] PIMELEON_PROFILE is not set"; exit 1; }
+[ -n "${TARGET_PLATFORM}" ]   || { echo "[ERROR] TARGET_PLATFORM is not set"; exit 1; }
+[ -n "${PIMELEON_PROFILE}" ] || { echo "[ERROR] PIMELEON_PROFILE is not set"; exit 1; }
 echo "Building Pimeleon image for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."
 
 mkdir -p output cache
@@ -31,9 +31,7 @@ SCRIPTS_DIR="./shared/scripts"
 echo "Using ansible=${ANSIBLE_DIR} configs=${CONFIGS_DIR} scripts=${SCRIPTS_DIR}"
 
 # Compute version
-chmod +x "${SCRIPTS_DIR}/get-next-version.sh"
-BASE_VERSION=$("${SCRIPTS_DIR}/get-next-version.sh" "${TARGET_PLATFORM}")
-PIMELEON_VERSION="${BASE_VERSION}"
+PIMELEON_VERSION=$(.gitlab/scripts/resolve-version.sh base "${TARGET_PLATFORM}")
 echo "[INFO] Building version: ${PIMELEON_VERSION}"
 
 # Create and start build container

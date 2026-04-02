@@ -104,7 +104,6 @@ packages:
   # Additional packages
   additional:
     - wireless-tools
-    - wpasupplicant
 
 # Storage configuration
 storage:
