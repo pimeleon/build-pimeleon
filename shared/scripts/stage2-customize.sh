@@ -40,6 +40,12 @@ setup_chroot "${MOUNT_POINT}"
 # Configure APT cache for chroot environment early
 configure_chroot_apt_proxy "${MOUNT_POINT}"
 
+# Protect resolv.conf before any apt-get runs.
+# systemd-resolved (in SYSTEM_PKGS) replaces /etc/resolv.conf with a symlink to
+# ../run/systemd/resolve/stub-resolv.conf (127.0.0.53), which is unreachable inside
+# the chroot namespace and breaks all subsequent apt-get operations.
+sudo chattr +i "${MOUNT_POINT}/etc/resolv.conf" 2>/dev/null || true
+
 # Update sources.list to ensure it matches current configuration (even if using old base cache)
 log_info "Updating APT sources"
 if [[ "${RPI_ARCH:-armhf}" == "arm64" ]]; then
@@ -147,6 +153,7 @@ chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${BU
 
 # Restore and protect resolv.conf (systemd-resolved might have converted it to a symlink)
 log_info "Restoring and protecting resolv.conf"
+sudo chattr -i "${MOUNT_POINT}/etc/resolv.conf" 2>/dev/null || true
 sudo rm -f "${MOUNT_POINT}/etc/resolv.conf"
 sudo tee "${MOUNT_POINT}/etc/resolv.conf" > /dev/null <<EOF
 # DNS for chroot build environment (restored after package installation)
