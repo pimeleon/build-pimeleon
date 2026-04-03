@@ -21,7 +21,7 @@ if [ -z "${CLEANUP_IMAGE}" ]; then
 fi
 
 if [ -n "${CLEANUP_IMAGE}" ]; then
-    echo "Cleaning up stale host loop devices using image: ${CLEANUP_IMAGE}"
+    echo "Cleaning up host loop devices (stale and active) using image: ${CLEANUP_IMAGE}"
     # Run a privileged helper container to clean up host loop devices.
     # We mount /dev, /run (for udev/lvm), and /sys to allow the container to manipulate host devices.
     docker run --rm \
@@ -33,7 +33,42 @@ if [ -n "${CLEANUP_IMAGE}" ]; then
         -v "$PWD":/workspace \
         -w /workspace \
         "${CLEANUP_IMAGE}" \
-        sh /workspace/.gitlab/scripts/cleanup-stale-loop-devices.sh || true
+        /bin/bash -c '
+set -eu
+
+# Clean up ALL loop devices associated with pimeleon images or build artifacts
+# This handles both active (from current build) and stale (from previous failures) devices
+
+all_loops=$(losetup -l -n -O NAME,BACK-FILE 2>/dev/null | grep -E "pimeleon|/tmp/build" | awk "{print \$1}" || true)
+
+if [ -z "${all_loops}" ]; then
+    echo "No loop devices found."
+    exit 0
+fi
+
+echo "Cleaning all loop devices:"
+for loop in ${all_loops}; do
+    echo "  - ${loop}"
+
+    loop_name=$(basename "${loop}")
+
+    for part in "/dev/mapper/${loop_name}p1" "/dev/mapper/${loop_name}p2" "/dev/${loop_name}p1" "/dev/${loop_name}p2"; do
+        if [ -e "${part}" ]; then
+            mount_points=$(findmnt -rn -S "${part}" -o TARGET 2>/dev/null || true)
+            if [ -n "${mount_points}" ]; then
+                echo "    unmounting ${part} mountpoints"
+                for mnt in ${mount_points}; do
+                    echo "      - ${mnt}"
+                    umount "${mnt}" 2>/dev/null || umount -l "${mnt}" 2>/dev/null || true
+                done
+            fi
+        fi
+    done
+
+    kpartx -d "${loop}" 2>/dev/null || true
+    losetup -d "${loop}" 2>/dev/null || true
+done
+' || true
 else
-    echo "[WARN] No builder image found for host loop cleanup. Stale loop devices may remain."
+    echo "[WARN] No builder image found for host loop cleanup. Loop devices may remain."
 fi
