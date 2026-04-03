@@ -104,8 +104,7 @@ COPY apps/ /workspace/apps/
 RUN mkdir -p /workspace/pi-router-apps && chown -R builder:docker /workspace
 
 # Cache Debian Buster base for debootstrap (matching production Pi 3B+)
-ADD --checksum=sha256:8b9ddf0a5c3371b337e68fbfd7034ccf1b0bd3494d4c998a9da14ae8cf4b8c28 \
-    http://deb.debian.org/debian/dists/buster/Release \
+ADD http://archive.debian.org/debian/dists/buster/Release \
     /cache/debian-buster-release
 
 # Set environment variables
