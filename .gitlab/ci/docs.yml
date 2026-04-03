@@ -56,9 +56,10 @@ trigger-docs-preview:
     name: documentation/preview
     url: https://preview.pimeleon-docs.pages.dev
   rules:
-    # Trigger on any non-MR pipeline for develop (direct push or merged MR)
-    - if: '$CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_BRANCH == "develop"'
-    - when: never
+    # Trigger on tags
+    - if: '$CI_COMMIT_TAG'
+    # Trigger on MRs targeting release/* or develop for preview
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
 
 # Trigger production site build on downstream repository
 trigger-docs-production:

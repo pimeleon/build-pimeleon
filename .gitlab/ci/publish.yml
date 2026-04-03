@@ -2,8 +2,41 @@
 # GitLab CI/CD - Publishing
 # Image registry, GitLab Pages, and Documentation Previews
 
-# Dry-run R2 validation (actual upload delegated to GitHub Actions)
-deploy:r2-dryrun:
+# Upload platform image artifacts to the GitLab Generic Packages registry.
+# Runs on direct push and MR merges targeting release/* branches.
+publish:image:
+  stage: publish
+  image: alpine:latest
+  tags:
+    - lightweight
+  environment:
+    name: production
+  needs:
+    - job: setup:platform
+      artifacts: true
+    - job: build:pimeleon
+      artifacts: true
+    - job: test:smoke
+      optional: true
+    - job: test:integration
+      optional: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_BRANCH =~ /^release\//'
+      when: on_success
+    - when: never
+  before_script:
+    - apk add --no-cache curl git
+  script:
+    - chmod +x .gitlab/scripts/publish-image.sh
+    - .gitlab/scripts/publish-image.sh
+  artifacts:
+    paths:
+      - output/*.img.xz
+      - output/*.sha256
+    expire_in: 1 week
+
+# Run upload to Cloudflare R2
+deploy:r2:
   stage: publish
   image: alpine:latest
   tags:
@@ -13,6 +46,8 @@ deploy:r2-dryrun:
       artifacts: true
     - job: build:pimeleon
       artifacts: true
+    - job: publish:image
+      artifacts: false
     - job: test:smoke
       artifacts: false
       optional: true
