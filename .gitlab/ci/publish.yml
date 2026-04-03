@@ -28,6 +28,8 @@ deploy:r2-dryrun:
     AWS_DEFAULT_REGION: auto
   environment:
     name: production
+  before_script:
+    - apk add --no-cache curl git
   script:
     - chmod +x .gitlab/scripts/deploy-r2.sh
     - .gitlab/scripts/deploy-r2.sh

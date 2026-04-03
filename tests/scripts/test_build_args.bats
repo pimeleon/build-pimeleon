@@ -93,7 +93,8 @@ _run_with_noop_main() {
     stop_line=$(grep -n '^main "\$@"' "$BUILD_LOCAL" | tail -1 | cut -d: -f1)
     run bash -c '
         set -- "$@"
-        source <(head -n '"$((stop_line - 1))"' "'"$BUILD_LOCAL"'") 2>/dev/null
+        export PROJECT_ROOT="'"${PROJECT_ROOT}"'"
+        source <(head -n '"$((stop_line - 1))"' "'"$BUILD_LOCAL"'")
         echo "PROFILE=${PIMELEON_PROFILE}"
         echo "MODEL=${PIMELEON_RPI_MODEL}"
         echo "VERSION=${RASPBIAN_VERSION}"

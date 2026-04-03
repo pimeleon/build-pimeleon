@@ -2,7 +2,7 @@
 set -eu
 
 # Install dependencies needed for version calculation and R2 uploads
-apk add --no-cache git aws-cli >/dev/null 2>&1 || true
+apk add --no-cache git aws-cli curl >/dev/null 2>&1 || true
 
 # Deploy Pimeleon image artifacts to Cloudflare R2 via S3-compatible API.
 #
@@ -11,8 +11,20 @@ apk add --no-cache git aws-cli >/dev/null 2>&1 || true
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION (set by job)
 
 VERSION=$(sh .gitlab/scripts/resolve-version.sh base "${TARGET_PLATFORM}")
+PACKAGE_VERSION=$(sh .gitlab/scripts/resolve-version.sh package "${TARGET_PLATFORM}")
 UPLOAD_PREFIX="${TARGET_PLATFORM}/v${VERSION}"
 echo "Deploying to R2: s3://${R2_BUCKET}/${UPLOAD_PREFIX}/"
+
+# Check for artifacts and handle skip case
+if [ ! -d "output" ] || [ -z "$(ls -A output/pimeleon-*.img.xz 2>/dev/null)" ]; then
+    if sh .gitlab/scripts/check-package-exists.sh "${PACKAGE_VERSION}"; then
+        echo "[INFO] Package ${PACKAGE_VERSION} already exists in the registry and no fresh artifacts were produced. Skipping R2 deployment."
+        exit 0
+    fi
+
+    echo "[ERROR] No artifacts found in output/ and package ${PACKAGE_VERSION} does not exist in registry."
+    exit 1
+fi
 
 cd output
 for file in pimeleon-*.img.xz pimeleon-*.img.metadata.json; do
