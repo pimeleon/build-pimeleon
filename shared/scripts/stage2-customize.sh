@@ -449,121 +449,9 @@ log_info "Building Pimeleon UI and API (${PIMELEON_PROFILE} mode, branch: ${PIME
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 pushd "${PIMELEON_UI_BUILD_DIR}" > /dev/null
 
-get_npm_proxy_url() {
-    printf '%s' "${npm_config_https_proxy:-${NPM_CONFIG_HTTPS_PROXY:-${npm_config_proxy:-${NPM_CONFIG_PROXY:-${NPM_HTTPS_PROXY:-${NPM_PROXY:-${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY:-${http_proxy:-${ALL_PROXY:-${all_proxy:-}}}}}}}}}}}}"
-}
-
-get_npm_registry_url() {
-    printf '%s' "${npm_config_registry:-${NPM_CONFIG_REGISTRY:-${NPM_REGISTRY:-}}}"
-}
-
-npm_proxy_config_url() {
-    local endpoint="$1"
-
-    case "$endpoint" in
-        http://*|https://*)
-            printf '%s' "$endpoint"
-            ;;
-        *)
-            printf 'http://%s' "$endpoint"
-            ;;
-    esac
-}
-
-npm_endpoint_reachable() {
-    local endpoint="$1"
-    local target host port
-
-    [[ -n "$endpoint" ]] || return 0
-
-    target="${endpoint#*://}"
-    target="${target%%/*}"
-    target="${target##*@}"
-
-    if [[ "$target" == \[*\]:* ]]; then
-        host="${target%%]*}"
-        host="${host#[}"
-        port="${target##*:}"
-    elif [[ "$target" == *:* ]]; then
-        host="${target%:*}"
-        port="${target##*:}"
-    else
-        host="$target"
-        case "$endpoint" in
-            http://*) port=80 ;;
-            https://*) port=443 ;;
-            *) port=443 ;;
-        esac
-    fi
-
-    timeout 2 bash -c "cat < /dev/null > /dev/tcp/${host}/${port}" 2>/dev/null
-}
-
-run_pnpm_command() {
-    if [[ "${NPM_DISABLE_PROXY_FALLBACK:-0}" == "1" ]]; then
-        env -u npm_config_registry \
-            -u NPM_CONFIG_REGISTRY \
-            -u NPM_REGISTRY \
-            -u npm_config_proxy \
-            -u NPM_CONFIG_PROXY \
-            -u npm_config_https_proxy \
-            -u NPM_CONFIG_HTTPS_PROXY \
-            -u NPM_PROXY \
-            -u NPM_HTTPS_PROXY \
-            -u HTTP_PROXY \
-            -u HTTPS_PROXY \
-            -u http_proxy \
-            -u https_proxy \
-            -u ALL_PROXY \
-            -u all_proxy \
-            pnpm "$@"
-    else
-        pnpm "$@"
-    fi
-}
-
-NPM_PROXY_URL="$(get_npm_proxy_url)"
-NPM_REGISTRY_URL="$(get_npm_registry_url)"
-NPM_PROXY_CONFIG_URL="$(npm_proxy_config_url "${NPM_PROXY_URL}")"
-NPM_DISABLE_PROXY_FALLBACK=0
-
-if [[ -n "${NPM_PROXY_URL}" ]] && ! npm_endpoint_reachable "${NPM_PROXY_URL}"; then
-    log_warn "pnpm: npm proxy ${NPM_PROXY_URL} is unreachable; falling back to no proxy"
-    NPM_DISABLE_PROXY_FALLBACK=1
-fi
-
-if [[ -n "${NPM_REGISTRY_URL}" ]] && ! npm_endpoint_reachable "${NPM_REGISTRY_URL}"; then
-    log_warn "pnpm: npm registry ${NPM_REGISTRY_URL} is unreachable; falling back to default registry"
-    NPM_DISABLE_PROXY_FALLBACK=1
-fi
-
 # Configure pnpm caching and always use the default registry.
-run_pnpm_command config set store-dir "${CACHE_DIR}/.pnpm-store"
-if [[ "${NPM_DISABLE_PROXY_FALLBACK}" == "1" ]] || [[ -z "${NPM_PROXY_URL}" ]]; then
-    run_pnpm_command config delete proxy 2>/dev/null || true
-    run_pnpm_command config delete https-proxy 2>/dev/null || true
-else
-    run_pnpm_command config set proxy "${NPM_PROXY_CONFIG_URL}"
-    run_pnpm_command config set https-proxy "${NPM_PROXY_CONFIG_URL}"
-fi
-
-if [[ "${NPM_DISABLE_PROXY_FALLBACK}" == "1" ]] || [[ -z "${NPM_REGISTRY_URL}" ]]; then
-    run_pnpm_command config delete registry 2>/dev/null || true
-else
-    run_pnpm_command config set registry "${NPM_REGISTRY_URL}"
-fi
-
-if [[ "${NPM_DISABLE_PROXY_FALLBACK}" == "1" ]]; then
-    log_info "pnpm: using cache at ${CACHE_DIR}/.pnpm-store with default registry and no proxy"
-elif [[ -n "${NPM_REGISTRY_URL}" ]] && [[ -n "${NPM_PROXY_URL}" ]]; then
-    log_info "pnpm: using cache at ${CACHE_DIR}/.pnpm-store with registry ${NPM_REGISTRY_URL} via proxy ${NPM_PROXY_URL}"
-elif [[ -n "${NPM_REGISTRY_URL}" ]]; then
-    log_info "pnpm: using cache at ${CACHE_DIR}/.pnpm-store with registry ${NPM_REGISTRY_URL}"
-elif [[ -n "${NPM_PROXY_URL}" ]]; then
-    log_info "pnpm: using cache at ${CACHE_DIR}/.pnpm-store with default registry via proxy ${NPM_PROXY_URL}"
-else
-    log_info "pnpm: using cache at ${CACHE_DIR}/.pnpm-store with default registry"
-fi
+pnpm config set store-dir "${CACHE_DIR}/.pnpm-store"
+log_info "pnpm: using cache at ${CACHE_DIR}/.pnpm-store with default registry"
 
 # Always start with clean node_modules to avoid store mismatch (ERR_NPM_UNEXPECTED_STORE)
 # or included dependencies conflicts (ERR_INCLUDED_DEPS_CONFLICT)
@@ -571,12 +459,12 @@ rm -rf node_modules
 
 # Ensure jose is present in the API package
 log_info "pnpm: preparing workspace dependencies"
-run_pnpm_command --filter "@pi-router/api" add jose
+pnpm --filter "@pi-router/api" add jose
 export CI=true
 log_info "pnpm: running frozen install"
-run_pnpm_command install --frozen-lockfile
+pnpm install --frozen-lockfile
 log_info "pnpm: running build"
-NODE_ENV="${PIMELEON_PROFILE}" run_pnpm_command build
+NODE_ENV="${PIMELEON_PROFILE}" pnpm build
 popd > /dev/null
 
 # =============================================================================
