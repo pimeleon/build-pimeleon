@@ -12,31 +12,11 @@ PIMELEON_GROUP="${PIMELEON_GROUP:-docker}"
 # Directory configuration
 CACHE_DIR="${CACHE_DIR:-/cache}"
 
-# Color codes for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Source logging library
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/lib-logging.sh"
 
-# Logging functions
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $*"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $*"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $*"
-}
-
-log_section() {
-    echo -e "\n${BLUE}==>${NC} $*"
-}
-
-# Error handling
+# Project name for cache keys and output naming
 die() {
     log_error "$*"
     exit 1
@@ -721,6 +701,7 @@ fetch_pimeleon_apps() {
     local reg="https://gitlab.pirouter.dev/api/v4/projects/${PIMELEON_APPS_PROJECT_ID}/packages/generic"
     local list_url="https://gitlab.pirouter.dev/api/v4/projects/${PIMELEON_APPS_PROJECT_ID}/packages?package_type=generic&package_name=${package}&per_page=5&order_by=created_at&sort=desc"
 
+    log_info "Listing ${package}/${arch} versions in pi-router-apps registry"
     local raw http_code api_response
     raw=$(curl -sLk \
             -H "PRIVATE-TOKEN: ${PIMELEON_APPS_READ_TOKEN}" \
@@ -748,7 +729,8 @@ fetch_pimeleon_apps() {
 
     local fname="${package}-${version}-${arch}-pimeleon.tar.gz"
     local url="${reg}/${package}/${arch}-${version}/${fname}"
-    log_info "Fetching ${package} ${version} (${arch}) from apps registry"
+    log_info "Resolved ${package} ${version} (${arch}) in pi-router-apps registry"
+    log_info "Download URL: ${url}"
 
     http_code=$(curl -sLk \
             -H "PRIVATE-TOKEN: ${PIMELEON_APPS_READ_TOKEN}" \
@@ -781,6 +763,7 @@ fetch_pimeleon_apps_github() {
 
     local gh_list_url="${api_url}?per_page=10"
     local raw http_code api_response
+    log_info "Listing GitHub releases for ${package}/${arch}"
     raw=$(curl -sL \
             "${auth_args[@]}" \
             -H "Accept: application/vnd.github+json" \
@@ -807,7 +790,8 @@ fetch_pimeleon_apps_github() {
         return 1
     fi
 
-    log_info "Fetching ${package} (${arch}) from GitHub package registry"
+    log_info "Resolved ${package} (${arch}) in GitHub releases"
+    log_info "Download URL: ${asset_url}"
     http_code=$(curl -sL \
             "${auth_args[@]}" \
             -o "${download_dir}/${package}.tar.gz" \
@@ -824,8 +808,9 @@ fetch_pimeleon_apps_github() {
 }
 
 # Get a pre-built binary package from the appropriate source based on build context.
-# CI development builds (MR to release/*): GitLab package registry.
-# CI production builds (tag or push to release/*): GitHub releases.
+# CI production builds (tag or push/MR to release/*): GitHub releases.
+# CI development builds (push/MR to develop): GitLab package registry.
+# Other non-release CI branches also use GitLab registry as the safest default.
 # Local builds: local mounted registry-apps path, then GitLab registry as fallback.
 # Source can be forced via PIMELEON_APPS_SOURCE=gitlab|github.
 # Usage: get_pimeleon_apps_artifact <package> <arch> <download_dir>
@@ -835,11 +820,25 @@ get_pimeleon_apps_artifact() {
     local download_dir="$3"
     local local_path="${PIMELEON_APPS_LOCAL_PATH:-/workspace/registry-apps}"
 
-    # 1. CI environment: PIMELEON_APPS_SOURCE must be set (via CI rules variables)
+    # 1. CI environment: auto-detect source unless explicitly set
     if [[ -n "${CI:-}" ]] || [[ -n "${GITLAB_CI:-}" ]]; then
-        [[ -n "${PIMELEON_APPS_SOURCE:-}" ]] || die "PIMELEON_APPS_SOURCE is not set — must be 'gitlab' or 'github'"
-
-        case "${PIMELEON_APPS_SOURCE}" in
+        local source="${PIMELEON_APPS_SOURCE:-}"
+        if [[ -z "${source}" ]]; then
+            if [[ -n "${CI_COMMIT_TAG:-}" ]] || \
+               [[ "${CI_COMMIT_BRANCH:-}" =~ ^release/ ]] || \
+               [[ "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}" =~ ^release/ ]]; then
+                source="github"
+                log_info "Auto-detected apps source: github (production build)"
+            elif [[ "${CI_COMMIT_BRANCH:-}" == "develop" ]] || \
+                 [[ "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}" == "develop" ]]; then
+                source="gitlab"
+                log_info "Auto-detected apps source: gitlab (develop build)"
+            else
+                source="gitlab"
+                log_info "Auto-detected apps source: gitlab (non-release CI build)"
+            fi
+        fi
+        case "${source}" in
             github)
                 log_info "CI (production): fetching ${package} from GitHub releases"
                 fetch_pimeleon_apps_github "$package" "$arch" "$download_dir"
@@ -851,7 +850,7 @@ get_pimeleon_apps_artifact() {
                 return $?
                 ;;
             *)
-                die "Unknown PIMELEON_APPS_SOURCE '${PIMELEON_APPS_SOURCE}' — must be 'gitlab' or 'github'"
+                die "Unknown PIMELEON_APPS_SOURCE '${source}' — must be 'gitlab' or 'github'"
                 ;;
         esac
     fi
@@ -870,6 +869,7 @@ get_pimeleon_apps_artifact() {
 
         if [[ -n "${local_file:-}" ]]; then
             log_info "Using local artifact: ${local_file}"
+            log_info "Copying ${package} artifact into ${download_dir}"
             sudo cp "${local_file}" "${download_dir}/${package}.tar.gz"
             return 0
         fi

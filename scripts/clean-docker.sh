@@ -3,31 +3,11 @@
 
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Source logging library
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/../shared/scripts/lib-logging.sh"
 
 echo -e "${BLUE}🧹 Pimeleon Build System - Selective Docker Cleanup${NC}"
-echo "============================================================"
-
-# Function to print colored output
-print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
 
 # Check if we want to preserve caches
 PRESERVE_CACHE=true
@@ -72,7 +52,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            print_error "Unknown option: $1"
+            log_error "Unknown option: $1"
             echo "Use --help for usage information"
             exit 1
             ;;
@@ -80,17 +60,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Get current disk usage
-print_info "Checking disk space before cleanup..."
+log_info "Checking disk space before cleanup..."
 BEFORE_SPACE=$(df -h / | tail -1 | awk '{print $4}')
 echo "Available space: $BEFORE_SPACE"
 
 # Stop Docker Compose services
-print_info "Stopping Docker Compose services..."
+log_info "Stopping Docker Compose services..."
 docker compose down 2>/dev/null || true
 
 # List cache status before cleanup
 if [[ "$PRESERVE_CACHE" == "true" ]]; then
-    print_info "Checking cache status..."
+    log_info "Checking cache status..."
     if [[ -d "./cache" ]]; then
         echo "Local cache directory contents:"
         ls -lah ./cache/ 2>/dev/null || echo "  (empty or no access)"
@@ -101,7 +81,7 @@ fi
 TEMP_CACHE_DIR=""
 if [[ "$PRESERVE_CACHE" == "true" ]] && [[ -d "./cache" ]] && [[ -n "$(ls -A ./cache 2>/dev/null)" ]]; then
     TEMP_CACHE_DIR=$(mktemp -d)
-    print_info "Backing up cache directory to $TEMP_CACHE_DIR"
+    log_info "Backing up cache directory to $TEMP_CACHE_DIR"
     # Use rsync if available for more reliable copy, fallback to cp
     if command -v rsync &>/dev/null; then
         rsync -a ./cache/ "$TEMP_CACHE_DIR/"
@@ -111,48 +91,48 @@ if [[ "$PRESERVE_CACHE" == "true" ]] && [[ -d "./cache" ]] && [[ -n "$(ls -A ./c
 fi
 
 # Cleanup Docker resources (granularly to avoid stalls and provide feedback)
-print_info "Removing stopped Docker containers..."
+log_info "Removing stopped Docker containers..."
 docker container prune -f
 
-print_info "Cleaning up stale host loop devices (if any)..."
+log_info "Cleaning up stale host loop devices (if any)..."
 if [ -f "./.gitlab/scripts/cleanup-stale-loop-devices.sh" ]; then
     sudo bash ./.gitlab/scripts/cleanup-stale-loop-devices.sh 2>/dev/null || true
 fi
 
-print_info "Removing unused Docker networks..."
+log_info "Removing unused Docker networks..."
 docker network prune -f
 
-print_info "Removing unused Docker images (preserving adblock2privoxy)..."
+log_info "Removing unused Docker images (preserving adblock2privoxy)..."
 # Keep pimeleon-adblock2privoxy:latest if it exists
 docker image prune -f --filter "label!=com.pimeleon.image=adblock2privoxy"
 
 # Cleanup build cache
-print_info "Clearing Docker build cache..."
+log_info "Clearing Docker build cache..."
 docker builder prune -af
 
 # Handle volumes
 if [[ "$PRESERVE_VOLUMES" == "true" ]]; then
-    print_warning "Preserving Docker volumes (apt-cache, debootstrap-cache, pip-cache)"
+    log_warn "Preserving Docker volumes (apt-cache, debootstrap-cache, pip-cache)"
     # Only remove orphaned volumes
-    print_info "Removing orphaned volumes..."
+    log_info "Removing orphaned volumes..."
     docker volume prune -f
 else
-    print_warning "Removing all Docker volumes including caches"
+    log_warn "Removing all Docker volumes including caches"
     docker volume prune -af
 fi
 
 # Handle local cache directory
 if [[ "$PRESERVE_CACHE" == "false" ]]; then
-    print_warning "Removing local cache directory"
+    log_warn "Removing local cache directory"
     sudo rm -rf ./cache
     mkdir -p ./cache
 else
-    print_info "Preserving local cache directory"
+    log_info "Preserving local cache directory"
 fi
 
 # Restore cache if we backed it up
 if [[ -n "$TEMP_CACHE_DIR" ]] && [[ "$PRESERVE_CACHE" == "true" ]]; then
-    print_info "Restoring cache directory"
+    log_info "Restoring cache directory"
     mkdir -p ./cache
     if command -v rsync &>/dev/null; then
         rsync -a "$TEMP_CACHE_DIR/" ./cache/
@@ -165,16 +145,16 @@ fi
 # Reload cached images if missing
 if [[ -f "./cache/pimeleon-adblock2privoxy.tar.gz" ]]; then
     if ! docker image inspect pimeleon-adblock2privoxy:latest &>/dev/null; then
-        print_info "Reloading adblock2privoxy image from cache..."
+        log_info "Reloading adblock2privoxy image from cache..."
         zcat "./cache/pimeleon-adblock2privoxy.tar.gz" | docker load
     else
-        print_info "adblock2privoxy image already exists, skipping reload"
+        log_info "adblock2privoxy image already exists, skipping reload"
     fi
 fi
 
 # Handle output directory cleanup
 if [[ "$CLEAN_OUTPUT" == "true" ]] && [[ -d "./output" ]]; then
-    print_info "Cleaning output directory..."
+    log_info "Cleaning output directory..."
 
     # Count files before cleanup
     IMG_COUNT=$(find ./output -name "*.img" -type f | wc -l 2>/dev/null || echo "0")
@@ -189,9 +169,9 @@ if [[ "$CLEAN_OUTPUT" == "true" ]] && [[ -d "./output" ]]; then
             LATEST_BASENAME=$(basename "$LATEST_IMG" .img)
             LATEST_LOG="./output/build-${LATEST_BASENAME#pimeleon-}.log"
 
-            print_warning "Preserving latest image: $(basename "$LATEST_IMG")"
+            log_warn "Preserving latest image: $(basename "$LATEST_IMG")"
             if [[ -f "$LATEST_LOG" ]]; then
-                print_warning "Preserving latest log: $(basename "$LATEST_LOG")"
+                log_warn "Preserving latest log: $(basename "$LATEST_LOG")"
             fi
 
             # Remove old images (keep latest)
@@ -211,23 +191,23 @@ if [[ "$CLEAN_OUTPUT" == "true" ]] && [[ -d "./output" ]]; then
         REMOVED_IMG=$((IMG_COUNT - REMAINING_IMG))
         REMOVED_LOG=$((LOG_COUNT - REMAINING_LOG))
 
-        print_success "Removed $REMOVED_IMG old images and $REMOVED_LOG old logs"
+        log_success "Removed $REMOVED_IMG old images and $REMOVED_LOG old logs"
         echo "Kept: $REMAINING_IMG image(s), $REMAINING_LOG log(s), and pi-initial-password.txt"
     else
-        print_info "Output directory is already clean (no .img or .log files found)"
+        log_info "Output directory is already clean (no .img or .log files found)"
     fi
 else
     if [[ "$CLEAN_OUTPUT" == "false" ]]; then
-        print_info "Preserving all output files"
+        log_info "Preserving all output files"
     fi
 fi
 
 # Check space after cleanup
-print_info "Checking disk space after cleanup..."
+log_info "Checking disk space after cleanup..."
 AFTER_SPACE=$(df -h / | tail -1 | awk '{print $4}')
 echo "Available space: $AFTER_SPACE (was: $BEFORE_SPACE)"
 
-print_success "Selective cleanup completed!"
+log_success "Selective cleanup completed!"
 
 # Show preserved resources
 echo ""

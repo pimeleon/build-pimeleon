@@ -3,22 +3,13 @@
 # Runs build directly on host without Docker container
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$SCRIPT_DIR")}"
 BUILDER_SCRIPTS="${PROJECT_ROOT}/containers/builder/scripts"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log_info() { echo -e "${BLUE}[INFO]${NC} $*"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $*"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
-log_section() { echo -e "\n${GREEN}=== $* ===${NC}"; }
+# Source logging library
+# shellcheck disable=SC1091
+source "${PROJECT_ROOT}/shared/scripts/lib-logging.sh"
 
 # Default configuration
 export PIMELEON_RPI_MODEL="${PIMELEON_RPI_MODEL:-3B+}"
