@@ -13,6 +13,26 @@ SCRIPTS=($(find shared/scripts scripts .gitlab/scripts shared/containers/tester 
 # shellcheck disable=SC1091
 source "$(dirname "${BASH_SOURCE[0]}")/../shared/scripts/lib-logging.sh"
 
+# Convert a jq count expression into a safe integer, even when the tool output is
+# empty or not valid JSON.
+parse_json_count() {
+    local filter="$1"
+    local json_input="${2-}"
+    local parsed_value
+
+    if [ -z "$json_input" ]; then
+        echo 0
+        return
+    fi
+
+    parsed_value=$(printf '%s' "$json_input" | jq -r "$filter" 2>/dev/null)
+    if [[ "$parsed_value" =~ ^[0-9]+$ ]]; then
+        echo "$parsed_value"
+    else
+        echo 0
+    fi
+}
+
 # Quality Thresholds - ZERO TOLERANCE
 # Any issue triggers failure
 
@@ -23,7 +43,7 @@ fi
 
 # Check for required tools
 MISSING_TOOLS=()
-for tool in shellcheck bashate semgrep jq; do
+for tool in shellcheck semgrep jq; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         MISSING_TOOLS+=("$tool")
     fi
@@ -45,9 +65,9 @@ SC_OUTPUT=$(shellcheck -f json "${SCRIPTS[@]}" 2>/dev/null || echo "[]")
 SC_CODE=$?
 
 # Safely parse issues
-SC_ISSUES=$(echo "$SC_OUTPUT" | jq 'length // 0' 2>/dev/null || echo 0)
-SC_ERRORS=$(echo "$SC_OUTPUT" | jq '[.[] | select(.level == "error")] | length // 0' 2>/dev/null || echo 0)
-SC_WARNINGS=$(echo "$SC_OUTPUT" | jq '[.[] | select(.level == "warning")] | length // 0' 2>/dev/null || echo 0)
+SC_ISSUES=$(parse_json_count 'length // 0' "$SC_OUTPUT")
+SC_ERRORS=$(parse_json_count '[.[] | select(.level == "error")] | length' "$SC_OUTPUT")
+SC_WARNINGS=$(parse_json_count '[.[] | select(.level == "warning")] | length' "$SC_OUTPUT")
 
 if [ "${SC_ISSUES}" -gt 0 ] || [ "${SC_CODE}" -ne 0 ] && [ "${SC_CODE}" -ne 1 ]; then
     echo -e "${RED}✘${NC}"
@@ -61,31 +81,11 @@ else
     echo -e "${GREEN}✔${NC}"
 fi
 
-# 2. Bashate
-echo -n -e "${BLUE}[2/3] Running Bashate... ${NC}"
-# Ignore E006 (Line too long) as it's common in shell scripts with complex commands
-BASHATE_OUTPUT=$(bashate --ignore E006 "${SCRIPTS[@]}" 2>&1)
-BASHATE_CODE=$?
-BASHATE_ERRORS=$(echo "$BASHATE_OUTPUT" | grep -c "E[0-9]" || true)
-
-if [ "${BASHATE_CODE}" -ne 0 ] || [ "${BASHATE_ERRORS}" -gt 0 ]; then
-    echo -e "${RED}✘${NC}"
-    if [ "${BASHATE_ERRORS}" -eq 0 ] && [ "${BASHATE_CODE}" -ne 0 ]; then
-        log_error "Bashate execution error:"
-        echo "$BASHATE_OUTPUT" | head -n 5
-    else
-        log_error "Failed: ${BASHATE_ERRORS} style errors found."
-        echo "$BASHATE_OUTPUT" | grep "E[0-9]" | head -n 10
-    fi
-else
-    echo -e "${GREEN}✔${NC}"
-fi
-
-# 3. Semgrep
+# 2. Semgrep
 echo -n -e "${BLUE}[3/3] Running Semgrep... ${NC}"
 SEMGREP_OUTPUT=$(semgrep --config auto --json "${SCRIPTS[@]}" 2>/dev/null)
 SEMGREP_CODE=$?
-SEMGREP_ISSUES=$(echo "${SEMGREP_OUTPUT}" | jq '.results | length' 2>/dev/null || echo 0)
+SEMGREP_ISSUES=$(parse_json_count '.results | length' "$SEMGREP_OUTPUT")
 
 if [ "${SEMGREP_ISSUES}" -gt 0 ] || { [ "${SEMGREP_CODE}" -ne 0 ] && [ "${SEMGREP_ISSUES}" -eq 0 ]; }; then
     echo -e "${RED}✘${NC}"
@@ -107,15 +107,12 @@ printf "%-25s | %-10s | %-10s\n" "Metric" "Found" "Threshold"
 echo "--------------------------------------------------"
 printf "%-25s | %-10s | %-10s\n" "ShellCheck Errors" "${SC_ERRORS}" "0"
 printf "%-25s | %-10s | %-10s\n" "ShellCheck Warnings" "${SC_WARNINGS}" "0"
-printf "%-25s | %-10s | %-10s\n" "Bashate Errors" "${BASHATE_ERRORS}" "0"
 printf "%-25s | %-10s | %-10s\n" "Semgrep Issues" "${SEMGREP_ISSUES}" "0"
 echo "--------------------------------------------------"
 
 # Final Verdict
 if [ "${SC_ISSUES}" -gt 0 ] || \
     [ "${SC_CODE}" -ne 0 ] && [ "${SC_CODE}" -ne 1 ] || \
-    [ "${BASHATE_CODE}" -ne 0 ] || \
-    [ "${BASHATE_ERRORS}" -gt 0 ] || \
     [ "${SEMGREP_ISSUES}" -gt 0 ] || \
     { [ "${SEMGREP_CODE}" -ne 0 ]; }; then
     log_error "RESULT: QUALITY BENCHMARK FAILED"

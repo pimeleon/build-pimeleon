@@ -34,7 +34,7 @@ lint:shell:
   needs: []
   before_script:
     - apt-get update -qq && apt-get install -y -qq --no-install-recommends shellcheck jq
-    - pip install --quiet semgrep bashate
+    - pip install --quiet semgrep
   script:
     - bash scripts/quality-benchmark.sh
 

@@ -47,25 +47,39 @@ jobs:
       - name: Resolve Platform and Version
         id: meta
         run: |
-          PLATFORM="${{ github.event.client_payload.target_platform || github.event.client_payload.platform || github.event.inputs.target_platform || 'rpi3-bookworm' }}"
-          chmod +x ./shared/scripts/get-next-version.sh
-          VERSION=$(./shared/scripts/get-next-version.sh "$PLATFORM")
+          PLATFORM="${{ github.event.client_payload.platform || github.event.inputs.target_platform || 'rpi3-bookworm' }}"
+          VERSION="${{ github.event.client_payload.version }}"
+          [ -n "$VERSION" ] || {
+            chmod +x ./shared/scripts/get-next-version.sh
+            VERSION=$(./shared/scripts/get-next-version.sh "$PLATFORM")
+          }
 
-          # Rebuild only on minor bump (feat/refactor commits touching build paths).
-          # Patch bumps (fix commits) and no-bump (service commits) reuse the existing image.
-          BASE_VERSION=$(cat "apps/${PLATFORM}/VERSION" 2>/dev/null || echo "0.1.0")
-          BASE_MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
-          NEW_MINOR=$(echo "$VERSION"      | cut -d. -f2)
-          if [ "$NEW_MINOR" -gt "$BASE_MINOR" ]; then
+          # Rebuild only on minor bump or if version is not provided (manual trigger)
+          if [ -z "${{ github.event.client_payload.version }}" ]; then
             NEEDS_REBUILD=true
           else
-            NEEDS_REBUILD=false
+            BASE_VERSION=$(cat "apps/${PLATFORM}/VERSION" 2>/dev/null || echo "0.1.0")
+            BASE_MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
+            NEW_MINOR=$(echo "$VERSION"      | cut -d. -f2)
+            if [ "$NEW_MINOR" -gt "$BASE_MINOR" ]; then
+              NEEDS_REBUILD=true
+            else
+              NEEDS_REBUILD=false
+            fi
           fi
 
           echo "target_platform=$PLATFORM"   >> $GITHUB_OUTPUT
           echo "version=$VERSION"            >> $GITHUB_OUTPUT
           echo "needs_rebuild=$NEEDS_REBUILD" >> $GITHUB_OUTPUT
           echo "builder_image=${{ env.REGISTRY }}/${{ github.repository }}/builder:latest" >> $GITHUB_OUTPUT
+          echo "ab2p_image=${{ env.REGISTRY }}/${{ github.repository }}/adblock2privoxy:latest" >> $GITHUB_OUTPUT
+
+      - name: Ensure adblock2privoxy image exists
+        run: |
+          if ! docker manifest inspect ${{ steps.meta.outputs.ab2p_image }} >/dev/null 2>&1; then
+            echo "[ERROR] adblock2privoxy image missing in GHCR. GitLab sync failed or not triggered."
+            exit 1
+          fi
 
       - name: Check for Existing Builder
         id: check_builder
@@ -78,14 +92,13 @@ jobs:
 
       - name: Build and Push Builder (if missing or forced)
         if: steps.check_builder.outputs.exists == 'false' || github.event.inputs.force_rebuild == 'true'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: containers/builder/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.builder_image }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: |
+          docker build \
+            --cache-from ${{ steps.meta.outputs.builder_image }} \
+            --build-arg AB2P_IMAGE=${{ steps.meta.outputs.ab2p_image }} \
+            -t ${{ steps.meta.outputs.builder_image }} \
+            -f shared/containers/builder/Dockerfile .
+          docker push ${{ steps.meta.outputs.builder_image }}
 
       - name: Build Pimeleon Image
         if: steps.meta.outputs.needs_rebuild == 'true' || github.event.inputs.force_rebuild == 'true'
@@ -111,6 +124,31 @@ jobs:
             ${{ steps.meta.outputs.builder_image }} \
             /scripts/build.sh
 
+      - name: Download artifacts from GitLab
+        if: steps.meta.outputs.needs_rebuild == 'false' && github.event.inputs.force_rebuild != 'true'
+        env:
+          GITLAB_API_V4_URL: "https://gitlab.pirouter.dev:8443/api/v4"
+          GITLAB_PROJECT_ID: "13"
+          GITLAB_TOKEN: ${{ secrets.GITLAB_READ_TOKEN }}
+        run: |
+          mkdir -p output
+          VERSION="${{ steps.meta.outputs.version }}"
+          PLATFORM="${{ steps.meta.outputs.target_platform }}"
+          PACKAGE_VERSION="${PLATFORM}-v${VERSION}"
+
+          echo "Downloading artifacts for ${PACKAGE_VERSION} from GitLab..."
+
+          # Use script but override CI variables for GH environment
+          CI_API_V4_URL="${GITLAB_API_V4_URL}" \
+          CI_PROJECT_ID="${GITLAB_PROJECT_ID}" \
+          CI_JOB_TOKEN="${GITLAB_TOKEN}" \
+          sh .gitlab/scripts/download-package-image.sh "${PACKAGE_VERSION}" "output"
+
+          CI_API_V4_URL="${GITLAB_API_V4_URL}" \
+          CI_PROJECT_ID="${GITLAB_PROJECT_ID}" \
+          CI_JOB_TOKEN="${GITLAB_TOKEN}" \
+          sh .gitlab/scripts/download-package-metadata.sh "${PACKAGE_VERSION}" "output/${PLATFORM}-v${VERSION}.img.metadata.json"
+
       - name: Generate Release Notes
         if: steps.meta.outputs.needs_rebuild == 'true' || github.event.inputs.force_rebuild == 'true'
         run: |
@@ -130,8 +168,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload to Cloudflare R2
-        if: steps.meta.outputs.needs_rebuild == 'true' || github.event.inputs.force_rebuild == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: pimeleon-releases
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          TARGET_PLATFORM: ${{ steps.meta.outputs.target_platform }}
+          VERSION: ${{ steps.meta.outputs.version }}
         run: |
           echo "Deploying artifacts to Cloudflare R2..."
-          # Implementation using rclone or similar (configured via secrets)
-          # This mirrors the logic in your deploy-r2.sh
+          UPLOAD_PREFIX="${TARGET_PLATFORM}/v${VERSION}"
+
+          cd output
+          for file in pimeleon-*.img.xz pimeleon-*.img.metadata.json; do
+              [ -f "$file" ] || continue
+              echo "Uploading $file..."
+              aws s3 cp "$file" "s3://${R2_BUCKET}/${UPLOAD_PREFIX}/$(basename "$file")" \
+                  --endpoint-url "${R2_ENDPOINT}" \
+                  --no-progress
+          done

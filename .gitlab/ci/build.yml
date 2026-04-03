@@ -20,6 +20,25 @@ setup:platform:
     reports:
       dotenv: platform.env
 
+# Sync adblock2privoxy image and metadata between GitLab and GitHub.
+# This ensures both registries have the latest pre-built Haskell binary.
+sync:ab2p:
+  stage: .pre
+  image: docker:latest
+  tags:
+    - containers
+  variables:
+    DOCKER_HOST: ""
+  rules:
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+  script:
+    - apk add --no-cache curl python3
+    - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
+    - chmod +x .gitlab/scripts/sync-ab2p.sh
+    - .gitlab/scripts/sync-ab2p.sh
+
 # Pull (or seed) the base image cache for the detected platform
 warm-cache:
   stage: .pre
