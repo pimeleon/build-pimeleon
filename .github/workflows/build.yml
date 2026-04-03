@@ -3,7 +3,7 @@ name: Pimeleon Production Build
 
 on:
   repository_dispatch:
-    types: [gitlab_release, deploy-r2]
+    types: [gitlab_release]
   workflow_dispatch:
     inputs:
       target_platform:
