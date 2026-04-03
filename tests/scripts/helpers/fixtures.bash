@@ -12,6 +12,12 @@ create_temp_git_repo() {
     export GIT_COMMITTER_NAME="Test User"
     export GIT_COMMITTER_EMAIL="test@example.com"
 
+    # Point to a nonexistent repo so the GitHub Releases API call fails fast
+    # and falls back to local git tags. This keeps tests offline and deterministic.
+    export GITHUB_REPO="pimeleon-test/nonexistent-repo-for-tests"
+    export GITHUB_REGISTRY_PUSH_TOKEN=""
+    export GITHUB_TOKEN=""
+
     (
         cd "$TEST_TMPDIR" || return 1
         git init -q
@@ -21,14 +27,14 @@ create_temp_git_repo() {
         # Create required directory structure
         mkdir -p apps/rpi3-bookworm/vars
 
-        # Seed VERSION file
-        echo "0.1.0" > apps/rpi3-bookworm/VERSION
-
         # Seed a dummy build path file so subsequent commits have something to touch
         echo "# placeholder" > apps/rpi3-bookworm/vars/main.yml
 
         git add .
         git commit -q -m "chore: initial repo setup"
+
+        # Tag the initial commit as the baseline release (replaces VERSION file)
+        git tag "rpi3-bookworm-v0.1.0"
     )
 }
 
