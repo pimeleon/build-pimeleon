@@ -9,12 +9,7 @@ publish-project-docs:
   tags:
     - lightweight
   needs:
-    - job: "lint:yaml"
     - job: "publish:image"
-      optional: true
-    - job: "test:smoke"
-      optional: true
-    - job: "test:integration"
       optional: true
 
   rules:
@@ -38,12 +33,7 @@ publish-project-docs:
 trigger-docs-preview:
   stage: docs
   needs:
-    - job: "lint:yaml"
     - job: "publish:image"
-      optional: true
-    - job: "test:smoke"
-      optional: true
-    - job: "test:integration"
       optional: true
   trigger:
     project: pirouter/pimeleon-site
@@ -56,10 +46,10 @@ trigger-docs-preview:
     name: documentation/preview
     url: https://preview.pimeleon-docs.pages.dev
   rules:
-    # Trigger on tags
-    - if: '$CI_COMMIT_TAG'
     # Trigger on MRs targeting release/* or develop for preview
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop)$/'
+      when: always
+    - when: never
 
 # Trigger production site build on downstream repository
 trigger-docs-production:

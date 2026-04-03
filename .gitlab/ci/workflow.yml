@@ -16,18 +16,17 @@ stages:
 
 variables:
   DOCKER_BUILDKIT: 1
-  # Default to develop images for feature branches
-  BUILD_IMAGE_NAME: builder
-  BUILD_IMAGE_TAG: develop
-  TEST_IMAGE_NAME: tester
-  TEST_IMAGE_TAG: develop
+  BUILD_IMAGE_NAME: builder-armhf
+  BUILD_IMAGE_TAG: latest
+  TEST_IMAGE_NAME: tester-armhf
+  TEST_IMAGE_TAG: latest
   GIT_DEPTH: 0
 
 # Override template for production-bound pipelines
 .release-images:
   variables:
-    BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-    TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+    BUILD_IMAGE_TAG: latest
+    TEST_IMAGE_TAG: latest
 
 # Global defaults for all jobs
 default:

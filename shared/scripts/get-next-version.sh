@@ -2,9 +2,14 @@
 # Resolve the next semver version for a platform.
 #
 # Base version source priority:
-#   1. Latest GitHub Release tag matching {platform}-v*
-#   2. Latest local git tag matching {platform}-v*
-#   3. Hardcoded default (0.3.0)
+#   GitLab CI builds:
+#     1. Latest GitLab package registry entry matching pimeleon/{platform}-v*
+#     2. Latest local git tag matching {platform}-v*
+#     3. Hardcoded default (0.3.0)
+#   GitHub / local builds:
+#     1. Latest GitHub Release tag matching {platform}-v*
+#     2. Latest local git tag matching {platform}-v*
+#     3. Hardcoded default (0.3.0)
 #
 # Bump rules (applied to commits on tracked build paths since last release):
 #   Breaking (feat!:/fix!:) → (major+1).(1 if minor commits else 0).(1 if patch commits else 0)
@@ -15,6 +20,7 @@
 # Usage: get-next-version.sh <platform>
 #
 # Env (optional):
+#   CI_API_V4_URL / CI_PROJECT_ID / CI_JOB_TOKEN — GitLab CI vars (auto-set in GitLab CI)
 #   GITHUB_REPO                — owner/repo (default: pimeleon/build-pimeleon)
 #   GITHUB_REGISTRY_PUSH_TOKEN / GITHUB_TOKEN — PAT for private repo access
 
@@ -22,6 +28,32 @@ set -eu
 
 GITHUB_REPO="${GITHUB_REPO:-pimeleon/build-pimeleon}"
 DEFAULT_BASE_VERSION="0.3.0"
+
+# Fetch the latest release version for a platform from the GitLab package registry.
+# Outputs the version string (e.g. "0.3.0") or returns 1 on failure.
+_gitlab_latest_version() {
+    _platform="$1"
+
+    [ -n "${CI_API_V4_URL:-}" ] || return 1
+    [ -n "${CI_PROJECT_ID:-}" ] || return 1
+    [ -n "${CI_JOB_TOKEN:-}" ]  || return 1
+
+    command -v curl >/dev/null 2>&1 || return 1
+
+    _resp=$(curl -skf \
+        -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?package_name=pimeleon&order_by=created_at&sort=desc&per_page=50" \
+        2>/dev/null) || return 1
+
+    _version=$(printf '%s' "$_resp" \
+        | grep '"version"' \
+        | grep "\"${_platform}-v" \
+        | head -1 \
+        | sed 's/.*"version": *"\([^"]*\)".*/\1/') || return 1
+
+    [ -n "$_version" ] || return 1
+    printf '%s' "$_version" | sed "s/^${_platform}-v//"
+}
 
 # Fetch the latest release version for a platform from GitHub Releases API.
 # Outputs the version string (e.g. "0.3.0") or returns 1 on failure.
@@ -73,7 +105,14 @@ get_next_version() {
     [ -n "$platform" ] || { echo "Error: platform is required" >&2; exit 1; }
 
     # --- Resolve base version ---
-    base_version=$(_github_latest_version "$platform" 2>/dev/null) || base_version=""
+    # GitLab CI: use GitLab package registry as primary source
+    # GitHub / local: use GitHub Releases as primary source
+    base_version=""
+    if [ -n "${CI_API_V4_URL:-}" ]; then
+        base_version=$(_gitlab_latest_version "$platform" 2>/dev/null) || base_version=""
+    else
+        base_version=$(_github_latest_version "$platform" 2>/dev/null) || base_version=""
+    fi
 
     if [ -z "$base_version" ]; then
         base_version=$(git tag -l "${platform}-v*" --sort=-v:refname 2>/dev/null \
