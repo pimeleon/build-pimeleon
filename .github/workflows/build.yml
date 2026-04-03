@@ -1,8 +1,9 @@
+---
 name: Pimeleon Production Build
 
 on:
   repository_dispatch:
-    types: [gitlab_release, deploy-r2]
+    types: [gitlab_release]
   workflow_dispatch:
     inputs:
       target_platform:
@@ -31,6 +32,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Make scripts executable
+        run: chmod +x .github/scripts/*.sh
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -46,83 +50,38 @@ jobs:
 
       - name: Resolve Platform and Version
         id: meta
-        run: |
-          PLATFORM="${{ github.event.client_payload.platform || github.event.inputs.target_platform || 'rpi3-bookworm' }}"
-          VERSION="${{ github.event.client_payload.version }}"
-          [ -n "$VERSION" ] || {
-            chmod +x ./shared/scripts/get-next-version.sh
-            VERSION=$(./shared/scripts/get-next-version.sh "$PLATFORM")
-          }
-
-          # Rebuild only on minor bump or if version is not provided (manual trigger)
-          if [ -z "${{ github.event.client_payload.version }}" ]; then
-            NEEDS_REBUILD=true
-          else
-            BASE_VERSION=$(cat "apps/${PLATFORM}/VERSION" 2>/dev/null || echo "0.1.0")
-            BASE_MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
-            NEW_MINOR=$(echo "$VERSION"      | cut -d. -f2)
-            if [ "$NEW_MINOR" -gt "$BASE_MINOR" ]; then
-              NEEDS_REBUILD=true
-            else
-              NEEDS_REBUILD=false
-            fi
-          fi
-
-          echo "target_platform=$PLATFORM"   >> $GITHUB_OUTPUT
-          echo "version=$VERSION"            >> $GITHUB_OUTPUT
-          echo "needs_rebuild=$NEEDS_REBUILD" >> $GITHUB_OUTPUT
-          echo "builder_image=${{ env.REGISTRY }}/${{ github.repository }}/builder:latest" >> $GITHUB_OUTPUT
-          echo "ab2p_image=${{ env.REGISTRY }}/${{ github.repository }}/adblock2privoxy:latest" >> $GITHUB_OUTPUT
+        env:
+          INPUT_PLATFORM: ${{ github.event.client_payload.platform || github.event.inputs.target_platform || 'rpi3-bookworm' }}
+          INPUT_VERSION: ${{ github.event.client_payload.version }}
+          REGISTRY: ${{ env.REGISTRY }}
+        run: bash .github/scripts/resolve-meta.sh
 
       - name: Ensure adblock2privoxy image exists
-        run: |
-          if ! docker manifest inspect ${{ steps.meta.outputs.ab2p_image }} >/dev/null 2>&1; then
-            echo "[ERROR] adblock2privoxy image missing in GHCR. GitLab sync failed or not triggered."
-            exit 1
-          fi
+        env:
+          AB2P_IMAGE: ${{ steps.meta.outputs.ab2p_image }}
+        run: bash .github/scripts/check-ab2p-image.sh
 
       - name: Check for Existing Builder
         id: check_builder
-        run: |
-          if docker manifest inspect ${{ steps.meta.outputs.builder_image }} >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
+        env:
+          BUILDER_IMAGE: ${{ steps.meta.outputs.builder_image }}
+        run: bash .github/scripts/check-builder-image.sh
 
       - name: Build and Push Builder (if missing or forced)
         if: steps.check_builder.outputs.exists == 'false' || github.event.inputs.force_rebuild == 'true'
-        run: |
-          docker build \
-            --cache-from ${{ steps.meta.outputs.builder_image }} \
-            --build-arg AB2P_IMAGE=${{ steps.meta.outputs.ab2p_image }} \
-            -t ${{ steps.meta.outputs.builder_image }} \
-            -f shared/containers/builder/Dockerfile .
-          docker push ${{ steps.meta.outputs.builder_image }}
+        env:
+          BUILDER_IMAGE: ${{ steps.meta.outputs.builder_image }}
+          AB2P_IMAGE: ${{ steps.meta.outputs.ab2p_image }}
+        run: bash .github/scripts/build-push-builder.sh
 
       - name: Build Pimeleon Image
         if: steps.meta.outputs.needs_rebuild == 'true' || github.event.inputs.force_rebuild == 'true'
         env:
+          BUILDER_IMAGE: ${{ steps.meta.outputs.builder_image }}
+          TARGET_PLATFORM: ${{ steps.meta.outputs.target_platform }}
+          VERSION: ${{ steps.meta.outputs.version }}
           PIMELEON_APPS_GITHUB_TOKEN: ${{ secrets.PIMELEON_APPS_GITHUB_TOKEN }}
-        run: |
-          mkdir -p output cache
-          docker run --rm --privileged \
-            -v /dev:/dev:rw \
-            -v ${{ github.workspace }}/shared/scripts:/scripts \
-            -v ${{ github.workspace }}/shared/configs:/configs \
-            -v ${{ github.workspace }}/shared/ansible:/ansible \
-            -v ${{ github.workspace }}/output:/output \
-            -v ${{ github.workspace }}/cache:/cache \
-            -e CI=true \
-            -e CACHE_DIR=/cache \
-            -e OUTPUT_DIR=/output \
-            -e TARGET_PLATFORM=${{ steps.meta.outputs.target_platform }} \
-            -e PIMELEON_VERSION=${{ steps.meta.outputs.version }} \
-            -e PIMELEON_PROFILE=production \
-            -e PIMELEON_APPS_SOURCE=github \
-            -e PIMELEON_APPS_GITHUB_TOKEN="${PIMELEON_APPS_GITHUB_TOKEN}" \
-            ${{ steps.meta.outputs.builder_image }} \
-            /scripts/build.sh
+        run: bash .github/scripts/build-pimeleon-image.sh
 
       - name: Download artifacts from GitLab
         if: steps.meta.outputs.needs_rebuild == 'false' && github.event.inputs.force_rebuild != 'true'
@@ -130,30 +89,16 @@ jobs:
           GITLAB_API_V4_URL: "https://gitlab.pirouter.dev:8443/api/v4"
           GITLAB_PROJECT_ID: "13"
           GITLAB_TOKEN: ${{ secrets.GITLAB_READ_TOKEN }}
-        run: |
-          mkdir -p output
-          VERSION="${{ steps.meta.outputs.version }}"
-          PLATFORM="${{ steps.meta.outputs.target_platform }}"
-          PACKAGE_VERSION="${PLATFORM}-v${VERSION}"
-
-          echo "Downloading artifacts for ${PACKAGE_VERSION} from GitLab..."
-
-          # Use script but override CI variables for GH environment
-          CI_API_V4_URL="${GITLAB_API_V4_URL}" \
-          CI_PROJECT_ID="${GITLAB_PROJECT_ID}" \
-          CI_JOB_TOKEN="${GITLAB_TOKEN}" \
-          sh .gitlab/scripts/download-package-image.sh "${PACKAGE_VERSION}" "output"
-
-          CI_API_V4_URL="${GITLAB_API_V4_URL}" \
-          CI_PROJECT_ID="${GITLAB_PROJECT_ID}" \
-          CI_JOB_TOKEN="${GITLAB_TOKEN}" \
-          sh .gitlab/scripts/download-package-metadata.sh "${PACKAGE_VERSION}" "output/${PLATFORM}-v${VERSION}.img.metadata.json"
+          PLATFORM: ${{ steps.meta.outputs.target_platform }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: bash .github/scripts/download-gitlab-artifacts.sh
 
       - name: Generate Release Notes
         if: steps.meta.outputs.needs_rebuild == 'true' || github.event.inputs.force_rebuild == 'true'
-        run: |
-          echo "Pimeleon release for ${{ steps.meta.outputs.target_platform }}" > release_notes.md
-          echo "Version: ${{ steps.meta.outputs.version }}" >> release_notes.md
+        env:
+          TARGET_PLATFORM: ${{ steps.meta.outputs.target_platform }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: bash .github/scripts/generate-release-notes.sh
 
       - name: Create GitHub Release
         if: steps.meta.outputs.needs_rebuild == 'true' || github.event.inputs.force_rebuild == 'true'
@@ -166,24 +111,3 @@ jobs:
             output/*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload to Cloudflare R2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_BUCKET: pimeleon-releases
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          TARGET_PLATFORM: ${{ steps.meta.outputs.target_platform }}
-          VERSION: ${{ steps.meta.outputs.version }}
-        run: |
-          echo "Deploying artifacts to Cloudflare R2..."
-          UPLOAD_PREFIX="${TARGET_PLATFORM}/v${VERSION}"
-
-          cd output
-          for file in pimeleon-*.img.xz pimeleon-*.img.metadata.json; do
-              [ -f "$file" ] || continue
-              echo "Uploading $file..."
-              aws s3 cp "$file" "s3://${R2_BUCKET}/${UPLOAD_PREFIX}/$(basename "$file")" \
-                  --endpoint-url "${R2_ENDPOINT}" \
-                  --no-progress
-          done

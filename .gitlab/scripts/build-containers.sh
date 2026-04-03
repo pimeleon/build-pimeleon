@@ -17,12 +17,21 @@ TESTER_DF="./containers/tester/Dockerfile"
 echo "Using builder Dockerfile: ${BUILDER_DF}"
 echo "Using tester Dockerfile: ${TESTER_DF}"
 
-# adblock2privoxy base image is managed by the sync:ab2p job in .pre stage.
-# We just ensure it's available locally.
+# Ensure adblock2privoxy base image exists in the registry (build once, reuse forever)
 AB2P_IMAGE="${CI_REGISTRY_IMAGE}/adblock2privoxy:latest"
-if ! docker image inspect "${AB2P_IMAGE}" >/dev/null 2>&1; then
-    echo "adblock2privoxy image not found locally, pulling from registry..."
-    docker pull "${AB2P_IMAGE}"
+AB2P_DF="./shared/containers/builder/Dockerfile.ab2p"
+[ -f "./containers/builder/Dockerfile.ab2p" ] && AB2P_DF="./containers/builder/Dockerfile.ab2p"
+
+if docker manifest inspect "${AB2P_IMAGE}" >/dev/null 2>&1; then
+    echo "adblock2privoxy image found in registry, skipping build"
+else
+    echo "adblock2privoxy image not found — building and pushing to registry..."
+    docker buildx build \
+        --cache-from "${AB2P_IMAGE}" \
+        -t "${AB2P_IMAGE}" \
+        --push \
+        -f "$AB2P_DF" "$(dirname "$AB2P_DF")"
+    echo "adblock2privoxy image pushed: ${AB2P_IMAGE}"
 fi
 
 # Build builder image
