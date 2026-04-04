@@ -2,8 +2,8 @@
 set -eu
 
 # Re-evaluate BUILD_IMAGE to bypass GitLab CI rules variables bug
-export BUILD_IMAGE="${CI_REGISTRY_IMAGE}/${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}"
-export TEST_IMAGE="${CI_REGISTRY_IMAGE}/${TEST_IMAGE_NAME}:${TEST_IMAGE_TAG}"
+export BUILD_IMAGE="${CI_REGISTRY_IMAGE}/builder:${BUILD_IMAGE_TAG}"
+export TEST_IMAGE="${CI_REGISTRY_IMAGE}/tester:${TEST_IMAGE_TAG}"
 echo "Checking registry for BUILD_IMAGE: ${BUILD_IMAGE}"
 echo "Checking registry for TEST_IMAGE: ${TEST_IMAGE}"
 

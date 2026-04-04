@@ -5,8 +5,8 @@ set -eu
 # Inputs (CI environment):
 #   CI_REGISTRY_IMAGE, BUILD_IMAGE, TEST_IMAGE, APT_PROXY, CI, PIMELEON_PROFILE
 # Re-evaluate BUILD_IMAGE to bypass GitLab CI rules variables bug
-export BUILD_IMAGE="${CI_REGISTRY_IMAGE}/${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}"
-export TEST_IMAGE="${CI_REGISTRY_IMAGE}/${TEST_IMAGE_NAME}:${TEST_IMAGE_TAG}"
+export BUILD_IMAGE="${CI_REGISTRY_IMAGE}/builder:${BUILD_IMAGE_TAG:-latest}"
+export TEST_IMAGE="${CI_REGISTRY_IMAGE}/tester:${TEST_IMAGE_TAG:-latest}"
 
 # Prioritize local Dockerfiles if they exist in the branch root
 BUILDER_DF="./containers/builder/Dockerfile"

@@ -10,8 +10,8 @@
   variables:
     # BuildKit for faster builds with cache reuse
     DOCKER_BUILDKIT: "1"
-    BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/${BUILD_IMAGE_NAME}:${BUILD_IMAGE_TAG}
-    TEST_IMAGE: ${CI_REGISTRY_IMAGE}/${TEST_IMAGE_NAME}:${TEST_IMAGE_TAG}
+    BUILD_IMAGE: ${CI_REGISTRY_IMAGE}/builder:${BUILD_IMAGE_TAG}
+    TEST_IMAGE: ${CI_REGISTRY_IMAGE}/tester:${TEST_IMAGE_TAG}
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
   tags:

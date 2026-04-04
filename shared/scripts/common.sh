@@ -579,17 +579,9 @@ EOF
 # Format: {platform}-{debian_version}  e.g., rpi3-bookworm, rpi4-bookworm
 load_app_config() {
     local app_name=$1
-    local workspace_dir="${WORKSPACE_DIR:-/workspace}"
-    local app_dir="${workspace_dir}/apps/${app_name}"
 
     if [[ -z "$app_name" ]]; then
         die "App name is required"
-    fi
-
-    if [[ ! -d "$app_dir" ]]; then
-        log_error "App not found: $app_name"
-        list_apps
-        die "Please specify a valid app name"
     fi
 
     # Parse app name: {device}-{debian}
@@ -609,11 +601,22 @@ load_app_config() {
             export PIMELEON_IMAGE_SIZE="${PIMELEON_IMAGE_SIZE:-4G}"
             ;;
         *)
-            die "Unknown device: $device (expected rpi3, rpi4)"
+            log_error "App not found: $app_name (unknown device: $device)"
+            list_apps
+            die "Please specify a valid app name"
             ;;
     esac
 
     export RASPBIAN_VERSION="$debian"
+
+    # Validate that the platform group directory exists in shared/ansible/inventory/group_vars/
+    local group_name
+    group_name="raspberrypi_$(echo "${PIMELEON_RPI_MODEL}" | tr '[:upper:]' '[:lower:]' | tr -d '+' | sed 's/3b/3bplus/')"
+    if [[ ! -d "${ANSIBLE_DIR:-/ansible}/inventory/group_vars/${group_name}" ]]; then
+        log_error "Platform group config not found for: ${app_name} (expected group: ${group_name})"
+        list_apps
+        die "Configuration missing for this platform"
+    fi
 
     log_info "App: ${app_name}"
     log_info "  Model: ${PIMELEON_RPI_MODEL}, Arch: ${RPI_ARCH}, Debian: ${RASPBIAN_VERSION}"
@@ -621,23 +624,33 @@ load_app_config() {
 
 # List available apps
 list_apps() {
-    local workspace_dir="${WORKSPACE_DIR:-/workspace}"
-    local apps_dir="${workspace_dir}/apps"
+    local ansible_dir="${ANSIBLE_DIR:-/ansible}"
+    local group_vars_dir="${ansible_dir}/inventory/group_vars"
 
-    if [[ ! -d "$apps_dir" ]]; then
-        die "FATAL: No apps directory found at: $apps_dir"
+    if [[ ! -d "$group_vars_dir" ]]; then
+        die "FATAL: No Ansible group_vars directory found at: $group_vars_dir"
     fi
 
     echo ""
-    echo "Available apps:"
-    echo "==============="
-    for app_dir in "$apps_dir"/*/; do
-        [[ -d "$app_dir" ]] || continue
-        local name
-        name=$(basename "$app_dir")
-        local device="${name%%-*}"
-        local debian="${name##*-}"
-        printf "  %-20s (%s, %s)\n" "$name" "$device" "$debian"
+    echo "Available platforms:"
+    echo "===================="
+    for group_dir in "${group_vars_dir}"/raspberrypi_*/; do
+        [[ -d "$group_dir" ]] || continue
+        local group_name
+        group_name=$(basename "$group_dir")
+        local model_suffix="${group_name#raspberrypi_}"
+
+        case "$model_suffix" in
+            3bplus)
+                printf "  %-20s (%s, %s)\n" "rpi3-bookworm" "3B+" "bookworm"
+                ;;
+            4b)
+                printf "  %-20s (%s, %s)\n" "rpi4-bookworm" "4B" "bookworm"
+                ;;
+            *)
+                printf "  %-20s (%s)\n" "$group_name" "custom"
+                ;;
+        esac
     done
     echo ""
 }
@@ -858,10 +871,28 @@ get_pimeleon_apps_artifact() {
     # 2. Local environment: Prioritize local cache if directory exists
     if [[ -d "${local_path}" ]]; then
         log_info "Checking local apps cache for ${package} in ${local_path}"
-        # Expected local format: ${package}/${arch}/${package}.tar.gz
-        # or simplified: ${package}.tar.gz in package dir
+
+        # New pi-router-apps structure (flat in output/):
+        # {package}-{version}-{arch}-pimeleon.tar.gz
+        # The script currently expects {package}.tar.gz in the download_dir.
+
         local local_file
-        if [[ -f "${local_path}/${package}/${arch}/${package}.tar.gz" ]]; then
+        # Look for the artifact in the sibling output directory if it matches the naming pattern
+        # The naming pattern from pi-router-apps/output is {package}-*-{arch}-pimeleon.tar.gz
+        local_file=$(find "${local_path}" -maxdepth 2 -name "${package}-*-${arch}-*.tar.gz" | head -1)
+
+        if [[ -n "${local_file:-}" ]]; then
+            log_info "Using local artifact: ${local_file}"
+            log_info "Copying ${package} artifact into ${download_dir}"
+            sudo cp "${local_file}" "${download_dir}/${package}.tar.gz"
+            sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "${download_dir}/${package}.tar.gz"
+            return 0
+        fi
+
+        # Fallback to existing structure checks for compatibility
+        if [[ -f "${local_path}/${package}/output/${arch}/${package}.tar.gz" ]]; then
+            local_file="${local_path}/${package}/output/${arch}/${package}.tar.gz"
+        elif [[ -f "${local_path}/${package}/${arch}/${package}.tar.gz" ]]; then
             local_file="${local_path}/${package}/${arch}/${package}.tar.gz"
         elif [[ -f "${local_path}/${package}/${package}.tar.gz" ]]; then
             local_file="${local_path}/${package}/${package}.tar.gz"
@@ -871,6 +902,7 @@ get_pimeleon_apps_artifact() {
             log_info "Using local artifact: ${local_file}"
             log_info "Copying ${package} artifact into ${download_dir}"
             sudo cp "${local_file}" "${download_dir}/${package}.tar.gz"
+            sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "${download_dir}/${package}.tar.gz"
             return 0
         fi
         log_warn "Artifact for ${package} (${arch}) not found in local path ${local_path}"

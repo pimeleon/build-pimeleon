@@ -126,7 +126,7 @@ build:containers:
       - cache/
     policy: pull
   script:
-    - chmod +x .gitlab/scripts/build-image.sh .gitlab/scripts/resolve-version.sh
+    - chmod +x .gitlab/scripts/build-image.sh
     - .gitlab/scripts/build-image.sh
   after_script:
     - chmod +x .gitlab/scripts/cleanup-build-container.sh

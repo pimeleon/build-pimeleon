@@ -40,38 +40,29 @@ BUILD_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 DEVICE_NAME="${TARGET_PLATFORM%%-*}"
 OS_NAME="${TARGET_PLATFORM##*-}"
 
-# Determine image name based on build type
-COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "dev")
-
-# Helper to get version from git tag
-get_git_tag_version() {
-    # On exact tag - use tag (strip v prefix)
-    if version=$(git describe --tags --exact-match HEAD 2>/dev/null); then
-        echo "${version#v}"
-        return 0
-    fi
-    return 1
-}
-
+# Determine version: prioritize PIMELEON_VERSION (from Makefile), fallback to get-next-version.sh
 if [ -n "${PIMELEON_VERSION:-}" ]; then
     IMAGE_VERSION="${PIMELEON_VERSION}"
-    # Release build (or tagged CI build): pimeleon-{device}-{version}-{os}.img
-    IMAGE_NAME="pimeleon-${DEVICE_NAME}-${IMAGE_VERSION}-${OS_NAME}.img"
-elif IMAGE_VERSION=$(get_git_tag_version); then
-    # Git tag build: pimeleon-{device}-{version}-{os}.img
-    IMAGE_NAME="pimeleon-${DEVICE_NAME}-${IMAGE_VERSION}-${OS_NAME}.img"
 else
-    # Development build: pimeleon-{device}-{version}-{os}-{commit}.img
-    # Calculate version from conventional commits
-    if [ -f "/scripts/get-next-version.sh" ]; then
-# shellcheck disable=SC1091
-        source /scripts/get-next-version.sh
-        IMAGE_VERSION=$(get_next_version "${TARGET_PLATFORM:-}")
+    # Try calling the script as a command
+    if IMAGE_VERSION=$(/scripts/get-next-version.sh "${TARGET_PLATFORM:-}" 2>/dev/null); then
+        export PIMELEON_VERSION="${IMAGE_VERSION}"
     else
         IMAGE_VERSION="0.0.0"
+        export PIMELEON_VERSION="${IMAGE_VERSION}"
     fi
+fi
+
+# Determine image name
+COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "dev")
+if _version=$(git describe --tags --exact-match HEAD 2>/dev/null) || [ -n "${PIMELEON_VERSION:-}" ]; then
+    # Release build (or version resolved build): pimeleon-{device}-{version}-{os}.img
+    IMAGE_NAME="pimeleon-${DEVICE_NAME}-${IMAGE_VERSION}-${OS_NAME}.img"
+else
+    # Development build (no version resolved): pimeleon-{device}-{version}-{os}-{commit}.img
     IMAGE_NAME="pimeleon-${DEVICE_NAME}-${IMAGE_VERSION}-${OS_NAME}-${COMMIT_HASH}.img"
 fi
+
 IMAGE_PATH="${OUTPUT_DIR}/${IMAGE_NAME}"
 LOG_FILE="${OUTPUT_DIR}/build-${TARGET_PLATFORM}-${BUILD_TIMESTAMP}.log"
 
