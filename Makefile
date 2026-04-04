@@ -69,7 +69,15 @@ build-docker: build-ab2p
 	@if [ "$(SKIP_DOCKER_BUILD)" != "1" ]; then \
 		docker compose build builder; \
 	fi
-	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PIMELEON_PROFILE) docker compose run --rm builder
+	@_ver=$$(GITHUB_REGISTRY_PUSH_TOKEN="$$GITHUB_REGISTRY_PUSH_TOKEN" \
+		./shared/scripts/get-next-version.sh "$(TARGET_PLATFORM)" 2>/dev/null || true); \
+	if [ -n "$$_ver" ]; then \
+		echo "[build] Resolved version from GitHub releases: $$_ver"; \
+	else \
+		echo "[build] GitHub version resolution failed — version will be auto-detected in container"; \
+	fi; \
+	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PIMELEON_PROFILE) \
+		docker compose run --rm -e PIMELEON_VERSION=$$_ver builder
 
 build-all:
 	@echo "Building all platforms..."
@@ -96,7 +104,11 @@ build-dev:
 build-nocache: build-ab2p
 	@echo "Building $(TARGET_PLATFORM) (no cache)..."
 	docker compose build --no-cache builder
-	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PIMELEON_PROFILE) docker compose run --rm builder
+	@_ver=$$(GITHUB_REGISTRY_PUSH_TOKEN="$$GITHUB_REGISTRY_PUSH_TOKEN" \
+		./shared/scripts/get-next-version.sh "$(TARGET_PLATFORM)" 2>/dev/null || true); \
+	[ -n "$$_ver" ] && echo "[build] Resolved version: $$_ver" || true; \
+	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PIMELEON_PROFILE) \
+		docker compose run --rm -e PIMELEON_VERSION=$$_ver builder
 
 build-local: check-deps
 	@echo "Building Pimeleon image (local)..."
