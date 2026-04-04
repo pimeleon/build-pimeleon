@@ -85,6 +85,53 @@ path for community contributions.
   - `security-scan`: Runs Trivy for vulnerability detection.
   - `release`: Automatically creates GitHub Releases for pushes to `main`.
 
+## Versioning Scheme
+
+Version numbers follow **SemVer** (`MAJOR.MINOR.PATCH`) and are computed automatically by
+`shared/scripts/get-next-version.sh` from conventional commit history since the last release.
+
+### Source of Truth (priority order)
+
+| Context | Primary source | Fallback |
+|---------|---------------|---------|
+| GitLab CI | GitLab package registry | local git tags → `0.3.0` |
+| GitHub Actions / local | GitHub Releases API | local git tags → `0.3.0` |
+
+GitHub Releases auth is provided via the `GITHUB_REGISTRY_PUSH_TOKEN` CI variable.
+
+### Bump Rules
+
+Commits are analysed on these paths since the last release tag:
+`apps/{platform}/`, `containers/`, `shared/containers/`, `shared/ansible/`,
+`shared/configs/`, `shared/scripts/`, `docker-compose.yml`, `requirements.txt`
+
+| Commit prefix | Bump |
+|---------------|------|
+| `feat!:` / `fix!:` | **major** (breaking change) |
+| `feat:` / `refactor:` | **minor** |
+| `fix:` / `build:` / `perf:` / untagged | **patch** |
+| `docs:` / `chore:` / `ci:` / `style:` / `test:` | none (service commits) |
+
+### Output Naming
+
+| Build type | Filename pattern |
+|------------|-----------------|
+| Release | `pimeleon-{device}-{version}-{os}.img` |
+| Development | `pimeleon-{device}-{version}-{os}-{short-hash}.img` |
+| CI package tag | `{platform}-v{version}` (e.g. `rpi3-bookworm-v0.3.1`) |
+
+### Local Build Version Resolution
+
+The `Makefile` resolves the version on the **host** before starting the builder container
+(mirroring the GitHub Actions approach in `.github/scripts/resolve-meta.sh`):
+
+```bash
+GITHUB_REGISTRY_PUSH_TOKEN=<token> make build TARGET_PLATFORM=rpi3-bookworm
+```
+
+The resolved version is passed into the container as `PIMELEON_VERSION`. If resolution
+fails (no token, no network), the container falls back to its own git-tag/default detection.
+
 ## Build Artifacts
 
 Both pipelines produce the following artifacts:
