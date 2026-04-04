@@ -26,9 +26,9 @@ help:
 	@echo "  make lint                               - Run linters"
 	@echo "  make clean                              - Clean build artifacts"
 	@echo ""
-	@echo "Available apps:"
-	@for app in apps/*/; do \
-		[ -d "$$app" ] && echo "  - $$(basename $$app)"; \
+	@echo "Available platforms:"
+	@for platform in shared/ansible/inventory/group_vars/raspberrypi_*/; do \
+		[ -d "$$platform" ] && echo "  - $$(basename $$platform | sed 's/raspberrypi_//' | sed 's/3bplus/rpi3-bookworm/' | sed 's/4b/rpi4-bookworm/')"; \
 	done
 	@echo ""
 	@echo "Examples:"
@@ -38,14 +38,22 @@ help:
 
 # List available apps
 list-apps:
-	@echo "Available apps:"
-	@echo "==============="
-	@for app in apps/*/; do \
-		[ -d "$$app" ] || continue; \
-		name=$$(basename $$app); \
-		device=$${name%%-*}; \
-		debian=$${name##*-}; \
-		printf "  %-20s (%s, %s)\n" "$$name" "$$device" "$$debian"; \
+	@echo "Available platforms:"
+	@echo "===================="
+	@for platform in shared/ansible/inventory/group_vars/raspberrypi_*/; do \
+		[ -d "$$platform" ] || continue; \
+		name=$$(basename $$platform | sed 's/raspberrypi_//'); \
+		case "$$name" in \
+			3bplus) \
+				printf "  %-20s (%s, %s)\n" "rpi3-bookworm" "3B+" "bookworm"; \
+				;; \
+			4b) \
+				printf "  %-20s (%s, %s)\n" "rpi4-bookworm" "4B" "bookworm"; \
+				;; \
+			*) \
+				printf "  %-20s (%s)\n" "$$name" "unknown"; \
+				;; \
+		esac; \
 	done
 
 # Build targets
@@ -60,22 +68,24 @@ build-ab2p:
 
 build-docker: build-ab2p
 	@echo "Building platform: $(TARGET_PLATFORM) [Profile: $(PIMELEON_PROFILE)]"
-	@if [ ! -d "apps/$(TARGET_PLATFORM)" ]; then \
-		echo "Error: Platform '$(TARGET_PLATFORM)' not found"; \
-		echo ""; \
-		$(MAKE) list-apps; \
-		exit 1; \
-	fi
 	@if [ "$(SKIP_DOCKER_BUILD)" != "1" ]; then \
 		docker compose build builder; \
 	fi
-	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PIMELEON_PROFILE) docker compose run --rm builder
+	@_ver=$$(PIMELEON_APPS_READ_TOKEN="$(PIMELEON_APPS_READ_TOKEN)" ./shared/scripts/get-next-version.sh "$(TARGET_PLATFORM)"); \
+	echo "[build] Resolved version: $$_ver"; \
+	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PIMELEON_PROFILE) \
+		docker compose run --rm -e PIMELEON_VERSION=$$_ver builder
 
 build-all:
 	@echo "Building all platforms..."
-	@for app in apps/*/; do \
-		[ -d "$$app" ] || continue; \
-		appname=$$(basename $$app); \
+	@for platform in shared/ansible/inventory/group_vars/raspberrypi_*/; do \
+		[ -d "$$platform" ] || continue; \
+		name=$$(basename $$platform | sed 's/raspberrypi_//'); \
+		case "$$name" in \
+			3bplus) appname="rpi3-bookworm"; ;; \
+			4b) appname="rpi4-bookworm"; ;; \
+			*) continue; ;; \
+		esac; \
 		echo ""; \
 		echo "========================================"; \
 		echo "Building $$appname..."; \
@@ -96,7 +106,11 @@ build-dev:
 build-nocache: build-ab2p
 	@echo "Building $(TARGET_PLATFORM) (no cache)..."
 	docker compose build --no-cache builder
-	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PIMELEON_PROFILE) docker compose run --rm builder
+	@_ver=$$(GITHUB_REGISTRY_PUSH_TOKEN="$$GITHUB_REGISTRY_PUSH_TOKEN" \
+		./shared/scripts/get-next-version.sh "$(TARGET_PLATFORM)" 2>/dev/null || true); \
+	[ -n "$$_ver" ] && echo "[build] Resolved version: $$_ver" || true; \
+	TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PIMELEON_PROFILE) \
+		docker compose run --rm -e PIMELEON_VERSION=$$_ver builder
 
 build-local: check-deps
 	@echo "Building Pimeleon image (local)..."

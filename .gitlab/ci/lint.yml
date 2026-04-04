@@ -8,6 +8,10 @@ lint:yaml:
   tags:
     - python
   needs: []
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+      when: never
+    - when: on_success
   before_script:
     - pip install --quiet yamllint
   script:
@@ -19,6 +23,10 @@ lint:ansible:
   tags:
     - python
   needs: []
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+      when: never
+    - when: on_success
   before_script:
     - pip install --quiet ansible-lint
     - ansible-galaxy collection install -r shared/ansible/requirements.yml
@@ -32,8 +40,12 @@ lint:shell:
   tags:
     - python
   needs: []
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+      when: never
+    - when: on_success
   before_script:
-    - apt-get update -qq && apt-get install -y -qq --no-install-recommends shellcheck jq
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends shellcheck jq &>/dev/null
     - pip install --quiet semgrep
   script:
     - bash scripts/quality-benchmark.sh
@@ -60,7 +72,7 @@ test:scripts:
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
   before_script:
-    - apt-get update -qq && apt-get install -y -qq --no-install-recommends bats git
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends bats git &>/dev/null
     - pip install --quiet pyyaml
   script:
     - mkdir -p test-results

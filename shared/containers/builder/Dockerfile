@@ -98,9 +98,7 @@ RUN pip install --upgrade pip && \
 RUN mkdir -p /output /cache /configs /ansible /scripts && \
     chown -R builder:docker /output /cache /configs /ansible /scripts
 
-# Copy app configs into image (scripts mounted/copied at runtime)
 # Build context must be project root (.) for these paths to work
-COPY apps/ /workspace/apps/
 RUN mkdir -p /workspace/pi-router-apps && chown -R builder:docker /workspace
 
 # Cache Debian Buster base for debootstrap (matching production Pi 3B+)

@@ -35,8 +35,12 @@ SCRIPTS_DIR="./shared/scripts"
 echo "Using ansible=${ANSIBLE_DIR} configs=${CONFIGS_DIR} scripts=${SCRIPTS_DIR}"
 
 # Compute version
-PIMELEON_VERSION=$(sh .gitlab/scripts/resolve-version.sh base "${TARGET_PLATFORM}")
-PACKAGE_VERSION=$(sh .gitlab/scripts/resolve-version.sh package "${TARGET_PLATFORM}")
+PIMELEON_VERSION=$(sh ./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+if [ -n "${CI_COMMIT_TAG:-}" ]; then
+    PACKAGE_VERSION="${CI_COMMIT_TAG}"
+else
+    PACKAGE_VERSION="${TARGET_PLATFORM}-v${PIMELEON_VERSION}"
+fi
 BUILDER_IMAGE_DIGEST=$(sh .gitlab/scripts/resolve-builder-image-digest.sh "${BUILD_IMAGE}")
 echo "[INFO] Building version: ${PIMELEON_VERSION}"
 echo "[INFO] Package version: ${PACKAGE_VERSION}"

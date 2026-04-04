@@ -72,8 +72,8 @@ build:containers:
     # Rebuild if dependencies changed
     - if: '$CI_COMMIT_TAG'
       variables:
-        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        BUILD_IMAGE_TAG: latest
+        TEST_IMAGE_TAG: latest
       changes:
         - shared/containers/**/*
         - containers/**/*
@@ -81,8 +81,8 @@ build:containers:
         - docker-compose.yml
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       variables:
-        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        BUILD_IMAGE_TAG: latest
+        TEST_IMAGE_TAG: latest
       changes:
         - shared/containers/**/*
         - containers/**/*
@@ -90,8 +90,8 @@ build:containers:
         - docker-compose.yml
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
-        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        BUILD_IMAGE_TAG: latest
+        TEST_IMAGE_TAG: latest
       changes:
         - shared/containers/**/*
         - containers/**/*
@@ -112,12 +112,6 @@ build:containers:
     - job: warm-cache
     - job: build:containers
       optional: true
-    - job: lint:yaml
-      optional: true
-    - job: lint:ansible
-      optional: true
-    - job: lint:shell
-      optional: true
     - job: test:scripts
       optional: true
     - job: security:trivy
@@ -132,7 +126,7 @@ build:containers:
       - cache/
     policy: pull
   script:
-    - chmod +x .gitlab/scripts/build-image.sh .gitlab/scripts/resolve-version.sh
+    - chmod +x .gitlab/scripts/build-image.sh
     - .gitlab/scripts/build-image.sh
   after_script:
     - chmod +x .gitlab/scripts/cleanup-build-container.sh
@@ -194,21 +188,21 @@ build:pimeleon:
       variables:
         PIMELEON_ENV_NAME: production
         PIMELEON_APPS_SOURCE: github
-        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        BUILD_IMAGE_TAG: latest
+        TEST_IMAGE_TAG: latest
     # Push/merge to release/* — production build from GitHub releases
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       variables:
         PIMELEON_ENV_NAME: production
         PIMELEON_APPS_SOURCE: github
-        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        BUILD_IMAGE_TAG: latest
+        TEST_IMAGE_TAG: latest
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
         PIMELEON_ENV_NAME: production
         PIMELEON_APPS_SOURCE: github
-        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        BUILD_IMAGE_TAG: latest
+        TEST_IMAGE_TAG: latest
 
     # Default: skip
     - when: never

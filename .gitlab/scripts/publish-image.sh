@@ -5,7 +5,12 @@ set -eu
 #
 # Inputs: TARGET_PLATFORM, CI_JOB_TOKEN, CI_API_V4_URL, CI_PROJECT_ID
 
-PACKAGE_VERSION=$(sh .gitlab/scripts/resolve-version.sh package "${TARGET_PLATFORM}")
+if [ -n "${CI_COMMIT_TAG:-}" ]; then
+    PACKAGE_VERSION="${CI_COMMIT_TAG}"
+else
+    PIMELEON_VERSION=$(sh ./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+    PACKAGE_VERSION="${TARGET_PLATFORM}-v${PIMELEON_VERSION}"
+fi
 
 echo "[INFO] Uploading artifacts for package version: ${PACKAGE_VERSION}"
 

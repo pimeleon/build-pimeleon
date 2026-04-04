@@ -20,18 +20,13 @@ if [ -z "$VERSION" ]; then
     VERSION=$(./shared/scripts/get-next-version.sh "$PLATFORM")
 fi
 
-# Rebuild on minor version bump or when triggered manually (no explicit version)
+# Rebuild when triggered manually (no explicit version)
 if [ -z "${INPUT_VERSION:-}" ]; then
     NEEDS_REBUILD=true
 else
-    BASE_VERSION=$(cat "apps/${PLATFORM}/VERSION" 2>/dev/null || echo "0.1.0")
-    BASE_MINOR=$(echo "$BASE_VERSION" | cut -d. -f2)
-    NEW_MINOR=$(echo "$VERSION"       | cut -d. -f2)
-    if [ "$NEW_MINOR" -gt "$BASE_MINOR" ]; then
-        NEEDS_REBUILD=true
-    else
-        NEEDS_REBUILD=false
-    fi
+    # If explicit version is provided, we only rebuild if we're not currently on a release tag
+    # or if some other condition is met. For now, we default to false if version is pinned.
+    NEEDS_REBUILD=false
 fi
 
 BUILDER_IMAGE="${REGISTRY}/${GITHUB_REPOSITORY}/builder:latest"

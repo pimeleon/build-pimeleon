@@ -31,7 +31,7 @@ check_root() {
 check_whiptail() {
     if ! command -v whiptail &>/dev/null; then
         echo -e "${RED}Error: whiptail not found${NC}"
-        echo "Install with: sudo apt-get install whiptail"
+        echo "Install with: sudo apt-get install whiptail" &>/dev/null
         exit 1
     fi
 }

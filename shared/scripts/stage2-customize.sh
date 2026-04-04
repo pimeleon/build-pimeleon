@@ -86,8 +86,8 @@ migrate_apt_keyring "${MOUNT_POINT}"
 
 # Update package lists
 log_info "Updating package lists"
-chroot_run "${MOUNT_POINT}" apt-get -qq update
-chroot_run "${MOUNT_POINT}" apt-get -qq -y upgrade
+chroot_run "${MOUNT_POINT}" apt-get -q update
+chroot_run "${MOUNT_POINT}" apt-get -q -y upgrade
 
 # Define package categories for better maintenance
 SYSTEM_PKGS=(
@@ -131,25 +131,25 @@ BUILD_DEPS=(
 
 # Install essential packages by category for better visibility
 log_info "Installing system core packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${SYSTEM_PKGS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${SYSTEM_PKGS[@]}" &>/dev/null
 
 log_info "Installing shell and utility packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${SHELL_PKGS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${SHELL_PKGS[@]}" &>/dev/null
 
 log_info "Installing core networking packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${NET_CORE_PKGS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${NET_CORE_PKGS[@]}" &>/dev/null
 
 log_info "Installing routing and wireless packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${NET_ROUTER_PKGS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${NET_ROUTER_PKGS[@]}" &>/dev/null
 
 log_info "Installing monitoring and diagnostics packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${MONITOR_PKGS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${MONITOR_PKGS[@]}" &>/dev/null
 
 log_info "Installing hardware-specific packages"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${HARDWARE_PKGS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${HARDWARE_PKGS[@]}" &>/dev/null
 
 log_info "Installing build dependencies and runtime environments"
-chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${BUILD_DEPS[@]}"
+chroot_run "${MOUNT_POINT}" apt-get install -qq -y --no-install-recommends "${BUILD_DEPS[@]}" &>/dev/null
 
 # Restore and protect resolv.conf (systemd-resolved might have converted it to a symlink)
 log_info "Restoring and protecting resolv.conf"
@@ -596,15 +596,6 @@ EOF
         log_info "Loading platform vars from: ${SHARED_VARS_DIR}/platform/raspberrypi"
         if [[ -n "$(ls -A "${SHARED_VARS_DIR}/platform/raspberrypi/" 2>/dev/null)" ]]; then
             cp -R "${SHARED_VARS_DIR}/platform/raspberrypi/"* "${WORK_DIR}/group_vars/raspberrypi/"
-        fi
-    fi
-
-    # Layer 3: Copy app-specific vars (highest priority - overrides shared)
-    APP_VARS_DIR="${WORKSPACE_DIR:-/workspace}/apps/${TARGET_PLATFORM}/vars"
-    if [[ -d "${APP_VARS_DIR}" ]]; then
-        log_info "Loading app-specific vars from: ${APP_VARS_DIR}"
-        if [[ -n "$(ls -A "${APP_VARS_DIR}/" 2>/dev/null)" ]]; then
-            cp -R "${APP_VARS_DIR}/"* "${WORK_DIR}/group_vars/${PLATFORM_GROUP}/"
         fi
     fi
 

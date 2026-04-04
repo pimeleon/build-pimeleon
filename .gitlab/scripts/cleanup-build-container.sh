@@ -14,17 +14,23 @@ if [ -f .build_container_id ]; then
     rm -f .build_container_id
 fi
 
-CLEANUP_IMAGE="${BUILD_IMAGE:-}"
-if [ -z "${CLEANUP_IMAGE}" ]; then
-    # Fallback: try to find a local builder image if BUILD_IMAGE is not set (e.g. local gitlab-runner)
-    CLEANUP_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "pimeleon-build-builder|pimeleon-builder" | head -n 1 || true)
+# Derive arch-correct builder image from TARGET_PLATFORM
+case "${TARGET_PLATFORM:-rpi3-bookworm}" in
+    *arm64*) _arch="arm64" ;;
+    *)       _arch="armhf" ;;
+esac
+CLEANUP_IMAGE="${CI_REGISTRY_IMAGE}/builder-${_arch}:latest"
+
+if [ -z "${CI_REGISTRY_IMAGE:-}" ]; then
+    # Fallback: try to find a local builder image (e.g. local gitlab-runner without registry)
+    CLEANUP_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "builder-armhf|builder-arm64" | head -n 1 || true)
 fi
 
 if [ -n "${CLEANUP_IMAGE}" ]; then
     echo "Cleaning up host loop devices (stale and active) using image: ${CLEANUP_IMAGE}"
     # Run a privileged helper container to clean up host loop devices.
     # We mount /dev, /run (for udev/lvm), and /sys to allow the container to manipulate host devices.
-    docker run --rm \
+    timeout 60 docker run --rm \
         --privileged \
         --user root \
         -v /dev:/dev \
@@ -65,8 +71,8 @@ for loop in ${all_loops}; do
         fi
     done
 
-    kpartx -d "${loop}" 2>/dev/null || true
-    losetup -d "${loop}" 2>/dev/null || true
+    kpartx -dv "${loop}" 2>/dev/null || true
+    losetup -d "${loop}" 2>/dev/null || losetup --detach "${loop}" 2>/dev/null || true
 done
 ' || true
 else
