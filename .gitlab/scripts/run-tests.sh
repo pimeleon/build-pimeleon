@@ -19,7 +19,12 @@ if [ -z "$(ls -A "$CI_PROJECT_DIR"/output/*.img 2>/dev/null)" ]; then
             xz -dkf "$archive"
         done
     else
-        PACKAGE_VERSION=$(sh .gitlab/scripts/resolve-version.sh package "${TARGET_PLATFORM}")
+        if [ -n "${CI_COMMIT_TAG:-}" ]; then
+            PACKAGE_VERSION="${CI_COMMIT_TAG}"
+        else
+            PIMELEON_VERSION=$(sh ./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+            PACKAGE_VERSION="${TARGET_PLATFORM}-v${PIMELEON_VERSION}"
+        fi
         echo "[INFO] No local image artifact found. Trying registry package ${PACKAGE_VERSION}"
         if sh .gitlab/scripts/check-package-exists.sh "${PACKAGE_VERSION}"; then
             sh .gitlab/scripts/download-package-image.sh "${PACKAGE_VERSION}" "$CI_PROJECT_DIR/output"

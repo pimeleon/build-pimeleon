@@ -93,3 +93,5 @@ site/assets/javascripts/lunr/min/lunr.*.min.js
 .mypy_cache/
 *trace.*
 .prettierrc
+*test_*
+*_test*

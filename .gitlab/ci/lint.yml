@@ -45,7 +45,7 @@ lint:shell:
       when: never
     - when: on_success
   before_script:
-    - apt-get update -qq && apt-get install -y -qq --no-install-recommends shellcheck jq
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends shellcheck jq &>/dev/null
     - pip install --quiet semgrep
   script:
     - bash scripts/quality-benchmark.sh
@@ -72,7 +72,7 @@ test:scripts:
     - if: '$CI_PIPELINE_SOURCE == "web"'
       when: always
   before_script:
-    - apt-get update -qq && apt-get install -y -qq --no-install-recommends bats git
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends bats git &>/dev/null
     - pip install --quiet pyyaml
   script:
     - mkdir -p test-results
