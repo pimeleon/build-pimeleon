@@ -25,7 +25,9 @@ RUN if [ -n "$APT_PROXY" ]; then \
 # Install base dependencies and build tools
 # APT caching handled by remote apt-cacher-ng via APT_PROXY
 # Clean local cache after install to reduce image size
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+RUN rm -f /etc/apt/apt.conf.d/docker-clean && \
+    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache && \
+    apt-get update && apt-get -qy upgrade && apt-get install -qy --no-install-recommends \
     ansible \
     bc \
     bison \
@@ -127,7 +129,9 @@ FROM base AS development
 USER root
 
 # Install development and debugging tools
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+RUN rm -f /etc/apt/apt.conf.d/docker-clean && \
+    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache && \
+    apt-get update && apt-get -qy upgrade && apt-get install -qy --no-install-recommends \
     ansible-lint \
     dnsutils \
     htop \

@@ -2,15 +2,15 @@
 # Pi-hole configuration for Pimeleon
 # Most of the installation is handled in stage2-customize.sh via the official installer
 
-- name: Check if pihole-FTL is installed
+- name: Check if pihole is installed
   ansible.builtin.stat:
-    path: /usr/bin/pihole-FTL
+    path: /usr/bin/pihole
   register: pihole_ftl_bin
   when: services_enabled.pihole | default(false)
 
-- name: Check if pihole-FTL is installed in /usr/local/bin
+- name: Check if pihole is installed in /usr/local/bin
   ansible.builtin.stat:
-    path: /usr/local/bin/pihole-FTL
+    path: /usr/local/bin/pihole
   register: pihole_ftl_local_bin
   when:
     - services_enabled.pihole | default(false)
@@ -58,19 +58,19 @@
   when:
     - services_enabled.pihole | default(false)
     - pihole_ftl_path != ""
-  notify: Restart pihole-FTL
+  notify: Restart pihole
 
-- name: Create Pi-hole FTL systemd service
+- name: Create Pi-hole systemd service
   ansible.builtin.template:
-    src: pihole/pihole-FTL.service.j2
-    dest: /etc/systemd/system/pihole-FTL.service
+    src: pihole/pihole.service.j2
+    dest: /etc/systemd/system/pihole.service
     mode: '0644'
   when:
     - services_enabled.pihole | default(false)
     - pihole_ftl_path != ""
   notify:
     - Reload systemd
-    - Restart pihole-FTL
+    - Restart pihole
 
 - name: Create pihole CLI symlink
   ansible.builtin.file:
@@ -82,4 +82,4 @@
     - services_enabled.pihole | default(false)
     - pihole_ftl_path != ""
 
-# Note: pihole-FTL service enablement happens in stage3-optimize.sh (outside chroot)
+# Note: pihole service enablement happens in stage3-optimize.sh (outside chroot)

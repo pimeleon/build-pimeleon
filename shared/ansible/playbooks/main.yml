@@ -175,9 +175,9 @@
         state: restarted
       when: ansible_connection != "chroot"
 
-    - name: Restart pihole-FTL
+    - name: Restart pihole
       ansible.builtin.systemd:
-        name: pihole-FTL
+        name: pihole
         state: restarted
       when: ansible_connection != "chroot"
 

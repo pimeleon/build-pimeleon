@@ -60,7 +60,7 @@ SERVICES_MAPPING=(
     "squid:squid"
     "tor:tor"
     "dnscrypt-proxy:dnscrypt_proxy"
-    "pihole-FTL:pihole"
+    "pihole:pihole"
     # Pimeleon application
     "pimeleon-api:pi_router_api"
     "pimeleon-proxy:pi_router_api"
@@ -105,7 +105,7 @@ for mapping in "${SERVICES_MAPPING[@]}"; do
         fi
     else
         # Fallback/Diagnostic for legacy Pi-hole or specific cases
-        if [[ "${service}" == "pihole-FTL" ]] || [[ "${service}" == "isc-dhcp-server" ]]; then
+        if [[ "${service}" == "pihole" ]] || [[ "${service}" == "isc-dhcp-server" ]]; then
             log_info "Attempting legacy service enablement for ${service}..."
             chroot_run "${MOUNT_POINT}" systemctl enable "${service}" 2>/dev/null \
                 || log_warn "Failed to enable legacy service ${service} — it may not start on boot"

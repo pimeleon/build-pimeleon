@@ -50,7 +50,7 @@ Clients → BIND9 (53) → Pi-hole (5553) → dnscrypt-proxy (5054) → Internet
 | Service | Package | Port | Role |
 |---------|---------|------|------|
 | bind9 | bind9 | 53 | Primary DNS, DDNS integration |
-| pihole-FTL | pihole | 5553 | Ad blocking, DNS filtering |
+| pihole | pihole | 5553 | Ad blocking, DNS filtering |
 | dnscrypt-proxy | dnscrypt-proxy | 5054 | Encrypted upstream DNS |
 
 ### Tier 3: Proxy Services
@@ -164,7 +164,7 @@ Clients → BIND9 (53) → Pi-hole (5553) → dnscrypt-proxy (5054) → Internet
 | nftables | ✅ | ✅ |
 | ssh | ✅ | ✅ |
 | fail2ban | ✅ | ✅ |
-| pihole-FTL | ✅ | ✅ |
+| pihole | ✅ | ✅ |
 | dnscrypt-proxy | ✅ | ✅ |
 | privoxy | ✅ | ✅ |
 | nginx | ✅ | ✅ |

@@ -27,11 +27,11 @@ install_pihole() {
     if is_service_enabled "pihole" 2>/dev/null; then
         log_info "Preparing Pi-hole installation from official installer and pi-router-apps FTL"
         sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
-        log_info "Fetching pihole-FTL artifact for ${RPI_ARCH:-armhf}"
-        if get_pimeleon_apps_artifact "pihole-FTL" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
+        log_info "Fetching pihole artifact for ${RPI_ARCH:-armhf}"
+        if get_pimeleon_apps_artifact "pihole" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
             log_info "Installing Pi-hole from artifact"
-            log_info "Extracting pihole-FTL.tar.gz to ${mount_point}"
-            sudo tar -xzf "${CACHE_DIR}/pimeleon-downloads/pihole-FTL.tar.gz" -C "${mount_point}/"
+            log_info "Extracting pihole.tar.gz to ${mount_point}"
+            sudo tar -xzf "${CACHE_DIR}/pimeleon-downloads/pihole.tar.gz" -C "${mount_point}/"
             return
         fi
 

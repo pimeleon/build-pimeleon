@@ -167,13 +167,13 @@
     mode: '0755'
   when: services_enabled.dns_server | default(true)
 
-- name: Configure bind9 to start after pihole-FTL
+- name: Configure bind9 to start after pihole
   ansible.builtin.copy:
     dest: /etc/systemd/system/bind9.service.d/override.conf
     content: |
       [Unit]
-      After=network-online.target pihole-FTL.service
-      Wants=network-online.target pihole-FTL.service
+      After=network-online.target pihole.service
+      Wants=network-online.target pihole.service
     mode: '0644'
   when:
     - services_enabled.dns_server | default(true)

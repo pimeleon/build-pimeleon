@@ -21,7 +21,7 @@ enabled_services:
   network:
     - bind9
     - isc-dhcp-server
-    - pihole-FTL
+    - pihole
     - dnscrypt-proxy
     - nftables
   optional:
