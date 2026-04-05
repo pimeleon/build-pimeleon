@@ -7,6 +7,7 @@ install_hostapd() {
     if is_service_enabled "hostapd" 2>/dev/null; then
         log_info "Preparing hostapd installation from pi-router-apps"
         sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+        sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "${CACHE_DIR}/pimeleon-downloads"
         log_info "Fetching hostapd artifact for ${RPI_ARCH:-armhf}"
         if get_pimeleon_apps_artifact "hostapd" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
             log_info "Installing hostapd from artifact"
@@ -27,6 +28,7 @@ install_pihole() {
     if is_service_enabled "pihole" 2>/dev/null; then
         log_info "Preparing Pi-hole installation from official installer and pi-router-apps FTL"
         sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+        sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "${CACHE_DIR}/pimeleon-downloads"
         log_info "Fetching pihole artifact for ${RPI_ARCH:-armhf}"
         if get_pimeleon_apps_artifact "pihole" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
             log_info "Installing Pi-hole from artifact"
@@ -47,6 +49,7 @@ install_tor() {
     if is_service_enabled "tor" 2>/dev/null; then
         log_info "Preparing Tor installation from pi-router-apps"
         sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+        sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "${CACHE_DIR}/pimeleon-downloads"
         log_info "Fetching Tor artifact for ${RPI_ARCH:-armhf}"
         if get_pimeleon_apps_artifact "tor" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
             log_info "Installing Tor from artifact"
@@ -67,6 +70,7 @@ install_dnscrypt_proxy() {
     if is_service_enabled "dnscrypt_proxy" 2>/dev/null; then
         log_info "Preparing dnscrypt-proxy installation from pi-router-apps"
         sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+        sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "${CACHE_DIR}/pimeleon-downloads"
         log_info "Fetching dnscrypt-proxy artifact for ${RPI_ARCH:-armhf}"
         if get_pimeleon_apps_artifact "dnscrypt-proxy" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
             log_info "Installing dnscrypt-proxy from artifact"
@@ -88,6 +92,7 @@ install_wpasupplicant() {
     local mount_point=$1
     log_info "Preparing wpa_supplicant installation from pi-router-apps"
     sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+    sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "${CACHE_DIR}/pimeleon-downloads"
     log_info "Fetching wpa_supplicant artifact for ${RPI_ARCH:-armhf}"
     if get_pimeleon_apps_artifact "wpa_supplicant" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
         log_info "Installing wpa_supplicant from artifact"
@@ -105,6 +110,7 @@ install_privoxy() {
     if is_service_enabled "privoxy" 2>/dev/null; then
         log_info "Preparing privoxy installation from pi-router-apps"
         sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
+        sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "${CACHE_DIR}/pimeleon-downloads"
         log_info "Fetching privoxy artifact for ${RPI_ARCH:-armhf}"
         if get_pimeleon_apps_artifact "privoxy" "${RPI_ARCH:-armhf}" "${CACHE_DIR}/pimeleon-downloads"; then
             log_info "Installing privoxy from artifact"

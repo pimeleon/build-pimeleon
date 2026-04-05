@@ -338,7 +338,7 @@ log_info "Downloading files for chroot installation"
 # Create download directory in cache (outside image to save space)
 sudo mkdir -p "${CACHE_DIR}/pimeleon-downloads"
 sudo chmod 755 "${CACHE_DIR}/pimeleon-downloads"
-sudo chown "$(id -u):$(id -g)" "${CACHE_DIR}/pimeleon-downloads"
+sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" "${CACHE_DIR}/pimeleon-downloads"
 
 # Fetch pre-built binaries from registry (production only)
 # Source is routed by get_pimeleon_apps_artifact: GitLab registry (dev CI) or GitHub releases (prod CI)

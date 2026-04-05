@@ -491,7 +491,7 @@ output/
 
 ```bash
 # Install QEMU ARM64 emulation
-sudo apt-get install qemu-system-arm qemu-efi-aarch64
+sudo apt-get install -q -y qemu-system-arm qemu-efi-aarch64
 
 # Boot image in QEMU
 qemu-system-aarch64 \
@@ -631,7 +631,7 @@ make build
 ```bash
 # Install Realtek firmware
 sudo apt-get update
-sudo apt-get install firmware-realtek
+sudo apt-get install -q -y firmware-realtek
 sudo reboot
 ```
 

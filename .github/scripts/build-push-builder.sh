@@ -10,6 +10,7 @@ set -euo pipefail
 docker build \
     --cache-from "${BUILDER_IMAGE}" \
     --build-arg AB2P_IMAGE="${AB2P_IMAGE}" \
+    --build-arg BUILDER_UID="${BUILDER_UID:-1001}" \
     -t "${BUILDER_IMAGE}" \
     -f shared/containers/builder/Dockerfile .
 

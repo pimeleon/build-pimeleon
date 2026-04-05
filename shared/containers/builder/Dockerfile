@@ -75,8 +75,9 @@ COPY --from=adblock2privoxy-builder /usr/local/bin/adblock2privoxy /usr/local/bi
 COPY --from=adblock2privoxy-builder /opt/adblock2privoxy/templates /usr/share/adblock2privoxy/templates
 
 # Create build user with sudo access
-RUN groupadd -g 999 docker && \
-    useradd -m -s /bin/bash -u 1001 builder && \
+ARG BUILDER_UID=1001
+RUN groupadd -f -g 999 docker && \
+    useradd -m -s /bin/bash -u ${BUILDER_UID} builder && \
     usermod -a -G docker builder && \
     echo "builder ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/builder && \
     chmod 0440 /etc/sudoers.d/builder
@@ -98,10 +99,10 @@ RUN pip install --upgrade pip && \
 
 # Set up working directories
 RUN mkdir -p /output /cache /configs /ansible /scripts && \
-    chown -R builder:docker /output /cache /configs /ansible /scripts
+    chown -R ${BUILDER_UID}:999 /output /cache /configs /ansible /scripts
 
 # Build context must be project root (.) for these paths to work
-RUN mkdir -p /workspace/pi-router-apps && chown -R builder:docker /workspace
+RUN mkdir -p /workspace/pi-router-apps && chown -R ${BUILDER_UID}:999 /workspace
 
 # Cache Debian Buster base for debootstrap (matching production Pi 3B+)
 ADD http://archive.debian.org/debian/dists/buster/Release \

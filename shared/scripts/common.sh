@@ -6,8 +6,9 @@ set -E
 PIMELEON_PROJECT_NAME="${PIMELEON_PROJECT_NAME:-pimeleon}"
 
 # Ownership configuration
-PIMELEON_USER="${PIMELEON_USER:-$(id -u)}"
-PIMELEON_GROUP="${PIMELEON_GROUP:-docker}"
+# Use BUILDER_UID if provided (e.g. from GitHub Actions build-arg), otherwise fallback to current user
+PIMELEON_USER="${PIMELEON_USER:-${BUILDER_UID:-$(id -u)}}"
+PIMELEON_GROUP="${PIMELEON_GROUP:-999}"
 
 # Directory configuration
 CACHE_DIR="${CACHE_DIR:-/cache}"
@@ -468,9 +469,18 @@ verify_stage() {
 # Configure APT cache for chroot environment
 configure_chroot_apt_proxy() {
     local mount_point=$1
+
+    # Increase APT cache limits and disable translations to prevent "Cannot allocate memory" errors
+    # especially during ARM emulation (QEMU user-mode)
+    sudo mkdir -p "${mount_point}/etc/apt/apt.conf.d"
+    sudo tee "${mount_point}/etc/apt/apt.conf.d/99build-tuning" > /dev/null <<EOF
+# Build-time APT Tuning
+APT::Cache-Start "256000000";
+Acquire::Languages "none";
+EOF
+
     if has_apt_proxy; then
         log_info "Configuring APT cache for chroot: ${APT_PROXY}"
-        sudo mkdir -p "${mount_point}/etc/apt/apt.conf.d"
         sudo tee "${mount_point}/etc/apt/apt.conf.d/01proxy" > /dev/null <<EOF
 # APT Cache Configuration for Build Process
 Acquire::http::Proxy "http://${APT_PROXY}";
@@ -480,6 +490,9 @@ Acquire::https::Timeout "120";
 Acquire::Retries "3";
 EOF
     fi
+
+    # Clean up partial lists that might be corrupt and cause "Cannot allocate memory" on parse
+    sudo rm -rf "${mount_point}/var/lib/apt/lists/partial/"*
 }
 
 # Remove APT cache proxy from chroot
@@ -488,6 +501,9 @@ remove_chroot_apt_proxy() {
     if [[ -f "${mount_point}/etc/apt/apt.conf.d/01proxy" ]]; then
         log_info "Removing APT cache configuration from chroot"
         sudo rm -f "${mount_point}/etc/apt/apt.conf.d/01proxy"
+    fi
+    if [[ -f "${mount_point}/etc/apt/apt.conf.d/99build-tuning" ]]; then
+        sudo rm -f "${mount_point}/etc/apt/apt.conf.d/99build-tuning"
     fi
 }
 
@@ -745,14 +761,15 @@ fetch_pimeleon_apps() {
     log_info "Resolved ${package} ${version} (${arch}) in pi-router-apps registry"
     log_info "Download URL: ${url}"
 
-    http_code=$(curl -sLk \
+    http_code=$(sudo curl -sLk \
             -H "PRIVATE-TOKEN: ${PIMELEON_APPS_READ_TOKEN}" \
             -o "${download_dir}/${package}.tar.gz" \
             -w "%{http_code}" \
         "${url}")
-    if [[ "${http_code}" != "200" ]]; then
-        log_error "Failed to fetch ${package}: HTTP ${http_code}"
+    if [[ "${http_code}" != "200" ]] || [[ ! -s "${download_dir}/${package}.tar.gz" ]]; then
+        log_error "Failed to fetch ${package}: HTTP ${http_code} (or empty file)"
         log_error "URL: ${url}"
+        sudo rm -f "${download_dir}/${package}.tar.gz"
         return 1
     fi
 
@@ -805,14 +822,15 @@ fetch_pimeleon_apps_github() {
 
     log_info "Resolved ${package} (${arch}) in GitHub releases"
     log_info "Download URL: ${asset_url}"
-    http_code=$(curl -sL \
+    http_code=$(sudo curl -sL \
             "${auth_args[@]}" \
             -o "${download_dir}/${package}.tar.gz" \
             -w "%{http_code}" \
         "${asset_url}")
-    if [[ "${http_code}" != "200" ]]; then
-        log_error "Failed to download ${package} from GitHub: HTTP ${http_code}"
+    if [[ "${http_code}" != "200" ]] || [[ ! -s "${download_dir}/${package}.tar.gz" ]]; then
+        log_error "Failed to download ${package} from GitHub: HTTP ${http_code} (or empty file)"
         log_error "URL: ${asset_url}"
+        sudo rm -f "${download_dir}/${package}.tar.gz"
         return 1
     fi
 

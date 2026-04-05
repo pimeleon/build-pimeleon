@@ -27,5 +27,6 @@ docker run --rm --privileged \
     -e PIMELEON_PROFILE=production \
     -e PIMELEON_APPS_SOURCE=github \
     -e PIMELEON_APPS_GITHUB_TOKEN="${PIMELEON_APPS_GITHUB_TOKEN}" \
+    -e BUILDER_UID="${BUILDER_UID:-1001}" \
     "${BUILDER_IMAGE}" \
     /scripts/build.sh
