@@ -7,7 +7,7 @@ set -euo pipefail
 # Inputs (env):
 #   GITLAB_API_V4_URL — GitLab API base URL
 #   GITLAB_PROJECT_ID — numeric project ID (13 for build-pimeleon)
-#   GITLAB_FETCH_TOKEN      — read-only personal access token
+#   GITLAB_DEPLOY_TOKEN      — read-only personal access token
 #   PLATFORM          — target platform slug (e.g. rpi3-bookworm)
 #   VERSION           — Pimeleon release version
 
@@ -18,10 +18,10 @@ echo "Downloading artifacts for ${PACKAGE_VERSION} from GitLab..."
 
 CI_API_V4_URL="${GITLAB_API_V4_URL}" \
 CI_PROJECT_ID="${GITLAB_PROJECT_ID}" \
-CI_JOB_TOKEN="${GITLAB_FETCH_TOKEN}" \
+CI_JOB_TOKEN="${GITLAB_DEPLOY_TOKEN}" \
 sh .gitlab/scripts/download-package-image.sh "${PACKAGE_VERSION}" "output"
 
 CI_API_V4_URL="${GITLAB_API_V4_URL}" \
 CI_PROJECT_ID="${GITLAB_PROJECT_ID}" \
-CI_JOB_TOKEN="${GITLAB_FETCH_TOKEN}" \
+CI_JOB_TOKEN="${GITLAB_DEPLOY_TOKEN}" \
 sh .gitlab/scripts/download-package-metadata.sh "${PACKAGE_VERSION}" "output/${PLATFORM}-v${VERSION}.img.metadata.json"

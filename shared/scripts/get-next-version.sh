@@ -22,7 +22,7 @@ _gitlab_latest_version() {
     _platform="$1"
     _url="${CI_API_V4_URL:-https://gitlab.pirouter.dev/api/v4}"
     _project_id="${CI_PROJECT_ID:-13}"
-    _token="${GITLAB_FETCH_TOKEN:-${CI_JOB_TOKEN:-${PIMELEON_APPS_READ_TOKEN:-}}}"
+    _token="${GITLAB_DEPLOY_TOKEN:-${CI_JOB_TOKEN:-${PIMELEON_APPS_READ_TOKEN:-}}}"
     [ -n "$_token" ] || return 1
     command -v curl >/dev/null 2>&1 || return 1
     _resp=$(curl -sk -H "JOB-TOKEN: ${_token}" -H "PRIVATE-TOKEN: ${_token}" "${_url}/projects/${_project_id}/packages?package_name=pimeleon&order_by=created_at&sort=desc&per_page=50" 2>/dev/null)

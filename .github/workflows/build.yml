@@ -88,7 +88,7 @@ jobs:
         env:
           GITLAB_API_V4_URL: "https://gitlab.pirouter.dev:8443/api/v4"
           GITLAB_PROJECT_ID: "13"
-          GITLAB_FETCH_TOKEN: ${{ secrets.GITLAB_FETCH_TOKEN }}
+          GITLAB_DEPLOY_TOKEN: ${{ secrets.GITLAB_DEPLOY_TOKEN }}
           PLATFORM: ${{ steps.meta.outputs.target_platform }}
           VERSION: ${{ steps.meta.outputs.version }}
         run: bash .github/scripts/download-gitlab-artifacts.sh
