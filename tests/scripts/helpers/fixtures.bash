@@ -12,11 +12,17 @@ create_temp_git_repo() {
     export GIT_COMMITTER_NAME="Test User"
     export GIT_COMMITTER_EMAIL="test@example.com"
 
-    # Point to a nonexistent repo so the GitHub Releases API call fails fast
-    # and falls back to local git tags. This keeps tests offline and deterministic.
+    # Point to nonexistent repos so API calls fail fast and fall back to local git tags.
+    # This keeps tests offline, deterministic, and isolated from production data.
     export GITHUB_REPO="pimeleon-test/nonexistent-repo-for-tests"
     export GITHUB_REGISTRY_PUSH_TOKEN=""
     export GITHUB_TOKEN=""
+    export CI_API_V4_URL="https://nonexistent-gitlab.test/api/v4"
+    export GITLAB_API_V4_URL="https://nonexistent-gitlab.test/api/v4"
+    export CI_JOB_TOKEN=""
+    export GITLAB_TOKEN=""
+    export GITLAB_FETCH_TOKEN=""
+    export PIMELEON_APPS_READ_TOKEN=""
 
     (
         cd "$TEST_TMPDIR" || return 1

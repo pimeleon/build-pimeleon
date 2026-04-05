@@ -18,7 +18,7 @@ setup:platform:
     - .gitlab/scripts/detect-platform.sh
   artifacts:
     reports:
-      dotenv: platform.env
+      dotenv: build.env
 
 # Sync adblock2privoxy image and metadata between GitLab and GitHub.
 # This ensures both registries have the latest pre-built Haskell binary.

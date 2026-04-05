@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-apk add --no-cache curl git xz >/dev/null 2>&1 || true
+apk add --no-cache curl git jq xz >/dev/null 2>&1 || true
 
 if [ -z "${TEST_SUITE:-}" ]; then
     echo "[ERROR] TEST_SUITE environment variable is required (e.g. smoke or integration)"
@@ -22,7 +22,10 @@ if [ -z "$(ls -A "$CI_PROJECT_DIR"/output/*.img 2>/dev/null)" ]; then
         if [ -n "${CI_COMMIT_TAG:-}" ]; then
             PACKAGE_VERSION="${CI_COMMIT_TAG}"
         else
-            PIMELEON_VERSION=$(sh ./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+            if [ -z "${PIMELEON_VERSION:-}" ]; then
+                git fetch --tags --quiet 2>/dev/null || true
+                PIMELEON_VERSION=$(sh ./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+            fi
             PACKAGE_VERSION="${TARGET_PLATFORM}-v${PIMELEON_VERSION}"
         fi
         echo "[INFO] No local image artifact found. Trying registry package ${PACKAGE_VERSION}"

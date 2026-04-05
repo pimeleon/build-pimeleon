@@ -38,7 +38,14 @@ fi
 
 PROFILE="production"
 
-echo "TARGET_PLATFORM=$PLATFORM" > platform.env
-echo "PIMELEON_PROFILE=$PROFILE" >> platform.env
+# Resolve version via wrapper
+SCRIPT_DIR="$(dirname "$0")"
+PIMELEON_VERSION=$(sh "${SCRIPT_DIR}/resolve-version.sh" "$PLATFORM")
+
+echo "TARGET_PLATFORM=$PLATFORM" > build.env
+echo "PIMELEON_PROFILE=$PROFILE" >> build.env
+echo "PIMELEON_VERSION=$PIMELEON_VERSION" >> build.env
+
 echo "Platform detected: $PLATFORM"
 echo "Profile selected: $PROFILE"
+echo "Version resolved: $PIMELEON_VERSION"
