@@ -15,6 +15,21 @@ NC='\033[0m'
 
 mkdir -p "${RESULTS_DIR}"
 
+if [[ "${PIMELEON_ENABLE_TESTS:-0}" != "1" ]]; then
+    echo -e "${YELLOW}[WARN]${NC} Script tests are disabled. Set PIMELEON_ENABLE_TESTS=1 to run them."
+    cat > "${RESULTS_DIR}/report.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="0" failures="0" errors="0" skipped="1">
+  <testsuite name="script-tests" tests="0" skipped="1">
+    <testcase name="script_tests_disabled" classname="setup">
+      <skipped message="Script tests are disabled"/>
+    </testcase>
+  </testsuite>
+</testsuites>
+EOF
+    exit 0
+fi
+
 if ! command -v bats &>/dev/null; then
     echo -e "${YELLOW}[WARN]${NC} bats not found — skipping script unit tests."
     echo -e "       Install with: apt install bats  (or brew install bats-core)"

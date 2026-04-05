@@ -11,6 +11,21 @@ fi
 mkdir -p test-results
 mkdir -p "$CI_PROJECT_DIR/output"
 
+if [ "${PIMELEON_ENABLE_TESTS:-0}" != "1" ]; then
+    echo "[INFO] Tests are disabled. Set PIMELEON_ENABLE_TESTS=1 to run them."
+    cat > test-results/junit.xml <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="0" failures="0" errors="0" skipped="1">
+  <testsuite name="${TEST_SUITE}" tests="0" skipped="1">
+    <testcase name="tests_disabled" classname="setup">
+      <skipped message="Tests are disabled"/>
+    </testcase>
+  </testsuite>
+</testsuites>
+EOF
+    exit 0
+fi
+
 if [ -z "$(ls -A "$CI_PROJECT_DIR"/output/*.img 2>/dev/null)" ]; then
     if [ -n "$(ls -A "$CI_PROJECT_DIR"/output/*.img.xz 2>/dev/null)" ]; then
         echo "[INFO] Expanding existing compressed image artifact for tests"

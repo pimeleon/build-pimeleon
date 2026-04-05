@@ -20,7 +20,6 @@ create_temp_git_repo() {
     export CI_API_V4_URL="https://nonexistent-gitlab.test/api/v4"
     export GITLAB_API_V4_URL="https://nonexistent-gitlab.test/api/v4"
     export CI_JOB_TOKEN=""
-    export GITLAB_TOKEN=""
     export GITLAB_FETCH_TOKEN=""
     export PIMELEON_APPS_READ_TOKEN=""
 
@@ -31,10 +30,10 @@ create_temp_git_repo() {
         git config user.name "Test User"
 
         # Create required directory structure
-        mkdir -p apps/rpi3-bookworm/vars
+        mkdir -p shared/configs
 
         # Seed a dummy build path file so subsequent commits have something to touch
-        echo "# placeholder" > apps/rpi3-bookworm/vars/main.yml
+        echo "# placeholder" > shared/configs/main.yml
 
         git add .
         git commit -q -m "chore: initial repo setup"

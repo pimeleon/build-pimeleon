@@ -6,7 +6,6 @@ set -euo pipefail
 # Inputs (env):
 #   GITLAB_API_V4_URL  — GitLab API base URL
 #   GITLAB_PROJECT_ID  — numeric project ID (13 for build-pimeleon)
-#   GITLAB_DEPLOY_TOKEN | GITLAB_TOKEN — read-only personal access token
 #   PLATFORM           — target platform slug (e.g. rpi3-bookworm)
 #   VERSION            — Pimeleon release version
 
@@ -15,8 +14,8 @@ SCRIPT_DIR="$(dirname "$0")"
 # Map GitHub Actions env vars to lib-api.sh expected variable names
 export CI_API_V4_URL="${GITLAB_API_V4_URL:-https://gitlab.pirouter.dev/api/v4}"
 export CI_PROJECT_ID="${GITLAB_PROJECT_ID:-13}"
-export GITLAB_TOKEN="${GITLAB_DEPLOY_TOKEN:-${GITLAB_TOKEN:-}}"
 
+# shellcheck disable=SC1091
 . "${SCRIPT_DIR}/../../shared/scripts/lib-api.sh"
 
 mkdir -p output

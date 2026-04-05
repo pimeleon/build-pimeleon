@@ -1,8 +1,8 @@
 # {{ ansible_managed }}
-# Pi-hole FTL systemd service (DNS sinkhole, no web interface)
+# Pi-hole systemd service (DNS sinkhole, no web interface)
 
 [Unit]
-Description=Pi-hole FTL DNS resolver
+Description=Pi-hole DNS resolver
 Documentation=https://docs.pi-hole.net/
 After=network-online.target dnscrypt-proxy.service
 Wants=network-online.target dnscrypt-proxy.service

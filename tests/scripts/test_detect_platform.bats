@@ -1,15 +1,25 @@
 #!/usr/bin/env bats
 # Unit tests for .gitlab/scripts/detect-platform.sh
 
+load "helpers/fixtures"
+
 PROJECT_ROOT="${BATS_TEST_DIRNAME}/../.."
 DETECT_PLATFORM="${PROJECT_ROOT}/.gitlab/scripts/detect-platform.sh"
 
 setup() {
-    TEST_TMPDIR="$(mktemp -d)"
+    create_temp_git_repo
+    # Add baseline tags for every platform used in these tests so
+    # get-next-version.sh can find a baseline ref for each platform.
+    (
+        cd "$TEST_TMPDIR"
+        git tag "rpi3-bookworm-v0.3.0"
+        git tag "rpi4-bookworm-v0.3.0"
+        git tag "rpi5-bookworm-v0.3.0"
+    )
 }
 
 teardown() {
-    rm -rf "${TEST_TMPDIR}"
+    cleanup_temp_git_repo
 }
 
 run_detect_platform() {

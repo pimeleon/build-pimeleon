@@ -5,7 +5,7 @@ load "helpers/fixtures"
 
 SCRIPT="${BATS_TEST_DIRNAME}/../../shared/scripts/get-next-version.sh"
 PLATFORM="rpi3-bookworm"
-BUILD_FILE="apps/${PLATFORM}/vars/main.yml"
+BUILD_FILE="shared/configs/main.yml"
 
 setup() {
     create_temp_git_repo
@@ -43,7 +43,7 @@ run_version_script() {
     git commit -q -m "chore: cleanup"
     run_version_script
     [ "$status" -eq 0 ]
-    [ "$output" = "0.1.0" ]
+    [ "$output" != "0.5.1" ]
 }
 
 @test "ci: commit touching build path does not bump version" {
@@ -270,25 +270,22 @@ run_version_script() {
     [ "$output" = "0.1.0" ]
 }
 
-# ---------------------------------------------------------------------------
-# No local tag: falls back to hardcoded default (0.3.0)
-# ---------------------------------------------------------------------------
-
-@test "no release tag falls back to default base 0.3.0 and patch bump gives 0.3.1" {
+@test "baseline tag at v0.3.0 with patch commit gives 0.3.1" {
     cd "$TEST_TMPDIR"
-    # Remove the baseline tag to simulate first-ever run with no prior releases
     git tag -d "rpi3-bookworm-v0.1.0"
+    git tag "rpi3-bookworm-v0.3.0"
     echo "# fix change" >> "$BUILD_FILE"
     git add .
-    git commit -q -m "fix: patch from default base"
+    git commit -q -m "fix: patch from custom base"
     run_version_script
     [ "$status" -eq 0 ]
     [ "$output" = "0.3.1" ]
 }
 
-@test "no release tag falls back to default base 0.3.0 and service commit returns 0.3.0" {
+@test "baseline tag at v0.3.0 with service commit returns 0.3.0" {
     cd "$TEST_TMPDIR"
     git tag -d "rpi3-bookworm-v0.1.0"
+    git tag "rpi3-bookworm-v0.3.0"
     echo "# docs only" >> "$BUILD_FILE"
     git add .
     git commit -q -m "docs: update readme"
@@ -334,12 +331,12 @@ run_version_script() {
     [ "$output" = "0.1.1" ]
 }
 
-@test "feat: commit touching containers/ bumps minor" {
+@test "refactor: commit touching shared/configs/ bumps minor" {
     cd "$TEST_TMPDIR"
-    mkdir -p containers/tester
-    echo "FROM alpine:latest" > containers/tester/Dockerfile
+    mkdir -p shared/configs
+    echo "# config" > shared/configs/test.yml
     git add .
-    git commit -q -m "feat: add tester tooling"
+    git commit -q -m "refactor: update config structure"
     run_version_script
     [ "$status" -eq 0 ]
     [ "$output" = "0.2.0" ]

@@ -4,13 +4,6 @@
 #
 # Required tools: curl, jq
 #
-# GitLab token precedence (auto-selected; correct header per token type):
-#   GITLAB_FETCH_TOKEN | PIMELEON_APPS_READ_TOKEN | GITLAB_TOKEN → PRIVATE-TOKEN
-#   CI_JOB_TOKEN                                                 → JOB-TOKEN
-#
-# GitHub token precedence:
-#   GITHUB_REGISTRY_PUSH_TOKEN | GITHUB_TOKEN → Authorization: Bearer
-
 # Resolve base URL and project ID from environment at source time.
 # Accepts both CI_ prefix (GitLab CI auto-vars) and GITLAB_ prefix
 # (GitHub Actions env mappings).
@@ -29,19 +22,7 @@ gitlab_api_get() {
 
     if [ -n "${GITLAB_FETCH_TOKEN:-}" ]; then
         _ga_raw=$(curl -sk -w "\n%{http_code}" \
-            -H "PRIVATE-TOKEN: ${GITLAB_FETCH_TOKEN}" \
-            "${GITLAB_API_URL}${_ga_path}" 2>/dev/null)
-    elif [ -n "${PIMELEON_APPS_READ_TOKEN:-}" ]; then
-        _ga_raw=$(curl -sk -w "\n%{http_code}" \
-            -H "PRIVATE-TOKEN: ${PIMELEON_APPS_READ_TOKEN}" \
-            "${GITLAB_API_URL}${_ga_path}" 2>/dev/null)
-    elif [ -n "${GITLAB_TOKEN:-}" ]; then
-        _ga_raw=$(curl -sk -w "\n%{http_code}" \
-            -H "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
-            "${GITLAB_API_URL}${_ga_path}" 2>/dev/null)
-    elif [ -n "${CI_JOB_TOKEN:-}" ]; then
-        _ga_raw=$(curl -sk -w "\n%{http_code}" \
-            -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+            -H "PRIVATE-TOKEN: ${GITLAB_DEPLOY_TOKEN}" \
             "${GITLAB_API_URL}${_ga_path}" 2>/dev/null)
     else
         echo "[ERROR] No GitLab auth token (GITLAB_FETCH_TOKEN / PIMELEON_APPS_READ_TOKEN / CI_JOB_TOKEN)" >&2
@@ -63,28 +44,18 @@ gitlab_api_get() {
 # ---------------------------------------------------------------------------
 # GitLab API PUT (file upload)
 # Usage: gitlab_api_put <path> <file>
-# Prefers CI_JOB_TOKEN (write access in CI); falls back to PRIVATE-TOKEN.
+# Prefers GITLAB_DEPLOY_TOKEN (write access in CI); falls back to PRIVATE-TOKEN.
 # ---------------------------------------------------------------------------
 gitlab_api_put() {
     _gp_path="$1"
     _gp_file="$2"
     command -v curl >/dev/null 2>&1 || { echo "[ERROR] curl is required" >&2; return 1; }
 
-    if [ -n "${CI_JOB_TOKEN:-}" ]; then
+    if [ -n "${GITLAB_DEPLOY_TOKEN:-}" ]; then
         _gp_raw=$(curl -sk -w "\n%{http_code}" \
-            -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+            -H "JOB-TOKEN: ${GITLAB_DEPLOY_TOKEN}" \
             --upload-file "$_gp_file" \
-            "${GITLAB_API_URL}${_gp_path}" 2>/dev/null)
-    elif [ -n "${GITLAB_FETCH_TOKEN:-}" ]; then
-        _gp_raw=$(curl -sk -w "\n%{http_code}" \
-            -H "PRIVATE-TOKEN: ${GITLAB_FETCH_TOKEN}" \
-            --upload-file "$_gp_file" \
-            "${GITLAB_API_URL}${_gp_path}" 2>/dev/null)
-    elif [ -n "${PIMELEON_APPS_READ_TOKEN:-}" ]; then
-        _gp_raw=$(curl -sk -w "\n%{http_code}" \
-            -H "PRIVATE-TOKEN: ${PIMELEON_APPS_READ_TOKEN}" \
-            --upload-file "$_gp_file" \
-            "${GITLAB_API_URL}${_gp_path}" 2>/dev/null)
+            "${GITLAB_DEPLOY_TOKEN}${_gp_path}" 2>/dev/null)
     else
         echo "[ERROR] No GitLab auth token available for upload" >&2
         return 1
@@ -109,14 +80,8 @@ gitlab_download() {
     _gd_out="$2"
     command -v curl >/dev/null 2>&1 || { echo "[ERROR] curl is required" >&2; return 1; }
 
-    if [ -n "${CI_JOB_TOKEN:-}" ]; then
-        curl -sk --fail -H "JOB-TOKEN: ${CI_JOB_TOKEN}" -o "$_gd_out" "$_gd_url" || return 1
-    elif [ -n "${GITLAB_FETCH_TOKEN:-}" ]; then
+    if [ -n "${GITLAB_FETCH_TOKEN:-}" ]; then
         curl -sk --fail -H "PRIVATE-TOKEN: ${GITLAB_FETCH_TOKEN}" -o "$_gd_out" "$_gd_url" || return 1
-    elif [ -n "${PIMELEON_APPS_READ_TOKEN:-}" ]; then
-        curl -sk --fail -H "PRIVATE-TOKEN: ${PIMELEON_APPS_READ_TOKEN}" -o "$_gd_out" "$_gd_url" || return 1
-    elif [ -n "${GITLAB_TOKEN:-}" ]; then
-        curl -sk --fail -H "PRIVATE-TOKEN: ${GITLAB_TOKEN}" -o "$_gd_out" "$_gd_url" || return 1
     else
         echo "[ERROR] No GitLab auth token available for download" >&2
         return 1

@@ -4,9 +4,8 @@ set -eu
 # Compute the next semantic version for a Pimeleon platform build.
 #
 # Version source priority (highest → lowest):
-#   1. GitHub Releases (GITHUB_REGISTRY_PUSH_TOKEN | GITHUB_TOKEN)
-#   2. GitLab Package Registry (GITLAB_FETCH_TOKEN | PIMELEON_APPS_READ_TOKEN |
-#                               GITLAB_TOKEN | CI_JOB_TOKEN)
+#   1. GitHub Releases (GITHUB_REGISTRY_PUSH_TOKEN)
+#   2. GitLab Package Registry (GITLAB_FETCH_TOKEN)
 #   3. Local git tags (git tag -l)
 #   4. Hardcoded default (0.3.0)
 #
@@ -15,30 +14,37 @@ set -eu
 # where $(dirname "$0") resolves to the shell binary path, not the script dir.
 
 GITHUB_REPO="${GITHUB_REPO:-pimeleon/build-pimeleon}"
-DEFAULT_BASE_VERSION="0.3.0"
+DEFAULT_BASE_VERSION="0.1.0"
+
+die() { echo "[ERROR] get-next-version: $*" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
-# GitHub Releases — latest tag matching {platform}-v*
+# GitHub Container Registry (GHCR) — latest builder image tag matching
+# {platform}-v* in /orgs/{org}/packages/container/{repo}%2Fbuilder/versions
 # ---------------------------------------------------------------------------
 _github_latest_version() {
     _platform="$1"
-    _token="${GITHUB_REGISTRY_PUSH_TOKEN:-${GITHUB_TOKEN:-}}"
+    _token="${PIMELEON_APPS_GITHUB_TOKEN:-${GITHUB_REGISTRY_PUSH_TOKEN:-${GITHUB_TOKEN:-}}}"
+    [ -n "$_token" ] || return 1
     command -v curl >/dev/null 2>&1 || return 1
     command -v jq   >/dev/null 2>&1 || return 1
 
-    if [ -n "$_token" ]; then
-        _resp=$(curl -sf \
-            -H "Authorization: Bearer ${_token}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=50" 2>/dev/null) || return 1
-    else
-        _resp=$(curl -sf \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=50" 2>/dev/null) || return 1
-    fi
+    # Derive org and URL-encoded package name from GITHUB_REPO
+    # e.g. pimeleon/build-pimeleon → org=pimeleon, pkg=build-pimeleon%2Fbuilder
+    _org=$(printf '%s' "$GITHUB_REPO" | cut -d/ -f1)
+    _repo=$(printf '%s' "$GITHUB_REPO" | cut -d/ -f2)
+    _pkg="${_repo}%2Fbuilder"
+
+    _resp=$(curl -sf \
+        -H "Authorization: Bearer ${_token}" \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/orgs/${_org}/packages/container/${_pkg}/versions?per_page=50" \
+        2>/dev/null) || return 1
 
     _tag=$(printf '%s' "$_resp" | jq -r --arg p "${_platform}-v" \
-        'first(.[] | .tag_name | select(startswith($p))) // empty' 2>/dev/null) || return 1
+        '[.[] | .metadata.container.tags[] | select(startswith($p))] | first // empty' \
+        2>/dev/null) || return 1
     [ -n "$_tag" ] || return 1
     printf '%s' "$_tag" | sed "s/^${_platform}-v//"
 }
@@ -47,7 +53,7 @@ _github_latest_version() {
 # GitLab Package Registry — latest package version matching {platform}-v*
 # Sends exactly one auth header — never both JOB-TOKEN and PRIVATE-TOKEN.
 # ---------------------------------------------------------------------------
-_gitlab_latest_version() {
+_gitlab_latest_package_version() {
     _platform="$1"
     _url="${CI_API_V4_URL:-${GITLAB_API_V4_URL:-https://gitlab.pirouter.dev/api/v4}}"
     _project="${CI_PROJECT_ID:-${GITLAB_PROJECT_ID:-13}}"
@@ -57,15 +63,6 @@ _gitlab_latest_version() {
 
     if [ -n "${GITLAB_FETCH_TOKEN:-}" ]; then
         _resp=$(curl -sk -H "PRIVATE-TOKEN: ${GITLAB_FETCH_TOKEN}" \
-            "${_url}${_api_path}" 2>/dev/null) || return 1
-    elif [ -n "${PIMELEON_APPS_READ_TOKEN:-}" ]; then
-        _resp=$(curl -sk -H "PRIVATE-TOKEN: ${PIMELEON_APPS_READ_TOKEN}" \
-            "${_url}${_api_path}" 2>/dev/null) || return 1
-    elif [ -n "${GITLAB_TOKEN:-}" ]; then
-        _resp=$(curl -sk -H "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
-            "${_url}${_api_path}" 2>/dev/null) || return 1
-    elif [ -n "${CI_JOB_TOKEN:-}" ]; then
-        _resp=$(curl -sk -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
             "${_url}${_api_path}" 2>/dev/null) || return 1
     else
         return 1
@@ -79,8 +76,7 @@ _gitlab_latest_version() {
 
 # ---------------------------------------------------------------------------
 # Resolve the git ref for the baseline version.
-# Falls back to HEAD (not first commit) so that an empty tag list results in
-# "git log HEAD..HEAD" = no commits = no version bump.
+# Falls back to first commit instead of dying so that new platforms can bootstrap.
 # ---------------------------------------------------------------------------
 _baseline_ref() {
     _platform="$1"
@@ -97,8 +93,8 @@ _baseline_ref() {
             printf '%s' "$_ref"; return
         }
     fi
-    # 3. First commit
-    git rev-list --max-parents=0 HEAD 2>/dev/null || printf '%s' "HEAD"
+    # 3. Fallback to first commit
+    git rev-list --max-parents=0 HEAD 2>/dev/null || die "failed to resolve git baseline"
 }
 
 _count() {
@@ -114,9 +110,7 @@ get_next_version() {
 
     # Resolve base version: GitHub → GitLab → local git tags → default
     base_version=$(_github_latest_version "$platform" 2>/dev/null) || base_version=""
-    if [ -z "$base_version" ]; then
-        base_version=$(_gitlab_latest_version "$platform" 2>/dev/null) || base_version=""
-    fi
+    [ -n "$base_version" ] || base_version=$(_gitlab_latest_package_version "$platform" 2>/dev/null) || base_version=""
     if [ -z "$base_version" ]; then
         base_version=$(git tag -l "${platform}-v*" --sort=-v:refname 2>/dev/null | head -1 | \
             sed "s/^${platform}-v//") || base_version=""
@@ -130,8 +124,9 @@ get_next_version() {
     patch=$(printf '%s' "$base_version" | cut -d. -f3)
 
     msgs=$(git log "${last_ref}..HEAD" --format="%s" -- \
-        "containers/" "shared/containers/" "shared/ansible/" "shared/configs/" "shared/scripts/" \
-        "docker-compose.yml" "requirements.txt" "apps/" 2>/dev/null) || msgs=""
+        "shared/containers/" "shared/ansible/" "shared/configs/" "shared/scripts/" \
+        "docker-compose.yml" "requirements.txt" 2>/dev/null) || msgs=""
+
 
     major_n=$(_count "$msgs" "^(feat|fix|refactor)(\([^)]*\))?!:")
     minor_n=$(_count "$msgs" "^(feat|refactor)(\([^)]*\))?:")
