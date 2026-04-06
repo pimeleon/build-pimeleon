@@ -3,7 +3,7 @@ set -eu
 
 # Upload Pimeleon image artifacts to the GitLab Generic Packages registry.
 #
-# Inputs: TARGET_PLATFORM, CI_JOB_TOKEN, CI_API_V4_URL, CI_PROJECT_ID
+# Inputs: TARGET_PLATFORM, GITLAB_DEPLOY_TOKEN, CI_API_V4_URL, CI_PROJECT_ID
 
 apk add --no-cache curl git jq >/dev/null 2>&1 || true
 
@@ -13,10 +13,10 @@ SCRIPT_DIR="$(dirname "$0")"
 if [ -n "${CI_COMMIT_TAG:-}" ]; then
     PACKAGE_VERSION="${CI_COMMIT_TAG}"
 else
-    if [ -z "${PIMELEON_VERSION:-}" ]; then
-        git fetch --tags --quiet 2>/dev/null || true
-        PIMELEON_VERSION=$(sh ./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
-    fi
+    [ -n "${PIMELEON_VERSION:-}" ] || {
+        echo "[ERROR] PIMELEON_VERSION is not set. Run .gitlab/scripts/detect-platform.sh first."
+        exit 1
+    }
     PACKAGE_VERSION="${TARGET_PLATFORM}-v${PIMELEON_VERSION}"
 fi
 

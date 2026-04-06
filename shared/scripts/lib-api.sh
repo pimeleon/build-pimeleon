@@ -4,6 +4,11 @@
 #
 # Required tools: curl, jq
 #
+# Simplified GitLab token handling:
+#   GITLAB_FETCH_TOKEN  -> read access outside GitLab CI (PRIVATE-TOKEN)
+#   CI_JOB_TOKEN        -> read access inside GitLab CI (JOB-TOKEN)
+#   GITLAB_DEPLOY_TOKEN -> write/delete access (PRIVATE-TOKEN)
+#
 # Resolve base URL and project ID from environment at source time.
 # Accepts both CI_ prefix (GitLab CI auto-vars) and GITLAB_ prefix
 # (GitHub Actions env mappings).
@@ -22,10 +27,14 @@ gitlab_api_get() {
 
     if [ -n "${GITLAB_FETCH_TOKEN:-}" ]; then
         _ga_raw=$(curl -sk -w "\n%{http_code}" \
-            -H "PRIVATE-TOKEN: ${GITLAB_DEPLOY_TOKEN}" \
+            -H "PRIVATE-TOKEN: ${GITLAB_FETCH_TOKEN}" \
+            "${GITLAB_API_URL}${_ga_path}" 2>/dev/null)
+    elif [ -n "${CI_JOB_TOKEN:-}" ]; then
+        _ga_raw=$(curl -sk -w "\n%{http_code}" \
+            -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
             "${GITLAB_API_URL}${_ga_path}" 2>/dev/null)
     else
-        echo "[ERROR] No GitLab auth token (GITLAB_FETCH_TOKEN / PIMELEON_APPS_READ_TOKEN / CI_JOB_TOKEN)" >&2
+        echo "[ERROR] No GitLab auth token (GITLAB_FETCH_TOKEN / CI_JOB_TOKEN)" >&2
         return 1
     fi
 
@@ -44,7 +53,7 @@ gitlab_api_get() {
 # ---------------------------------------------------------------------------
 # GitLab API PUT (file upload)
 # Usage: gitlab_api_put <path> <file>
-# Prefers GITLAB_DEPLOY_TOKEN (write access in CI); falls back to PRIVATE-TOKEN.
+# Uses GITLAB_DEPLOY_TOKEN for write access.
 # ---------------------------------------------------------------------------
 gitlab_api_put() {
     _gp_path="$1"
@@ -53,11 +62,11 @@ gitlab_api_put() {
 
     if [ -n "${GITLAB_DEPLOY_TOKEN:-}" ]; then
         _gp_raw=$(curl -sk -w "\n%{http_code}" \
-            -H "JOB-TOKEN: ${GITLAB_DEPLOY_TOKEN}" \
+            -H "PRIVATE-TOKEN: ${GITLAB_DEPLOY_TOKEN}" \
             --upload-file "$_gp_file" \
-            "${GITLAB_DEPLOY_TOKEN}${_gp_path}" 2>/dev/null)
+            "${GITLAB_API_URL}${_gp_path}" 2>/dev/null)
     else
-        echo "[ERROR] No GitLab auth token available for upload" >&2
+        echo "[ERROR] GITLAB_DEPLOY_TOKEN is required for GitLab uploads" >&2
         return 1
     fi
 
@@ -67,6 +76,34 @@ gitlab_api_put() {
     if [ "$_gp_status" != "200" ] && [ "$_gp_status" != "201" ]; then
         echo "[ERROR] GitLab API PUT ${_gp_path}: HTTP ${_gp_status}" >&2
         echo "[DEBUG] Response: ${_gp_body}" >&2
+        return 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# GitLab API DELETE
+# Usage: gitlab_api_delete <path>
+# Uses GITLAB_DEPLOY_TOKEN for destructive API calls.
+# ---------------------------------------------------------------------------
+gitlab_api_delete() {
+    _gd_path="$1"
+    command -v curl >/dev/null 2>&1 || { echo "[ERROR] curl is required" >&2; return 1; }
+
+    if [ -n "${GITLAB_DEPLOY_TOKEN:-}" ]; then
+        _gd_raw=$(curl -sk -X DELETE -w "\n%{http_code}" \
+            -H "PRIVATE-TOKEN: ${GITLAB_DEPLOY_TOKEN}" \
+            "${GITLAB_API_URL}${_gd_path}" 2>/dev/null)
+    else
+        echo "[ERROR] GITLAB_DEPLOY_TOKEN is required for GitLab deletes" >&2
+        return 1
+    fi
+
+    _gd_status=$(printf '%s' "$_gd_raw" | tail -1)
+    _gd_body=$(printf '%s' "$_gd_raw" | sed '$d')
+
+    if [ "$_gd_status" != "200" ] && [ "$_gd_status" != "204" ]; then
+        echo "[ERROR] GitLab API DELETE ${_gd_path}: HTTP ${_gd_status}" >&2
+        echo "[DEBUG] Response: ${_gd_body}" >&2
         return 1
     fi
 }
@@ -82,8 +119,10 @@ gitlab_download() {
 
     if [ -n "${GITLAB_FETCH_TOKEN:-}" ]; then
         curl -sk --fail -H "PRIVATE-TOKEN: ${GITLAB_FETCH_TOKEN}" -o "$_gd_out" "$_gd_url" || return 1
+    elif [ -n "${CI_JOB_TOKEN:-}" ]; then
+        curl -sk --fail -H "JOB-TOKEN: ${CI_JOB_TOKEN}" -o "$_gd_out" "$_gd_url" || return 1
     else
-        echo "[ERROR] No GitLab auth token available for download" >&2
+        echo "[ERROR] No GitLab auth token available for download (GITLAB_FETCH_TOKEN / CI_JOB_TOKEN)" >&2
         return 1
     fi
 }

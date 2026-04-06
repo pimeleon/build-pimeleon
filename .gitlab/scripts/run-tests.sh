@@ -37,10 +37,10 @@ if [ -z "$(ls -A "$CI_PROJECT_DIR"/output/*.img 2>/dev/null)" ]; then
         if [ -n "${CI_COMMIT_TAG:-}" ]; then
             PACKAGE_VERSION="${CI_COMMIT_TAG}"
         else
-            if [ -z "${PIMELEON_VERSION:-}" ]; then
-                git fetch --tags --quiet 2>/dev/null || true
-                PIMELEON_VERSION=$(sh ./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
-            fi
+            [ -n "${PIMELEON_VERSION:-}" ] || {
+                echo "[ERROR] PIMELEON_VERSION is not set. Run .gitlab/scripts/detect-platform.sh first."
+                exit 1
+            }
             PACKAGE_VERSION="${TARGET_PLATFORM}-v${PIMELEON_VERSION}"
         fi
         echo "[INFO] No local image artifact found. Trying registry package ${PACKAGE_VERSION}"
