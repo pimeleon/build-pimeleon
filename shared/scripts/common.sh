@@ -570,6 +570,7 @@ generate_metadata() {
 {
     "version": "$(date +%Y%m%d-%H%M%S)",
     "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+    "commit_sha": "${CI_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}",
     "image_name": "$(basename "$image_path")",
     "image_size": $size,
     "checksums": {
@@ -580,6 +581,7 @@ generate_metadata() {
         "rpi_model": "${PIMELEON_RPI_MODEL:-3B+}",
         "raspbian_version": "${RASPBIAN_VERSION:-buster}",
         "builder_version": "1.0.0",
+        "commit_sha": "${CI_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}",
         "builder_image_ref": "${BUILDER_IMAGE_REF:-unknown}",
         "builder_image_digest": "${BUILDER_IMAGE_DIGEST:-unknown}"
     }
@@ -839,11 +841,13 @@ fetch_pimeleon_apps_github() {
 }
 
 # Get a pre-built binary package from the appropriate source based on build context.
-# CI production builds (tag or push/MR to release/*): GitHub releases.
+# CI production builds (tag or push/MR to release/*): GHCR image (pre-populated via PIMELEON_APPS_LOCAL_PATH).
 # CI development builds (push/MR to develop): GitLab package registry.
 # Other non-release CI branches also use GitLab registry as the safest default.
 # Local builds: local mounted registry-apps path, then GitLab registry as fallback.
 # Source can be forced via PIMELEON_APPS_SOURCE=gitlab|github.
+# For github source: artifacts must be pre-extracted from ghcr.io/pimeleon/pimeleon-apps/builder-armhf:latest
+# into PIMELEON_APPS_LOCAL_PATH (default: /workspace/registry-apps) before the builder container starts.
 # Usage: get_pimeleon_apps_artifact <package> <arch> <download_dir>
 get_pimeleon_apps_artifact() {
     local package="$1"
@@ -871,7 +875,20 @@ get_pimeleon_apps_artifact() {
         fi
         case "${source}" in
             github)
-                log_info "CI (production): fetching ${package} from GitHub releases"
+                log_info "CI (production): fetching ${package} from GHCR pre-populated path"
+                local github_path="${PIMELEON_APPS_LOCAL_PATH:-/workspace/registry-apps}"
+                local github_file
+                github_file=$(find "${github_path}" -maxdepth 2 \
+                    -name "${package}-*-${arch}-*.tar.gz" 2>/dev/null | head -1)
+                if [[ -n "${github_file:-}" ]]; then
+                    log_info "Using GHCR artifact: ${github_file}"
+                    sudo cp "${github_file}" "${download_dir}/${package}.tar.gz"
+                    sudo chown "${PIMELEON_USER}:${PIMELEON_GROUP}" \
+                        "${download_dir}/${package}.tar.gz"
+                    return 0
+                fi
+                # Fallback: GHCR path not pre-populated — download from GitHub releases
+                log_info "GHCR path empty, falling back to GitHub releases"
                 fetch_pimeleon_apps_github "$package" "$arch" "$download_dir"
                 return $?
                 ;;
