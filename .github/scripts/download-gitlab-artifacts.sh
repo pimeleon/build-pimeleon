@@ -12,8 +12,8 @@ set -euo pipefail
 SCRIPT_DIR="$(dirname "$0")"
 
 # Map GitHub Actions env vars to lib-api.sh expected variable names
-export CI_API_V4_URL="${GITLAB_API_V4_URL:-https://gitlab.pirouter.dev/api/v4}"
-export CI_PROJECT_ID="${GITLAB_PROJECT_ID:-13}"
+export CI_API_V4_URL="${GITLAB_API_V4_URL:-}"
+export CI_PROJECT_ID="${GITLAB_PROJECT_ID:-}"
 
 # shellcheck disable=SC1091
 . "${SCRIPT_DIR}/../../shared/scripts/lib-api.sh"

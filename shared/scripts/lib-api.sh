@@ -10,11 +10,13 @@
 #   GITLAB_DEPLOY_TOKEN -> write/delete access (PRIVATE-TOKEN)
 #
 # Resolve base URL and project ID from environment at source time.
-# Accepts both CI_ prefix (GitLab CI auto-vars) and GITLAB_ prefix
 # (GitHub Actions env mappings).
-GITLAB_API_URL="${CI_API_V4_URL:-${GITLAB_API_V4_URL:-https://gitlab.pirouter.dev/api/v4}}"
-GITLAB_PROJECT="${CI_PROJECT_ID:-${GITLAB_PROJECT_ID:-13}}"
+GITLAB_API_URL="${GITLAB_API_V4_URL:-}"
+GITLAB_PROJECT="${GITLAB_PROJECT_ID:-}"
 GITHUB_REPO="${GITHUB_REPO:-pimeleon/build-pimeleon}"
+
+if [ -z "${GITLAB_API_URL:-}" ]; then echo "[WARN] lib-api.sh: GITLAB_API_URL not set" >&2; fi
+if [ -z "${GITLAB_PROJECT:-}" ]; then echo "[WARN] lib-api.sh: GITLAB_PROJECT not set" >&2; fi
 
 # ---------------------------------------------------------------------------
 # GitLab API GET
