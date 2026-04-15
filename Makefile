@@ -1,5 +1,9 @@
 .PHONY: help build build-ab2p build-app build-all build-local build-docker test clean lint dev shell docs check-deps list-apps
 
+# Load .env for local builds (no error if missing)
+-include .env
+export GITLAB_FETCH_TOKEN GITLAB_API_V4_URL GITLAB_PROJECT_ID
+
 # Default platform (can be overridden: make build TARGET_PLATFORM=rpi4-bookworm)
 TARGET_PLATFORM ?= rpi3-bookworm
 PIMELEON_PROFILE ?= production

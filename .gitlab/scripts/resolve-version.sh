@@ -16,7 +16,7 @@ if [ -n "${CI_COMMIT_TAG:-}" ]; then
     # Tag format: {platform}-v{version}, e.g., rpi4-bookworm-v1.2.3
     VERSION=$(echo "$CI_COMMIT_TAG" | sed 's/.*-v//')
 else
-    git fetch --tags --quiet 2>/dev/null || true
+    git fetch --quiet origin "+refs/tags/*:refs/tags/*" 2>/dev/null || true
     # Calculate next version based on commits
     SCRIPT_DIR="$(dirname "$0")"
     VERSION=$(sh "${SCRIPT_DIR}/../../shared/scripts/get-next-version.sh" "$PLATFORM")
