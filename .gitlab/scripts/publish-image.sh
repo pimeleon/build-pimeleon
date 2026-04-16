@@ -10,15 +10,11 @@ apk add --no-cache curl git jq >/dev/null 2>&1 || true
 SCRIPT_DIR="$(dirname "$0")"
 . "${SCRIPT_DIR}/../../shared/scripts/lib-api.sh"
 
-if [ -n "${CI_COMMIT_TAG:-}" ]; then
-    PACKAGE_VERSION="${CI_COMMIT_TAG}"
-else
-    [ -n "${PIMELEON_VERSION:-}" ] || {
-        echo "[ERROR] PIMELEON_VERSION is not set. Run .gitlab/scripts/detect-platform.sh first."
-        exit 1
-    }
-    PACKAGE_VERSION="${TARGET_PLATFORM}-v${PIMELEON_VERSION}"
-fi
+[ -n "${PIMELEON_VERSION:-}" ] || {
+    echo "[ERROR] PIMELEON_VERSION is not set. Run .gitlab/scripts/detect-platform.sh first."
+    exit 1
+}
+PACKAGE_VERSION="${TARGET_PLATFORM}-v${PIMELEON_VERSION}"
 
 echo "[INFO] Uploading artifacts for package version: ${PACKAGE_VERSION}"
 
