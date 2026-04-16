@@ -55,12 +55,12 @@ fi
 
 # Determine image name
 COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "dev")
-if _version=$(git describe --tags --exact-match HEAD 2>/dev/null) || [ -n "${PIMELEON_VERSION:-}" ]; then
-    # Release build (or version resolved build): pimeleon-{device}-{version}-{os}.img
-    IMAGE_NAME="pimeleon-${DEVICE_NAME}-${IMAGE_VERSION}-${OS_NAME}.img"
-else
-    # Development build (no version resolved): pimeleon-{device}-{version}-{os}-{commit}.img
+if [ "${PIMELEON_PROFILE:-}" = "development" ]; then
+    # Development build: pimeleon-{device}-{version}-{os}-{commit}.img
     IMAGE_NAME="pimeleon-${DEVICE_NAME}-${IMAGE_VERSION}-${OS_NAME}-${COMMIT_HASH}.img"
+else
+    # Production build: pimeleon-{device}-{version}-{os}.img
+    IMAGE_NAME="pimeleon-${DEVICE_NAME}-${IMAGE_VERSION}-${OS_NAME}.img"
 fi
 
 IMAGE_PATH="${OUTPUT_DIR}/${IMAGE_NAME}"
