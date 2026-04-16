@@ -15,19 +15,9 @@ set -euo pipefail
 PLATFORM="${INPUT_PLATFORM:-rpi3-bookworm}"
 VERSION="${INPUT_VERSION:-}"
 
-if [ -z "$VERSION" ]; then
-    chmod +x ./shared/scripts/get-next-version.sh
-    VERSION=$(./shared/scripts/get-next-version.sh "$PLATFORM")
-fi
+[ -n "$VERSION" ] || { echo "[ERROR] INPUT_VERSION is required — must be provided by GitLab trigger or workflow_dispatch input" >&2; exit 1; }
 
-# Rebuild when triggered manually (no explicit version)
-if [ -z "${INPUT_VERSION:-}" ]; then
-    NEEDS_REBUILD=true
-else
-    # If explicit version is provided, we only rebuild if we're not currently on a release tag
-    # or if some other condition is met. For now, we default to false if version is pinned.
-    NEEDS_REBUILD=false
-fi
+NEEDS_REBUILD=true
 
 BUILDER_IMAGE="${REGISTRY}/${GITHUB_REPOSITORY}/builder:latest"
 AB2P_IMAGE="${REGISTRY}/${GITHUB_REPOSITORY}/adblock2privoxy:latest"
