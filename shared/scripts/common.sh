@@ -859,8 +859,7 @@ get_pimeleon_apps_artifact() {
     if [[ -n "${CI:-}" ]] || [[ -n "${GITLAB_CI:-}" ]]; then
         local source="${PIMELEON_APPS_SOURCE:-}"
         if [[ -z "${source}" ]]; then
-            if [[ -n "${CI_COMMIT_TAG:-}" ]] || \
-               [[ "${CI_COMMIT_BRANCH:-}" =~ ^release/ ]] || \
+            if [[ "${CI_COMMIT_BRANCH:-}" =~ ^release/ ]] || \
                [[ "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}" =~ ^release/ ]]; then
                 source="github"
                 log_info "Auto-detected apps source: github (production build)"

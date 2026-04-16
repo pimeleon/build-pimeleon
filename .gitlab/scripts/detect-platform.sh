@@ -6,13 +6,10 @@ set -eu
 # POSIX-compatible (runs in alpine:latest which has no bash).
 #
 # Inputs (CI environment):
-#   CI_COMMIT_TAG, CI_PIPELINE_SOURCE, CI_MERGE_REQUEST_TARGET_BRANCH_NAME,
+#   CI_PIPELINE_SOURCE, CI_MERGE_REQUEST_TARGET_BRANCH_NAME,
 #   CI_COMMIT_BRANCH, TARGET_PLATFORM (web override)
 
-if [ -n "${CI_COMMIT_TAG:-}" ]; then
-    # Tag format: {platform}-v{version}, e.g., rpi4-bookworm-v1.2.3
-    PLATFORM=$(echo "$CI_COMMIT_TAG" | sed 's/-v[0-9].*//')
-elif [ "${CI_PIPELINE_SOURCE:-}" = "merge_request_event" ]; then
+if [ "${CI_PIPELINE_SOURCE:-}" = "merge_request_event" ]; then
     # MRs target a release platform when available, otherwise use the default platform.
     case "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-}" in
         release/*)

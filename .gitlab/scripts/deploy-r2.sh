@@ -16,11 +16,7 @@ apk add --no-cache git aws-cli curl >/dev/null 2>&1 || true
 }
 
 VERSION="${PIMELEON_VERSION}"
-if [ -n "${CI_COMMIT_TAG:-}" ]; then
-    PACKAGE_VERSION="${CI_COMMIT_TAG}"
-else
-    PACKAGE_VERSION="${TARGET_PLATFORM}-v${VERSION}"
-fi
+PACKAGE_VERSION="${TARGET_PLATFORM}-v${VERSION}"
 UPLOAD_PREFIX="${TARGET_PLATFORM}/v${VERSION}"
 echo "Deploying to R2: s3://${R2_BUCKET}/${UPLOAD_PREFIX}/"
 

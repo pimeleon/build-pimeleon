@@ -40,11 +40,7 @@ echo "Using ansible=${ANSIBLE_DIR} configs=${CONFIGS_DIR} scripts=${SCRIPTS_DIR}
     exit 1
 }
 
-if [ -n "${CI_COMMIT_TAG:-}" ]; then
-    PACKAGE_VERSION="${CI_COMMIT_TAG}"
-else
-    PACKAGE_VERSION="${TARGET_PLATFORM}-v${PIMELEON_VERSION}"
-fi
+PACKAGE_VERSION="${TARGET_PLATFORM}-v${PIMELEON_VERSION}"
 BUILDER_IMAGE_DIGEST=$(sh .gitlab/scripts/resolve-builder-image-digest.sh "${BUILD_IMAGE}")
 echo "[INFO] Building version: ${PIMELEON_VERSION}"
 echo "[INFO] Package version: ${PACKAGE_VERSION}"

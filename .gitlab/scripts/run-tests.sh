@@ -34,15 +34,11 @@ if [ -z "$(ls -A "$CI_PROJECT_DIR"/output/*.img 2>/dev/null)" ]; then
             xz -dkf "$archive"
         done
     else
-        if [ -n "${CI_COMMIT_TAG:-}" ]; then
-            PACKAGE_VERSION="${CI_COMMIT_TAG}"
-        else
-            [ -n "${PIMELEON_VERSION:-}" ] || {
-                echo "[ERROR] PIMELEON_VERSION is not set. Run .gitlab/scripts/detect-platform.sh first."
-                exit 1
-            }
-            PACKAGE_VERSION="${TARGET_PLATFORM}-v${PIMELEON_VERSION}"
-        fi
+        [ -n "${PIMELEON_VERSION:-}" ] || {
+            echo "[ERROR] PIMELEON_VERSION is not set. Run .gitlab/scripts/detect-platform.sh first."
+            exit 1
+        }
+        PACKAGE_VERSION="${TARGET_PLATFORM}-v${PIMELEON_VERSION}"
         echo "[INFO] No local image artifact found. Trying registry package ${PACKAGE_VERSION}"
         if sh .gitlab/scripts/check-package-exists.sh "${PACKAGE_VERSION}"; then
             sh .gitlab/scripts/download-package-image.sh "${PACKAGE_VERSION}" "$CI_PROJECT_DIR/output"
