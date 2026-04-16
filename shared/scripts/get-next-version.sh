@@ -17,10 +17,10 @@ _gitlab_api_get() {
     command -v curl >/dev/null 2>&1 || return 1
 
     if [ -n "${GITLAB_FETCH_TOKEN:-}" ]; then
-        curl -sk -H "PRIVATE-TOKEN: ${GITLAB_FETCH_TOKEN}" \
+        curl -skf -H "PRIVATE-TOKEN: ${GITLAB_FETCH_TOKEN}" \
             "$_request_url" 2>/dev/null || return 1
     elif [ -n "${CI_JOB_TOKEN:-}" ]; then
-        curl -sk -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        curl -skf -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
             "$_request_url" 2>/dev/null || return 1
     else
         return 1
@@ -54,7 +54,7 @@ _gitlab_version_exists() {
     _platform="$1"
     _version="$2"
     _url="${CI_API_V4_URL:-${GITLAB_API_V4_URL:-https://gitlab.pirouter.dev/api/v4}}"
-    _project="${CI_PROJECT_ID:-${GITLAB_PROJECT_ID:-}}"
+    _project="${CI_PROJECT_ID:-${GITLAB_PROJECT_ID:-13}}"
     command -v curl >/dev/null 2>&1 || return 1
     command -v jq   >/dev/null 2>&1 || return 1
 
