@@ -54,8 +54,6 @@ deploy:r2:
   rules:
     - if: '$CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_BRANCH =~ /^release\//'
       when: on_success
-    - if: '$CI_COMMIT_TAG'
-      when: on_success
     - when: never
   variables:
     AWS_ACCESS_KEY_ID: $S3_ACCESS_KEY_ID
