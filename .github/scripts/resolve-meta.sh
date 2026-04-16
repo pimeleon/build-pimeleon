@@ -13,9 +13,9 @@ set -euo pipefail
 #   target_platform, version, needs_rebuild, builder_image, ab2p_image
 
 PLATFORM="${INPUT_PLATFORM:-rpi3-bookworm}"
-VERSION="${INPUT_VERSION:-}"
 
-[ -n "$VERSION" ] || { echo "[ERROR] INPUT_VERSION is required — must be provided by GitLab trigger or workflow_dispatch input" >&2; exit 1; }
+chmod +x ./shared/scripts/get-next-version.sh
+VERSION=$(./shared/scripts/get-next-version.sh "$PLATFORM")
 
 NEEDS_REBUILD=true
 

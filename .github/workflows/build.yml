@@ -55,8 +55,8 @@ jobs:
         id: meta
         env:
           INPUT_PLATFORM: ${{ github.event.client_payload.platform || github.event.inputs.target_platform || 'rpi3-bookworm' }}
-          INPUT_VERSION: ${{ github.event.client_payload.version || github.event.inputs.version }}
           REGISTRY: ${{ env.REGISTRY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash .github/scripts/resolve-meta.sh
 
       - name: Ensure adblock2privoxy image exists

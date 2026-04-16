@@ -77,19 +77,18 @@ _github_latest_version() {
     _platform="$1"
     _org=$(printf '%s' "$GITHUB_REPO" | cut -d/ -f1)
     _repo=$(printf '%s' "$GITHUB_REPO" | cut -d/ -f2)
-    _pkg="${_repo}%2Fbuilder"
     command -v curl >/dev/null 2>&1 || die "curl is required"
     command -v jq   >/dev/null 2>&1 || die "jq is required"
 
     _resp=$(_github_api_get \
-        "https://api.github.com/orgs/${_org}/packages/container/${_pkg}/versions?per_page=50") || \
-        die "GHCR query failed for ${_platform}"
+        "https://api.github.com/repos/${_org}/${_repo}/releases?per_page=50") || \
+        die "GitHub Releases query failed for ${_platform}"
 
     _tag=$(printf '%s' "$_resp" | jq -r --arg p "${_platform}-v" \
-        '[.[] | .metadata.container.tags[] | select(startswith($p))] | first // empty' \
-        2>/dev/null) || die "failed to parse GHCR response for ${_platform}"
+        '[.[] | .tag_name | select(startswith($p))] | first // empty' \
+        2>/dev/null) || die "failed to parse GitHub Releases response for ${_platform}"
     if [ -z "$_tag" ] || [ "$_tag" = "null" ]; then
-        die "no published version found for ${_platform} in GHCR"
+        die "no published release found for ${_platform} in GitHub"
     fi
     printf '%s' "$_tag" | sed "s/^${_platform}-v//"
 }
