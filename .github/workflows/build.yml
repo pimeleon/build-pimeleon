@@ -10,9 +10,6 @@ on:
         description: 'Platform to build (e.g., rpi3-bookworm)'
         required: true
         default: 'rpi3-bookworm'
-      version:
-        description: 'Resolved version to build (optional; if omitted, compute from git history)'
-        required: false
       force_rebuild:
         description: 'Force a full rebuild'
         type: boolean

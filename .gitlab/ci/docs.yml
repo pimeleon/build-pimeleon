@@ -13,9 +13,8 @@ publish-project-docs:
       optional: true
 
   rules:
-    # Run on release branch push (merge to release/*) or version tags
+    # Run on release branch push (merge to release/*)
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_COMMIT_TAG'
     # Run on MRs targeting release/* or develop to verify documentation
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
   before_script:
@@ -75,6 +74,5 @@ trigger-docs-production:
     name: documentation/production
     url: https://pimeleon.org
   rules:
-    # Trigger on any release branch push (merge to release/*) or version tags
+    # Trigger on any release branch push (merge to release/*)
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_COMMIT_TAG'

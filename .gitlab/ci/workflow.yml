@@ -46,10 +46,6 @@ workflow:
     # Full pipeline on release branches (one branch per platform)
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
       when: always
-    # Full pipeline on version tags (production release)
-    # Supports both platform-specific ({platform}-v*) and global (v*) tags
-    - if: '$CI_COMMIT_TAG =~ /^(v[0-9]+|[a-z0-9-]+-v[0-9]+)/'
-      when: always
     # Lint + scan on develop (build stage excluded)
     - if: '$CI_COMMIT_BRANCH == "develop"'
       when: always

@@ -6,7 +6,6 @@ setup:platform:
   tags:
     - lightweight
   rules:
-    - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
   script:
@@ -26,7 +25,6 @@ sync:ab2p:
   variables:
     DOCKER_HOST: ""
   rules:
-    - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
   script:
@@ -45,7 +43,6 @@ warm-cache:
     - job: setup:platform
       artifacts: true
   rules:
-    - if: '$CI_COMMIT_TAG'
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
   cache:
