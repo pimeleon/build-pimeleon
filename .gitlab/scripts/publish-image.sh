@@ -3,12 +3,20 @@ set -eu
 
 # Upload Pimeleon image artifacts to the GitLab Generic Packages registry.
 #
-# Inputs: TARGET_PLATFORM, CI_JOB_TOKEN, CI_API_V4_URL, CI_PROJECT_ID
+# Inputs: TARGET_PLATFORM, GITLAB_DEPLOY_TOKEN, CI_API_V4_URL, CI_PROJECT_ID
+
+apk add --no-cache curl git jq >/dev/null 2>&1 || true
+
+SCRIPT_DIR="$(dirname "$0")"
+. "${SCRIPT_DIR}/../../shared/scripts/lib-api.sh"
 
 if [ -n "${CI_COMMIT_TAG:-}" ]; then
     PACKAGE_VERSION="${CI_COMMIT_TAG}"
 else
-    PIMELEON_VERSION=$(sh ./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+    [ -n "${PIMELEON_VERSION:-}" ] || {
+        echo "[ERROR] PIMELEON_VERSION is not set. Run .gitlab/scripts/detect-platform.sh first."
+        exit 1
+    }
     PACKAGE_VERSION="${TARGET_PLATFORM}-v${PIMELEON_VERSION}"
 fi
 
@@ -35,24 +43,13 @@ fi
 echo "[INFO] Fresh artifacts found. Deleting existing package ${PACKAGE_VERSION} if it exists..."
 sh .gitlab/scripts/delete-package.sh "${PACKAGE_VERSION}" || { echo "[WARN] Package deletion failed, attempting upload anyway..." ; }
 
-# Upload logic
-# We use -w to check the HTTP status code because -f doesn't give us the response body on failure
+# Upload artifacts
 for file in output/pimeleon-*.img.xz output/*.img.metadata.json output/*.sha256; do
     if [ -f "$file" ]; then
         echo "[INFO] Uploading $(basename "$file")..."
-
-        HTTP_RESPONSE=$(curl -s -k -w "\n%{http_code}" \
-                --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-                --upload-file "$file" \
-            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/pimeleon/${PACKAGE_VERSION}/$(basename "$file")")
-
-        STATUS=$(echo "$HTTP_RESPONSE" | tail -1)
-
-        if [ "$STATUS" != "201" ] && [ "$STATUS" != "200" ]; then
-            echo "[ERROR] Upload of $(basename "$file") failed with HTTP ${STATUS}"
-            echo "[DEBUG] Response body: $(echo "$HTTP_RESPONSE" | sed '$d')"
-            exit 1
-        fi
+        gitlab_api_put \
+            "/projects/${GITLAB_PROJECT}/packages/generic/pimeleon/${PACKAGE_VERSION}/$(basename "$file")" \
+            "$file"
         echo "[INFO] Successfully uploaded $(basename "$file")"
     fi
 done

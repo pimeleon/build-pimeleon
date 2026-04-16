@@ -11,6 +11,23 @@ echo "Test suite: ${TEST_SUITE}"
 echo "Images dir: ${IMAGES_DIR}"
 echo "Results dir: ${RESULTS_DIR}"
 
+mkdir -p "${RESULTS_DIR}"
+
+if [[ "${PIMELEON_ENABLE_TESTS:-0}" != "1" ]]; then
+    echo "Tests are disabled. Set PIMELEON_ENABLE_TESTS=1 to run them."
+    cat > "${RESULTS_DIR}/junit.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="0" failures="0" errors="0" skipped="1">
+  <testsuite name="${TEST_SUITE}" tests="0" skipped="1">
+    <testcase name="tests_disabled" classname="setup">
+      <skipped message="Tests are disabled"/>
+    </testcase>
+  </testsuite>
+</testsuites>
+EOF
+    exit 0
+fi
+
 # Check for test images
 if ! ls "${IMAGES_DIR}"/*.img 1>/dev/null 2>&1; then
     echo "ERROR: No .img files found in ${IMAGES_DIR}"

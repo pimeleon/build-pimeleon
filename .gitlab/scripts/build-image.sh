@@ -13,7 +13,7 @@ set -eu
 #   PIMELEON_APPS_SOURCE, PIMELEON_APPS_PROJECT_ID, PIMELEON_APPS_READ_TOKEN,
 #   PIMELEON_APPS_GITHUB_TOKEN
 
-apk add --no-cache curl git >/dev/null 2>&1 || true
+apk add --no-cache curl git jq >/dev/null 2>&1 || true
 
 [ -n "${TARGET_PLATFORM}" ]   || { echo "[ERROR] TARGET_PLATFORM is not set"; exit 1; }
 [ -n "${PIMELEON_PROFILE}" ] || { echo "[ERROR] PIMELEON_PROFILE is not set"; exit 1; }
@@ -34,8 +34,12 @@ SCRIPTS_DIR="./shared/scripts"
 
 echo "Using ansible=${ANSIBLE_DIR} configs=${CONFIGS_DIR} scripts=${SCRIPTS_DIR}"
 
-# Compute version
-PIMELEON_VERSION=$(sh ./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+# Use the pipeline-resolved version from setup:platform.
+[ -n "${PIMELEON_VERSION:-}" ] || {
+    echo "[ERROR] PIMELEON_VERSION is not set. Run .gitlab/scripts/detect-platform.sh first."
+    exit 1
+}
+
 if [ -n "${CI_COMMIT_TAG:-}" ]; then
     PACKAGE_VERSION="${CI_COMMIT_TAG}"
 else

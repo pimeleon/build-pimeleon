@@ -13,21 +13,11 @@ set -euo pipefail
 #   target_platform, version, needs_rebuild, builder_image, ab2p_image
 
 PLATFORM="${INPUT_PLATFORM:-rpi3-bookworm}"
-VERSION="${INPUT_VERSION:-}"
 
-if [ -z "$VERSION" ]; then
-    chmod +x ./shared/scripts/get-next-version.sh
-    VERSION=$(./shared/scripts/get-next-version.sh "$PLATFORM")
-fi
+chmod +x ./shared/scripts/get-next-version.sh
+VERSION=$(./shared/scripts/get-next-version.sh "$PLATFORM")
 
-# Rebuild when triggered manually (no explicit version)
-if [ -z "${INPUT_VERSION:-}" ]; then
-    NEEDS_REBUILD=true
-else
-    # If explicit version is provided, we only rebuild if we're not currently on a release tag
-    # or if some other condition is met. For now, we default to false if version is pinned.
-    NEEDS_REBUILD=false
-fi
+NEEDS_REBUILD=true
 
 BUILDER_IMAGE="${REGISTRY}/${GITHUB_REPOSITORY}/builder:latest"
 AB2P_IMAGE="${REGISTRY}/${GITHUB_REPOSITORY}/adblock2privoxy:latest"

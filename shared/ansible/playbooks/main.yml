@@ -14,7 +14,7 @@
     - name: Ensure Python3 is installed (raw bootstrap)
       ansible.builtin.raw: |
         if ! command -v python3 >/dev/null 2>&1; then
-          apt-get -q update && apt-get install -qy python3-minimal
+          apt-get -q update && apt-get install -q -y python3-minimal
         fi
       changed_when: false
 
@@ -175,9 +175,9 @@
         state: restarted
       when: ansible_connection != "chroot"
 
-    - name: Restart pihole-FTL
+    - name: Restart pihole
       ansible.builtin.systemd:
-        name: pihole-FTL
+        name: pihole
         state: restarted
       when: ansible_connection != "chroot"
 

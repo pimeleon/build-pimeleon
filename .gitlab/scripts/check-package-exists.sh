@@ -7,27 +7,18 @@ set -eu
 #   1 => package does not exist
 #   2 => registry query failed
 
+SCRIPT_DIR="$(dirname "$0")"
+. "${SCRIPT_DIR}/../../shared/scripts/lib-api.sh"
+
 package_version="${1:-}"
-
 [ -n "${package_version}" ] || { echo "[ERROR] package version is required" >&2; exit 2; }
-[ -n "${CI_API_V4_URL:-}" ] || { echo "[ERROR] CI_API_V4_URL is not set" >&2; exit 2; }
-[ -n "${CI_PROJECT_ID:-}" ] || { echo "[ERROR] CI_PROJECT_ID is not set" >&2; exit 2; }
-[ -n "${CI_JOB_TOKEN:-}" ] || { echo "[ERROR] CI_JOB_TOKEN is not set" >&2; exit 2; }
+command -v jq >/dev/null 2>&1 || { echo "[ERROR] jq is required" >&2; exit 2; }
 
-registry_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?package_name=pimeleon&package_version=${package_version}"
-http_response=$(curl -sk -w "\n%{http_code}" --header "JOB-TOKEN: ${CI_JOB_TOKEN}" "${registry_url}")
-status=$(echo "${http_response}" | tail -1)
-result=$(echo "${http_response}" | sed '$d')
+_body=$(gitlab_api_get \
+    "/projects/${GITLAB_PROJECT}/packages?package_name=pimeleon&package_version=${package_version}") || exit 2
 
-if [ "${status}" != "200" ]; then
-    echo "[ERROR] Registry query failed for ${package_version}: HTTP ${status}" >&2
-    echo "[DEBUG] URL: ${registry_url}" >&2
-    echo "[DEBUG] Response: ${result}" >&2
-    exit 2
-fi
-
-if echo "${result}" | grep -q '"id":'; then
+_count=$(printf '%s' "$_body" | jq 'length' 2>/dev/null) || _count=0
+if [ "${_count:-0}" -gt 0 ]; then
     exit 0
 fi
-
 exit 1

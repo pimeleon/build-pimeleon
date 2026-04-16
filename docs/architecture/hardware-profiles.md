@@ -500,11 +500,11 @@ load_hardware_profile() {
 # stage2-customize.sh
 
 # Install kernel from profile
-chroot_run apt-get install -y "${PACKAGES_KERNEL}"
+chroot_run apt-get install -q -y "${PACKAGES_KERNEL}"
 
 # Install firmware packages
 for pkg in "${PACKAGES_FIRMWARE[@]}"; do
-    chroot_run apt-get install -y "${pkg}"
+    chroot_run apt-get install -q -y "${pkg}"
 done
 
 # Copy device tree if specified

@@ -95,3 +95,5 @@ site/assets/javascripts/lunr/min/lunr.*.min.js
 .prettierrc
 *test_*
 *_test*
+*.env
+*.env*

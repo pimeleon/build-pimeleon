@@ -1,8 +1,13 @@
 .PHONY: help build build-ab2p build-app build-all build-local build-docker test clean lint dev shell docs check-deps list-apps
 
+# Load .env for local builds (no error if missing)
+-include .env
+export GITLAB_FETCH_TOKEN GITLAB_API_V4_URL GITLAB_PROJECT_ID
+
 # Default platform (can be overridden: make build TARGET_PLATFORM=rpi4-bookworm)
 TARGET_PLATFORM ?= rpi3-bookworm
 PIMELEON_PROFILE ?= production
+PIMELEON_ENABLE_TESTS ?= 0
 
 # Default target
 help:
@@ -121,25 +126,42 @@ check-deps:
 	@./scripts/check-local-deps.sh 2>/dev/null || echo "Local deps check script not found"
 
 # Test targets
-test: build
-	@echo "Running full test suite for $(TARGET_PLATFORM)..."
-	docker compose build tester
-	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=all tester
+test:
+	@if [ "$(PIMELEON_ENABLE_TESTS)" != "1" ]; then \
+		echo "Tests are disabled. Set PIMELEON_ENABLE_TESTS=1 to run them."; \
+	else \
+		echo "Running full test suite for $(TARGET_PLATFORM)..."; \
+		$(MAKE) build TARGET_PLATFORM=$(TARGET_PLATFORM) PIMELEON_PROFILE=$(PIMELEON_PROFILE); \
+		docker compose build tester; \
+		TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=all tester; \
+	fi
 
 test-smoke:
-	@echo "Running smoke tests for $(TARGET_PLATFORM)..."
-	docker compose build tester
-	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=smoke tester
+	@if [ "$(PIMELEON_ENABLE_TESTS)" != "1" ]; then \
+		echo "Tests are disabled. Set PIMELEON_ENABLE_TESTS=1 to run them."; \
+	else \
+		echo "Running smoke tests for $(TARGET_PLATFORM)..."; \
+		docker compose build tester; \
+		TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=smoke tester; \
+	fi
 
 test-integration:
-	@echo "Running integration tests for $(TARGET_PLATFORM)..."
-	docker compose build tester
-	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=integration tester
+	@if [ "$(PIMELEON_ENABLE_TESTS)" != "1" ]; then \
+		echo "Tests are disabled. Set PIMELEON_ENABLE_TESTS=1 to run them."; \
+	else \
+		echo "Running integration tests for $(TARGET_PLATFORM)..."; \
+		docker compose build tester; \
+		TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=integration tester; \
+	fi
 
 test-security:
-	@echo "Running security tests for $(TARGET_PLATFORM)..."
-	docker compose build tester
-	TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=security tester
+	@if [ "$(PIMELEON_ENABLE_TESTS)" != "1" ]; then \
+		echo "Tests are disabled. Set PIMELEON_ENABLE_TESTS=1 to run them."; \
+	else \
+		echo "Running security tests for $(TARGET_PLATFORM)..."; \
+		docker compose build tester; \
+		TARGET_PLATFORM=$(TARGET_PLATFORM) docker compose run --rm -e TEST_SUITE=security tester; \
+	fi
 
 # Development targets
 dev:

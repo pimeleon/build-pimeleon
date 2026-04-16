@@ -12,11 +12,16 @@ create_temp_git_repo() {
     export GIT_COMMITTER_NAME="Test User"
     export GIT_COMMITTER_EMAIL="test@example.com"
 
-    # Point to a nonexistent repo so the GitHub Releases API call fails fast
-    # and falls back to local git tags. This keeps tests offline and deterministic.
+    # Point to nonexistent repos so API calls fail fast and fall back to local git tags.
+    # This keeps tests offline, deterministic, and isolated from production data.
     export GITHUB_REPO="pimeleon-test/nonexistent-repo-for-tests"
     export GITHUB_REGISTRY_PUSH_TOKEN=""
     export GITHUB_TOKEN=""
+    export CI_API_V4_URL="https://nonexistent-gitlab.test/api/v4"
+    export GITLAB_API_V4_URL="https://nonexistent-gitlab.test/api/v4"
+    export CI_JOB_TOKEN=""
+    export GITLAB_FETCH_TOKEN=""
+    export PIMELEON_APPS_READ_TOKEN=""
 
     (
         cd "$TEST_TMPDIR" || return 1
@@ -25,10 +30,10 @@ create_temp_git_repo() {
         git config user.name "Test User"
 
         # Create required directory structure
-        mkdir -p apps/rpi3-bookworm/vars
+        mkdir -p shared/configs
 
         # Seed a dummy build path file so subsequent commits have something to touch
-        echo "# placeholder" > apps/rpi3-bookworm/vars/main.yml
+        echo "# placeholder" > shared/configs/main.yml
 
         git add .
         git commit -q -m "chore: initial repo setup"

@@ -570,7 +570,7 @@ gantt
    **Before**:
 
    ```bash
-   chroot_run apt-get install -y raspberrypi-kernel libraspberrypi-bin firmware-brcm80211
+   chroot_run apt-get install -q -y raspberrypi-kernel libraspberrypi-bin firmware-brcm80211
    ```
 
    **After**:
@@ -578,13 +578,13 @@ gantt
    ```bash
    # Install kernel from profile
    log_info "Installing kernel: ${PACKAGES_KERNEL}"
-   chroot_run apt-get install -y "${PACKAGES_KERNEL}"
+   chroot_run apt-get install -q -y "${PACKAGES_KERNEL}"
 
    # Install firmware packages from profile
    if [[ ${#PACKAGES_FIRMWARE[@]} -gt 0 ]]; then
        log_info "Installing firmware packages: ${PACKAGES_FIRMWARE[*]}"
        for pkg in "${PACKAGES_FIRMWARE[@]}"; do
-           chroot_run apt-get install -y "${pkg}" || log_warn "Failed to install: ${pkg}"
+           chroot_run apt-get install -q -y "${pkg}" || log_warn "Failed to install: ${pkg}"
        done
    fi
    ```
@@ -956,7 +956,7 @@ gantt
 
    ```dockerfile
    # Install U-Boot tools for boot script compilation
-   RUN apt-get install -y u-boot-tools
+   RUN apt-get install -q -y u-boot-tools
    ```
 
 **Deliverables**:

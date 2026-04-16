@@ -72,7 +72,7 @@ else
             # Update cache
             sudo mkdir -p "${CACHE_DIR}/ab2p"
             sudo cp -r "${TEMP_DIR}/ab2p/"* "${CACHE_DIR}/ab2p/"
-            sudo chown -R "$(id -u):$(id -g)" "${CACHE_DIR}"
+            sudo chown -R "${PIMELEON_USER}:${PIMELEON_GROUP}" "${CACHE_DIR}"
             log_info "Generated and cached ab2p filters"
         else
             log_warn "adblock2privoxy produced no output"

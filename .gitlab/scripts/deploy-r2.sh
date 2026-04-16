@@ -7,10 +7,15 @@ apk add --no-cache git aws-cli curl >/dev/null 2>&1 || true
 # Deploy Pimeleon image artifacts to Cloudflare R2 via S3-compatible API.
 #
 # Inputs (CI environment):
-#   TARGET_PLATFORM, R2_BUCKET, R2_ENDPOINT
+#   TARGET_PLATFORM, PIMELEON_VERSION, R2_BUCKET, R2_ENDPOINT
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION (set by job)
 
-VERSION=$(sh ./shared/scripts/get-next-version.sh "${TARGET_PLATFORM}")
+[ -n "${PIMELEON_VERSION:-}" ] || {
+    echo "[ERROR] PIMELEON_VERSION is not set. Run .gitlab/scripts/detect-platform.sh first."
+    exit 1
+}
+
+VERSION="${PIMELEON_VERSION}"
 if [ -n "${CI_COMMIT_TAG:-}" ]; then
     PACKAGE_VERSION="${CI_COMMIT_TAG}"
 else

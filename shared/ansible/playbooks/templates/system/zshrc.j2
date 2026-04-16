@@ -142,7 +142,7 @@ alias hostapd-status='sudo systemctl status hostapd'
 alias privoxy-restart='sudo systemctl restart privoxy'
 alias tor-restart='sudo systemctl restart tor'
 alias squid-restart='sudo systemctl restart squid'
-alias pihole-restart='sudo systemctl restart pihole-FTL'
+alias pihole-restart='sudo systemctl restart pihole'
 
 # ============================================================================
 # Aliases - DNS
@@ -234,7 +234,7 @@ pim-dashboard() {
     done
     echo ""
     echo "▶ Privacy Services:"
-    for svc in privoxy tor squid pihole-FTL dnscrypt-proxy; do
+    for svc in privoxy tor squid pihole dnscrypt-proxy; do
         if systemctl cat "$svc" &>/dev/null; then
             systemctl is-active --quiet "$svc" \
                 && echo "  ✓ $svc" \
@@ -251,7 +251,7 @@ pim-dashboard() {
 startup() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     local core=(pimeleon-api bind9 hostapd isc-dhcp-server privoxy fail2ban)
-    local optional=(tor pihole-FTL squid dnscrypt-proxy)
+    local optional=(tor pihole squid dnscrypt-proxy)
     for svc in "${core[@]}"; do
         systemctl is-active --quiet "$svc" \
             && echo "  ✓ $svc" \
@@ -515,7 +515,7 @@ SERVICE MANAGEMENT:
   privoxy-restart      Restart privoxy
   tor-restart          Restart tor
   squid-restart        Restart squid
-  pihole-restart       Restart pihole-FTL
+  pihole-restart       Restart pihole
 
 SECURITY:
   pim-security-check   Security audit (SSH, nftables, fail2ban, ports)
