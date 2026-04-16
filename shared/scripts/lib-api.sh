@@ -56,20 +56,25 @@ gitlab_api_get() {
 # ---------------------------------------------------------------------------
 # GitLab API PUT (file upload)
 # Usage: gitlab_api_put <path> <file>
-# Uses GITLAB_DEPLOY_TOKEN for write access.
+# Prefers CI_JOB_TOKEN (JOB-TOKEN) in CI; falls back to GITLAB_DEPLOY_TOKEN.
 # ---------------------------------------------------------------------------
 gitlab_api_put() {
     _gp_path="$1"
     _gp_file="$2"
     command -v curl >/dev/null 2>&1 || { echo "[ERROR] curl is required" >&2; return 1; }
 
-    if [ -n "${GITLAB_DEPLOY_TOKEN:-}" ]; then
+    if [ -n "${CI_JOB_TOKEN:-}" ]; then
+        _gp_raw=$(curl -sk -w "\n%{http_code}" \
+            -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+            --upload-file "$_gp_file" \
+            "${GITLAB_API_URL}${_gp_path}" 2>/dev/null)
+    elif [ -n "${GITLAB_DEPLOY_TOKEN:-}" ]; then
         _gp_raw=$(curl -sk -w "\n%{http_code}" \
             -H "PRIVATE-TOKEN: ${GITLAB_DEPLOY_TOKEN}" \
             --upload-file "$_gp_file" \
             "${GITLAB_API_URL}${_gp_path}" 2>/dev/null)
     else
-        echo "[ERROR] GITLAB_DEPLOY_TOKEN is required for GitLab uploads" >&2
+        echo "[ERROR] No write token available (CI_JOB_TOKEN / GITLAB_DEPLOY_TOKEN)" >&2
         return 1
     fi
 
@@ -86,18 +91,22 @@ gitlab_api_put() {
 # ---------------------------------------------------------------------------
 # GitLab API DELETE
 # Usage: gitlab_api_delete <path>
-# Uses GITLAB_DEPLOY_TOKEN for destructive API calls.
+# Prefers CI_JOB_TOKEN (JOB-TOKEN) in CI; falls back to GITLAB_DEPLOY_TOKEN.
 # ---------------------------------------------------------------------------
 gitlab_api_delete() {
     _gd_path="$1"
     command -v curl >/dev/null 2>&1 || { echo "[ERROR] curl is required" >&2; return 1; }
 
-    if [ -n "${GITLAB_DEPLOY_TOKEN:-}" ]; then
+    if [ -n "${CI_JOB_TOKEN:-}" ]; then
+        _gd_raw=$(curl -sk -X DELETE -w "\n%{http_code}" \
+            -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+            "${GITLAB_API_URL}${_gd_path}" 2>/dev/null)
+    elif [ -n "${GITLAB_DEPLOY_TOKEN:-}" ]; then
         _gd_raw=$(curl -sk -X DELETE -w "\n%{http_code}" \
             -H "PRIVATE-TOKEN: ${GITLAB_DEPLOY_TOKEN}" \
             "${GITLAB_API_URL}${_gd_path}" 2>/dev/null)
     else
-        echo "[ERROR] GITLAB_DEPLOY_TOKEN is required for GitLab deletes" >&2
+        echo "[ERROR] No write token available (CI_JOB_TOKEN / GITLAB_DEPLOY_TOKEN)" >&2
         return 1
     fi
 
