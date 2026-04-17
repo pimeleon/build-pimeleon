@@ -80,7 +80,7 @@ build:containers:
 
 # Publish image to registry after MR build so release-push pipeline can skip
 # rebuilding when only non-image files changed.
-publish:image:mr:
+publish:gitlab-image:
   stage: publish
   image: alpine:latest
   tags:

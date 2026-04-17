@@ -3,25 +3,25 @@
 # Automated tag creation for production builds and official releases.
 # GitHub Actions is responsible for creating GitHub Releases.
 
-# The same file list gates build:pimeleon and trigger:github.
-# These jobs inherit the skip-cascade from their non-optional needs:
-#   tag:production → publish:image → build:pimeleon
-#   tag:release    → trigger:github
+# Skip-cascade via non-optional needs:
+#   tag:production → publish:gitlab-image → build:pimeleon  (MR pipeline)
+#   tag:release       → trigger:github                     (release branch push)
 
-# Create annotated production tag after image is confirmed in GitLab registry.
+# Create annotated production tag after image is published via MR pipeline.
+# Runs when a release-bound MR builds and publishes a new image version.
 # Tag format: {platform}-v{version}  e.g. rpi3-bookworm-v0.4.2
 tag:production:
-  stage: release
+  stage: publish
   image: alpine:latest
   tags:
     - lightweight
   needs:
     - job: setup:platform
       artifacts: true
-    - job: publish:image
+    - job: publish:gitlab-image
       artifacts: false
   rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       when: on_success
     - when: never
   before_script:

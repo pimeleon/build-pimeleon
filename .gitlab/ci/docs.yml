@@ -3,20 +3,29 @@
 # External documentation site triggers
 
 # Build MkDocs site and provide artifact preview (internal to project)
-publish-project-docs:
-  stage: docs
+publish:project-docs:
+  stage: publish
   image: python:3.11-slim
   tags:
     - lightweight
   needs:
-    - job: "publish:image"
+    - job: "publish:gitlab-image"
       optional: true
-
+    - job: "tag:production"
+      optional: true
   rules:
     # Run on release branch push (merge to release/*)
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      changes:
+        - docs/**/*
+        - README.md
+        - LICENSE
     # Run on MRs targeting release/* or develop to verify documentation
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+      changes:
+        - docs/**/*
+        - README.md
+        - LICENSE
   before_script:
     - chmod +x .gitlab/scripts/setup-apt-proxy.sh
     - .gitlab/scripts/setup-apt-proxy.sh
