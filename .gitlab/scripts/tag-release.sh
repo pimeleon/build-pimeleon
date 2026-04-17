@@ -8,7 +8,7 @@ set -eu
 #   TARGET_PLATFORM          — e.g. rpi3-bookworm
 #   PIMELEON_VERSION         — e.g. 0.4.2  (the version just built and triggered)
 #   PIMELEON_APPS_GITHUB_TOKEN / GITHUB_TOKEN — for GitHub API reads
-#   GITLAB_PUSH_TOKEN / CI_JOB_TOKEN          — for git push
+#   CI_JOB_TOKEN                              — for git push (auto-injected by GitLab)
 #
 # Tuning:
 #   TAG_RELEASE_TIMEOUT   — max seconds to wait for GitHub release (default: 600)

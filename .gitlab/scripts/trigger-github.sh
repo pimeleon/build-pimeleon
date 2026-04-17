@@ -5,10 +5,12 @@ set -eu
 apk add --no-cache curl git >/dev/null 2>&1 || true
 
 # Trigger the "Pimeleon Production Build" GitHub Actions workflow via workflow_dispatch.
+# GitHub Actions resolves the version independently via get-next-version.sh + GHCR.
 #
 # Inputs (CI environment):
-#   TARGET_PLATFORM, PIMELEON_VERSION, CI_COMMIT_REF_NAME
-#   GITHUB_REGISTRY_PUSH_TOKEN (PAT with repo scope)
+#   TARGET_PLATFORM, CI_COMMIT_REF_NAME
+#   PIMELEON_VERSION             — validated to confirm setup:platform ran
+#   GITHUB_REGISTRY_PUSH_TOKEN   — PAT with repo scope
 
 GITHUB_REPO="pimeleon/build-pimeleon"
 WORKFLOW_FILE="build.yml"
@@ -18,15 +20,14 @@ if [ -z "${GITHUB_REGISTRY_PUSH_TOKEN:-}" ]; then
     exit 1
 fi
 
-echo "Triggering 'Pimeleon Production Build' on ${GITHUB_REPO}"
-echo "  Platform: ${TARGET_PLATFORM}"
-echo "  Version:  ${PIMELEON_VERSION:-unset}"
-echo "  Ref:      ${CI_COMMIT_REF_NAME}"
-
 [ -n "${PIMELEON_VERSION:-}" ] || {
-    echo "Error: PIMELEON_VERSION not set. Cannot trigger GitHub Actions consistently."
+    echo "Error: PIMELEON_VERSION not set — setup:platform artifact missing."
     exit 1
 }
+
+echo "Triggering 'Pimeleon Production Build' on ${GITHUB_REPO}"
+echo "  Platform: ${TARGET_PLATFORM}"
+echo "  Ref:      ${CI_COMMIT_REF_NAME}"
 
 HTTP_CODE=$(curl -s -o /tmp/gh-dispatch-response.txt -w "%{http_code}" \
     -X POST \
@@ -37,7 +38,6 @@ HTTP_CODE=$(curl -s -o /tmp/gh-dispatch-response.txt -w "%{http_code}" \
         \"ref\": \"${CI_COMMIT_REF_NAME}\",
         \"inputs\": {
             \"target_platform\": \"${TARGET_PLATFORM}\",
-            \"version\": \"${PIMELEON_VERSION}\",
             \"force_rebuild\": \"false\"
         }
     }")
