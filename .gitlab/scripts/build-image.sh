@@ -15,8 +15,25 @@ set -eu
 
 apk add --no-cache curl git jq >/dev/null 2>&1 || true
 
-[ -n "${TARGET_PLATFORM}" ]   || { echo "[ERROR] TARGET_PLATFORM is not set"; exit 1; }
+[ -n "${TARGET_PLATFORM}" ]  || { echo "[ERROR] TARGET_PLATFORM is not set"; exit 1; }
 [ -n "${PIMELEON_PROFILE}" ] || { echo "[ERROR] PIMELEON_PROFILE is not set"; exit 1; }
+
+# Local builds only: skip if no image-relevant files changed since the last production tag.
+# CI/CD skip is handled exclusively by rules.changes in build.yml.
+if [ -z "${CI:-}" ]; then
+    _ref=$(git tag -l "${TARGET_PLATFORM}-v*" 2>/dev/null | sort -V | tail -1 || true)
+    [ -n "$_ref" ] || _ref=$(git rev-list --max-parents=0 HEAD)
+    _changed=$(git diff --name-only "${_ref}" HEAD -- \
+        shared/ansible/ shared/configs/ shared/containers/ \
+        shared/scripts/ docker-compose.yml 2>/dev/null | head -1)
+    if [ -z "$_changed" ]; then
+        echo "[INFO] No image-relevant changes since ${_ref} — skipping local rebuild."
+        mkdir -p output
+        exit 0
+    fi
+    echo "[INFO] Changes detected since ${_ref} — proceeding with build."
+fi
+
 echo "Building Pimeleon image for ${TARGET_PLATFORM} (Profile: ${PIMELEON_PROFILE})..."
 
 mkdir -p output cache
