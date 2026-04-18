@@ -1,6 +1,6 @@
 ---
 # GitLab CI/CD - Build
-# Cache warming, Containers, and Pimeleon Image
+# Containers and Pimeleon Image
 
 # Detect platform from release branch name and export as dotenv artifact.
 # Downstream jobs use TARGET_PLATFORM via: needs: [job: setup:platform, artifacts: true]
@@ -38,28 +38,6 @@ sync:ab2p:
     - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
     - chmod +x .gitlab/scripts/sync-ab2p.sh
     - .gitlab/scripts/sync-ab2p.sh
-
-# Pull (or seed) the base image cache for the detected platform
-warm-cache:
-  stage: .pre
-  image: alpine:latest
-  tags:
-    - linux
-  needs:
-    - job: setup:platform
-      artifacts: true
-  rules:
-    - if: '$CI_COMMIT_TAG'
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
-  cache:
-    key: "base-system-${TARGET_PLATFORM}"
-    paths:
-      - cache/
-    policy: pull-push
-  script:
-    - chmod +x .gitlab/scripts/warm-cache.sh
-    - .gitlab/scripts/warm-cache.sh
 
 # Build builder and tester Docker images when container sources change
 build:containers:
@@ -109,7 +87,6 @@ build:containers:
   needs:
     - job: setup:platform
       artifacts: true
-    - job: warm-cache
     - job: build:containers
       optional: true
     - job: lint:yaml
@@ -130,7 +107,7 @@ build:containers:
     key: "base-system-${TARGET_PLATFORM}"
     paths:
       - cache/
-    policy: pull
+    policy: pull-push
   script:
     - chmod +x .gitlab/scripts/build-image.sh .gitlab/scripts/resolve-version.sh
     - .gitlab/scripts/build-image.sh
@@ -152,12 +129,15 @@ build:containers:
       - output/pim-initial-password.txt
     expire_in: 1 week
 
-# Finalize build by uploading artifacts to registry if build passed
-publish:image:
+# Publish image to GitLab registry after MR build so release-push pipeline can skip
+# rebuilding when only non-image files changed.
+publish:gitlab-image:
   stage: publish
   image: alpine:latest
   tags:
     - lightweight
+  environment:
+    name: production
   needs:
     - job: setup:platform
       artifacts: true
@@ -169,7 +149,6 @@ publish:image:
     - job: test:integration
       optional: true
   rules:
-    # Production: MR to release/*
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
   before_script:
     - apk add --no-cache curl git
@@ -177,8 +156,6 @@ publish:image:
     - chmod +x .gitlab/scripts/publish-image.sh
     - .gitlab/scripts/publish-image.sh
   artifacts:
-    reports:
-      dotenv: publish.env
     paths:
       - output/*.img.xz
       - output/*.sha256
