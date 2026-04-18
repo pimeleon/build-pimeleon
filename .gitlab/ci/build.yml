@@ -186,23 +186,15 @@ publish:image:
 # Platform build — triggered by push to release/* branches, version tags, and release-bound MRs
 build:pimeleon:
   extends: .build-pimeleon
-  environment:
-    name: $PIMELEON_ENV_NAME
   rules:
     # Tag — production build from GitHub releases
     - if: '$CI_COMMIT_TAG'
       variables:
-        PIMELEON_ENV_NAME: production
-        PIMELEON_APPS_SOURCE: github
+        PIMELEON_APPS_SOURCE: gitlab
         BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
         TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
     # Push/merge to release/* — production build from GitHub releases
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-      variables:
-        PIMELEON_ENV_NAME: production
-        PIMELEON_APPS_SOURCE: github
-        BUILD_IMAGE_TAG: latest
-        TEST_IMAGE_TAG: latest
       changes:
         - shared/ansible/**/*
         - shared/configs/**/*
@@ -217,11 +209,16 @@ build:pimeleon:
         - shared/scripts/stage3-optimize.sh
         - shared/scripts/stage4-package.sh
         - docker-compose.yml
+      variables:
+        PIMELEON_APPS_SOURCE: gitlab
+        BUILD_IMAGE_TAG: latest
+        TEST_IMAGE_TAG: latest
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      when: never
     # MR targeting release/* — only rebuild when image-relevant files changed
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
-        PIMELEON_ENV_NAME: production
-        PIMELEON_APPS_SOURCE: github
+        PIMELEON_APPS_SOURCE: gitlab
         BUILD_IMAGE_TAG: latest
         TEST_IMAGE_TAG: latest
       changes:
@@ -238,6 +235,8 @@ build:pimeleon:
         - shared/scripts/stage3-optimize.sh
         - shared/scripts/stage4-package.sh
         - docker-compose.yml
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+      when: never
 
     # Default: skip
     - when: never
