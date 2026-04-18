@@ -37,6 +37,4 @@ paths = [
   '''test-results/''',
   # Log files
   '''\.log$''',
-  # Local config with intentional tokens
-  '''CLAUDE\.md$''',
 ]
