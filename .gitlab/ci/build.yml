@@ -201,14 +201,43 @@ build:pimeleon:
       variables:
         PIMELEON_ENV_NAME: production
         PIMELEON_APPS_SOURCE: github
-        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        BUILD_IMAGE_TAG: latest
+        TEST_IMAGE_TAG: latest
+      changes:
+        - shared/ansible/**/*
+        - shared/configs/**/*
+        - shared/containers/**/*
+        - shared/scripts/build.sh
+        - shared/scripts/common.sh
+        - shared/scripts/generate-privoxy-filters.sh
+        - shared/scripts/lib-logging.sh
+        - shared/scripts/lib-services.sh
+        - shared/scripts/stage1-base.sh
+        - shared/scripts/stage2-customize.sh
+        - shared/scripts/stage3-optimize.sh
+        - shared/scripts/stage4-package.sh
+        - docker-compose.yml
+    # MR targeting release/* — only rebuild when image-relevant files changed
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
       variables:
         PIMELEON_ENV_NAME: production
         PIMELEON_APPS_SOURCE: github
-        BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-        TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
+        BUILD_IMAGE_TAG: latest
+        TEST_IMAGE_TAG: latest
+      changes:
+        - shared/ansible/**/*
+        - shared/configs/**/*
+        - shared/containers/**/*
+        - shared/scripts/build.sh
+        - shared/scripts/common.sh
+        - shared/scripts/generate-privoxy-filters.sh
+        - shared/scripts/lib-logging.sh
+        - shared/scripts/lib-services.sh
+        - shared/scripts/stage1-base.sh
+        - shared/scripts/stage2-customize.sh
+        - shared/scripts/stage3-optimize.sh
+        - shared/scripts/stage4-package.sh
+        - docker-compose.yml
 
     # Default: skip
     - when: never
