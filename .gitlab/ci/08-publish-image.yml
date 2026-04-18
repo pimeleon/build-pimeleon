@@ -1,0 +1,35 @@
+---
+#  Gitlab CI/CD - GitLab Image Publishing
+#  This job builds and publishes the Pimeleon image to GitLab's container registry
+
+# Publish image to GitLab registry after MR build so release-push pipeline can skip
+# rebuilding when only non-image files changed.
+publish:gitlab-image:
+  stage: publish-image
+  image: alpine:latest
+  tags:
+    - lightweight
+  environment:
+    name: production
+  needs:
+    - job: setup:platform
+      artifacts: true
+    - job: build:pimeleon
+      artifacts: true
+      optional: true
+    - job: test:smoke
+      optional: true
+    - job: test:integration
+      optional: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+  before_script:
+    - apk add --no-cache curl git
+  script:
+    - chmod +x .gitlab/scripts/publish-image.sh
+    - .gitlab/scripts/publish-image.sh
+  artifacts:
+    paths:
+      - output/*.img.xz
+      - output/*.sha256
+    expire_in: 1 week

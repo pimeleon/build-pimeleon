@@ -2,8 +2,8 @@
 # GitLab CI/CD - Publishing
 
 # Run upload to Cloudflare R2
-deploy:r2:
-  stage: publish
+deploy:r2-dry-run:
+  stage: deploy
   image: alpine:latest
   tags:
     - lightweight

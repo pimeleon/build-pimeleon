@@ -1,0 +1,39 @@
+---
+# GitLab CI/CD - Linting
+# YAML, Ansible, and Shell
+
+lint:yaml:
+  stage: lint
+  image: python:3.11-slim
+  tags:
+    - python
+  needs: []
+  before_script:
+    - pip install --quiet yamllint
+  script:
+    - yamllint -c .yamllint .
+
+lint:ansible:
+  stage: lint
+  image: python:3.11-slim
+  tags:
+    - python
+  needs: []
+  before_script:
+    - pip install --quiet ansible-lint
+    - ansible-galaxy collection install -r shared/ansible/requirements.yml
+  script:
+    - cd shared/ansible
+    - ansible-lint playbooks/*.yml
+
+lint:shell:
+  stage: lint
+  image: python:3.11-slim
+  tags:
+    - python
+  needs: []
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends shellcheck jq
+    - pip install --quiet semgrep
+  script:
+    - bash scripts/quality-benchmark.sh

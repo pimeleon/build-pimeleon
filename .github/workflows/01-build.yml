@@ -92,22 +92,3 @@ jobs:
           PLATFORM: ${{ steps.meta.outputs.target_platform }}
           VERSION: ${{ steps.meta.outputs.version }}
         run: bash .github/scripts/download-gitlab-artifacts.sh
-
-      - name: Generate Release Notes
-        if: steps.meta.outputs.needs_rebuild == 'true' || github.event.inputs.force_rebuild == 'true'
-        env:
-          TARGET_PLATFORM: ${{ steps.meta.outputs.target_platform }}
-          VERSION: ${{ steps.meta.outputs.version }}
-        run: bash .github/scripts/generate-release-notes.sh
-
-      - name: Create GitHub Release
-        if: steps.meta.outputs.needs_rebuild == 'true' || github.event.inputs.force_rebuild == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.meta.outputs.target_platform }}-v${{ steps.meta.outputs.version }}
-          body_path: release_notes.md
-          files: |
-            output/*.img.xz
-            output/*.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

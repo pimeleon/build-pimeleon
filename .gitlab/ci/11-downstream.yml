@@ -1,7 +1,7 @@
 # Trigger GitHub Actions to build and publish the GitHub Release.
 # GitHub creates release-{platform}-v{version} tag and GitHub Release body.
 trigger:github:
-  stage: release
+  stage: downstream
   image: alpine:latest
   tags:
     - lightweight
@@ -20,7 +20,7 @@ trigger:github:
     - job: publish:gitlab-image
       optional: true
       artifacts: false
-    - job: deploy:r2
+    - job: deploy:r2-dry-run
       optional: true
       artifacts: false
   rules:
@@ -45,3 +45,44 @@ trigger:github:
   script:
     - chmod +x .gitlab/scripts/trigger-github.sh
     - .gitlab/scripts/trigger-github.sh
+
+# Build MkDocs site and provide artifact preview (internal to project)
+publish:project-docs:
+  stage: downstream
+  image: python:3.11-slim
+  tags:
+    - lightweight
+  needs:
+    - job: "lint:yaml"
+    - job: "publish:gitlab-image"
+      optional: true
+    - job: "test:smoke"
+      optional: true
+    - job: "test:integration"
+      optional: true
+
+  rules:
+    # Run on release branch push (merge to release/*) or version tags
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
+    - if: '$CI_COMMIT_TAG'
+      changes:
+        - docs/**/*
+        - README.md
+        - LICENSE
+    # Run on MRs targeting release/* or develop to verify documentation
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+      changes:
+        - docs/**/*
+        - README.md
+        - LICENSE
+  before_script:
+    - chmod +x .gitlab/scripts/setup-apt-proxy.sh
+    - .gitlab/scripts/setup-apt-proxy.sh
+  script:
+    - chmod +x .gitlab/scripts/build-docs.sh
+    - .gitlab/scripts/build-docs.sh
+  artifacts:
+    paths:
+      - public
+    expire_in: 1 week

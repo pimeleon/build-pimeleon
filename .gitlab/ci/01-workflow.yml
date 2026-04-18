@@ -3,16 +3,16 @@
 # Stages, Variables, Defaults, and Workflow Rules
 
 stages:
-  - .pre
+  - prepare
   - scan
   - lint
   - test-scripts
   - build
   - test-images
-  - publish
-  - release
-  - docs
-  - .post
+  - publish-image
+  - deploy
+  - tag
+  - downstream
 
 variables:
   DOCKER_BUILDKIT: 1
