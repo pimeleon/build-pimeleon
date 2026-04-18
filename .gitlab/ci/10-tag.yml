@@ -1,0 +1,29 @@
+---
+# GitLab CI/CD - Tags
+# Automated production tag creation and GitHub release trigger.
+# GitHub Actions is responsible for creating GitHub Releases and release tags.
+
+# Create annotated production tag after image is published via MR pipeline.
+# Tag format: {platform}-v{version}-{short_sha}  e.g. rpi3-bookworm-v0.4.2-abc1234
+tag:production:
+  stage: tag
+  image: alpine:latest
+  tags:
+    - lightweight
+  needs:
+    - job: setup:platform
+      artifacts: true
+    - job: publish:gitlab-image
+      artifacts: true
+      optional: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_BRANCH =~ /^release\//'
+      when: on_success
+    - when: never
+  before_script:
+    - apk add --no-cache curl
+  script:
+    - chmod +x .gitlab/scripts/create-tag.sh
+    - .gitlab/scripts/create-tag.sh
+        "${TARGET_PLATFORM}-v${PUBLISHED_VERSION}-${CI_COMMIT_SHORT_SHA}"
+        "Production build ${TARGET_PLATFORM} v${PUBLISHED_VERSION}"

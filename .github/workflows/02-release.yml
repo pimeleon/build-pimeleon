@@ -1,0 +1,47 @@
+---
+name: Pimeleon Production Release
+
+on:
+  repository_dispatch:
+    types: [gitlab_release]
+  workflow_dispatch:
+    inputs:
+      target_platform:
+        description: 'Platform to build (e.g., rpi3-bookworm)'
+        required: true
+        default: 'rpi3-bookworm'
+      force_rebuild:
+        description: 'Force a full rebuild'
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Generate Release Notes
+        if: steps.meta.outputs.needs_rebuild == 'true' || github.event.inputs.force_rebuild == 'true'
+        env:
+          TARGET_PLATFORM: ${{ steps.meta.outputs.target_platform }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: bash .github/scripts/generate-release-notes.sh
+
+      - name: Create GitHub Release
+        if: steps.meta.outputs.needs_rebuild == 'true' || github.event.inputs.force_rebuild == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.target_platform }}-v${{ steps.meta.outputs.version }}
+          body_path: release_notes.md
+          files: |
+            output/*.img.xz
+            output/*.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
