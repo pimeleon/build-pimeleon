@@ -13,7 +13,7 @@ tag:production:
   needs:
     - job: setup:platform
       artifacts: true
-    - job: publish:image
+    - job: publish:gitlab-image
       artifacts: true
   rules:
     - if: '$CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_BRANCH =~ /^release\//'
@@ -46,7 +46,7 @@ trigger:github:
     - job: test:integration
       optional: true
       artifacts: false
-    - job: publish:image
+    - job: publish:gitlab-image
       optional: true
       artifacts: false
     - job: deploy:r2
