@@ -46,6 +46,7 @@ deploy:r2:
       artifacts: true
     - job: build:pimeleon
       artifacts: true
+      optional: true
     - job: publish:image
       artifacts: false
     - job: test:smoke

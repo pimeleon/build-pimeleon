@@ -165,6 +165,7 @@ publish:image:
       artifacts: true
     - job: build:pimeleon
       artifacts: true
+      optional: true
     - job: test:smoke
       optional: true
     - job: test:integration
