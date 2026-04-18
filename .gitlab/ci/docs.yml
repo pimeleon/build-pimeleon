@@ -3,7 +3,7 @@
 # External documentation site triggers
 
 # Build MkDocs site and provide artifact preview (internal to project)
-publish-project-docs:
+publish:project-docs:
   stage: docs
   image: python:3.11-slim
   tags:
@@ -35,7 +35,7 @@ publish-project-docs:
     expire_in: 1 week
 
 # Trigger preview site build on downstream repository
-trigger-docs-preview:
+trigger:docs-preview:
   stage: docs
   needs:
     - job: "lint:yaml"
@@ -62,7 +62,7 @@ trigger-docs-preview:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
 
 # Trigger production site build on downstream repository
-trigger-docs-production:
+trigger:docs-production:
   stage: docs
   needs:
     - job: "lint:yaml"
