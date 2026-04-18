@@ -16,6 +16,8 @@ tag:production:
     - job: publish:gitlab-image
       artifacts: true
       optional: true
+    - job: deploy:r2-dry-run
+      artifacts: true
   rules:
     - if: '$CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_BRANCH =~ /^release\//'
       when: on_success

@@ -64,7 +64,10 @@ publish:project-docs:
   rules:
     # Run on release branch push (merge to release/*) or version tags
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-      when: always
+      changes:
+        - docs/**/*
+        - README.md
+        - LICENSE
     - if: '$CI_COMMIT_TAG'
       changes:
         - docs/**/*
