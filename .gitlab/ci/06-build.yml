@@ -2,6 +2,7 @@
 # GitLab CI/CD - Build
 # Containers and Pimeleon Image
 
+
 # Build builder and tester Docker images when container sources change
 build:containers:
   extends: .docker-job
@@ -90,38 +91,6 @@ build:containers:
       - output/*.version.txt
       - output/*.log
       - output/pim-initial-password.txt
-    expire_in: 1 week
-
-# Publish image to GitLab registry after MR build so release-push pipeline can skip
-# rebuilding when only non-image files changed.
-publish:gitlab-image:
-  stage: publish
-  image: alpine:latest
-  tags:
-    - lightweight
-  environment:
-    name: production
-  needs:
-    - job: setup:platform
-      artifacts: true
-    - job: build:pimeleon
-      artifacts: true
-      optional: true
-    - job: test:smoke
-      optional: true
-    - job: test:integration
-      optional: true
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
-  before_script:
-    - apk add --no-cache curl git
-  script:
-    - chmod +x .gitlab/scripts/publish-image.sh
-    - .gitlab/scripts/publish-image.sh
-  artifacts:
-    paths:
-      - output/*.img.xz
-      - output/*.sha256
     expire_in: 1 week
 
 # Platform build — triggered by push to release/* branches, version tags, and release-bound MRs

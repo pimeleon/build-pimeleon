@@ -6,7 +6,7 @@
 # Create annotated production tag after image is published via MR pipeline.
 # Tag format: {platform}-v{version}-{short_sha}  e.g. rpi3-bookworm-v0.4.2-abc1234
 tag:production:
-  stage: publish
+  stage: tag
   image: alpine:latest
   tags:
     - lightweight

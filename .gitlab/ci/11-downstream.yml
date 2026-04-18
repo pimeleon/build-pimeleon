@@ -1,7 +1,7 @@
 # Trigger GitHub Actions to build and publish the GitHub Release.
 # GitHub creates release-{platform}-v{version} tag and GitHub Release body.
 trigger:github:
-  stage: release
+  stage: downstream
   image: alpine:latest
   tags:
     - lightweight
@@ -20,7 +20,7 @@ trigger:github:
     - job: publish:gitlab-image
       optional: true
       artifacts: false
-    - job: deploy:r2
+    - job: deploy:r2-dry-run
       optional: true
       artifacts: false
   rules:
@@ -48,7 +48,7 @@ trigger:github:
 
 # Build MkDocs site and provide artifact preview (internal to project)
 publish:project-docs:
-  stage: release
+  stage: downstream
   image: python:3.11-slim
   tags:
     - lightweight
