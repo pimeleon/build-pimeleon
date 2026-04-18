@@ -20,9 +20,18 @@ publish:project-docs:
   rules:
     # Run on release branch push (merge to release/*) or version tags
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
     - if: '$CI_COMMIT_TAG'
+      changes:
+        - docs/**/*
+        - README.md
+        - LICENSE
     # Run on MRs targeting release/* or develop to verify documentation
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
+      changes:
+        - docs/**/*
+        - README.md
+        - LICENSE
   before_script:
     - chmod +x .gitlab/scripts/setup-apt-proxy.sh
     - .gitlab/scripts/setup-apt-proxy.sh
@@ -56,24 +65,27 @@ trigger:docs-preview:
     name: documentation/preview
     url: https://preview.pimeleon-docs.pages.dev
   rules:
+    # Run on release branch push (merge to release/*) or version tags
+    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
     # Trigger on tags
-    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_TAG =~ /^release\-/ && $CI_COMMIT_BRANCH =~ /^release\//'
+      changes:
+        - docs/**/*
+        - README.md
+        - LICENSE
     # Trigger on MRs targeting release/* or develop for preview
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
-
+      changes:
+        - docs/**/*
+        - README.md
+        - LICENSE
 # Trigger production site build on downstream repository
 trigger:docs-production:
   stage: docs
   needs:
-    - job: "lint:yaml"
-    - job: "trigger:github"
-      optional: true
-    - job: "publish:image"
-      optional: true
     - job: "test:smoke"
-      optional: true
     - job: "test:integration"
-      optional: true
   trigger:
     project: pirouter/pimeleon-site
     branch: master
@@ -87,4 +99,6 @@ trigger:docs-production:
   rules:
     # Trigger on any release branch push (merge to release/*) or version tags
     - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_COMMIT_TAG'
+      when: always
+    - if: '$CI_COMMIT_TAG =~ /^release\-/ && $CI_COMMIT_BRANCH =~ /^release\//'
+      when: always
