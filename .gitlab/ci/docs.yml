@@ -10,7 +10,7 @@ publish:project-docs:
     - lightweight
   needs:
     - job: "lint:yaml"
-    - job: "publish:image"
+    - job: "publish:gitlab-image"
       optional: true
     - job: "test:smoke"
       optional: true
@@ -48,7 +48,7 @@ trigger:docs-preview:
   stage: docs
   needs:
     - job: "lint:yaml"
-    - job: "publish:image"
+    - job: "publish:gitlab-image"
       optional: true
     - job: "test:smoke"
       optional: true
