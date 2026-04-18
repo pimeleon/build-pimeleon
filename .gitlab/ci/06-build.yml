@@ -2,43 +2,6 @@
 # GitLab CI/CD - Build
 # Containers and Pimeleon Image
 
-# Detect platform from release branch name and export as dotenv artifact.
-# Downstream jobs use TARGET_PLATFORM via: needs: [job: setup:platform, artifacts: true]
-setup:platform:
-  stage: .pre
-  image: alpine:latest
-  tags:
-    - lightweight
-  rules:
-    - if: '$CI_COMMIT_TAG'
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|release\/.+)$/'
-  script:
-    - chmod +x .gitlab/scripts/detect-platform.sh
-    - .gitlab/scripts/detect-platform.sh
-  artifacts:
-    reports:
-      dotenv: platform.env
-
-# Sync adblock2privoxy image and metadata between GitLab and GitHub.
-# This ensures both registries have the latest pre-built Haskell binary.
-sync:ab2p:
-  stage: .pre
-  image: docker:latest
-  tags:
-    - containers
-  variables:
-    DOCKER_HOST: ""
-  rules:
-    - if: '$CI_COMMIT_TAG'
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
-  script:
-    - apk add --no-cache curl python3
-    - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
-    - chmod +x .gitlab/scripts/sync-ab2p.sh
-    - .gitlab/scripts/sync-ab2p.sh
-
 # Build builder and tester Docker images when container sources change
 build:containers:
   extends: .docker-job
