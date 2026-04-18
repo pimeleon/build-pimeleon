@@ -6,6 +6,8 @@ set -eu
 # Inputs: TARGET_PLATFORM, CI_JOB_TOKEN, CI_API_V4_URL, CI_PROJECT_ID
 
 PACKAGE_VERSION=$(sh .gitlab/scripts/resolve-version.sh package "${TARGET_PLATFORM}")
+PIMELEON_VERSION=$(echo "${PACKAGE_VERSION}" | sed 's/.*-v//')
+echo "PUBLISHED_VERSION=${PIMELEON_VERSION}" > publish.env
 
 echo "[INFO] Uploading artifacts for package version: ${PACKAGE_VERSION}"
 

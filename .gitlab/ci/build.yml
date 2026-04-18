@@ -158,8 +158,6 @@ publish:image:
   image: alpine:latest
   tags:
     - lightweight
-  environment:
-    name: production
   needs:
     - job: setup:platform
       artifacts: true
@@ -179,6 +177,8 @@ publish:image:
     - chmod +x .gitlab/scripts/publish-image.sh
     - .gitlab/scripts/publish-image.sh
   artifacts:
+    reports:
+      dotenv: publish.env
     paths:
       - output/*.img.xz
       - output/*.sha256
@@ -194,8 +194,8 @@ build:pimeleon:
         PIMELEON_APPS_SOURCE: gitlab
         BUILD_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
         TEST_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}
-    # Push/merge to release/* — production build from GitHub releases
-    - if: '$CI_COMMIT_BRANCH =~ /^release\//'
+    # Push/merge to release/* — production build from GitHub releases (only if not an MR pipeline)
+    - if: '$CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_BRANCH =~ /^release\//'
       changes:
         - shared/ansible/**/*
         - shared/configs/**/*
