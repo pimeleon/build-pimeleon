@@ -10,5 +10,5 @@ include:
   - local: '.gitlab/ci/build.yml'
   - local: '.gitlab/ci/test.yml'
   - local: '.gitlab/ci/publish.yml'
-  - local: '.gitlab/ci/release.yml'
+  - local: '.gitlab/ci/tags.yml'
   - local: '.gitlab/ci/docs.yml'

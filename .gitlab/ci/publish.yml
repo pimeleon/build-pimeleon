@@ -16,6 +16,7 @@ publish:image:
       artifacts: true
     - job: build:pimeleon
       artifacts: true
+      optional: true
     - job: test:smoke
       optional: true
     - job: test:integration
@@ -30,6 +31,8 @@ publish:image:
     - chmod +x .gitlab/scripts/publish-image.sh
     - .gitlab/scripts/publish-image.sh
   artifacts:
+    reports:
+      dotenv: publish.env
     paths:
       - output/*.img.xz
       - output/*.sha256

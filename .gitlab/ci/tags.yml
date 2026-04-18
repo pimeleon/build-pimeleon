@@ -1,6 +1,6 @@
 ---
-# GitLab CI/CD - Release
-# Automated tag creation for production builds.
+# GitLab CI/CD - Tags
+# Automated production tag creation and GitHub release trigger.
 # GitHub Actions is responsible for creating GitHub Releases and release tags.
 
 # Create annotated production tag after image is published via MR pipeline.
@@ -16,7 +16,7 @@ tag:production:
     - job: publish:image
       artifacts: true
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
+    - if: '$CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_BRANCH =~ /^release\//'
       when: on_success
     - when: never
   before_script:

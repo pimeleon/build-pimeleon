@@ -152,12 +152,15 @@ build:containers:
       - output/pim-initial-password.txt
     expire_in: 1 week
 
-# Finalize build by uploading artifacts to registry if build passed
-publish:image:
+# Publish image to GitLab registry after MR build so release-push pipeline can skip
+# rebuilding when only non-image files changed.
+publish:gitlab-image:
   stage: publish
   image: alpine:latest
   tags:
     - lightweight
+  environment:
+    name: production
   needs:
     - job: setup:platform
       artifacts: true
@@ -169,7 +172,6 @@ publish:image:
     - job: test:integration
       optional: true
   rules:
-    # Production: MR to release/*
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^release\//'
   before_script:
     - apk add --no-cache curl git
@@ -177,8 +179,6 @@ publish:image:
     - chmod +x .gitlab/scripts/publish-image.sh
     - .gitlab/scripts/publish-image.sh
   artifacts:
-    reports:
-      dotenv: publish.env
     paths:
       - output/*.img.xz
       - output/*.sha256
